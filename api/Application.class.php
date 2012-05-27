@@ -520,7 +520,11 @@ class CerberusApplication extends DevblocksApplication {
 			$bucket_id = $t_or_c_id; 
 		} else {
 			$group_id = $t_or_c_id;
+                    if($t_or_c=='a') {
+			$bucket_id = -1;
+                    } else {
 			$bucket_id = 0;
+                    }
 		}
 		
 		return array($group_id, $bucket_id);
