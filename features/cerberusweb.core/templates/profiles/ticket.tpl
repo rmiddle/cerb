@@ -2,7 +2,12 @@
 {$page_context_id = $ticket->id}
 
 <div style="float:left">
-	<h1>{$ticket->subject}</h1>
+	<h1>
+            {$ticket->subject|truncate:128}
+            {if DevblocksPlatform::isPluginEnabled('cerberusweb.timetracking')}
+                - Total Ticket Time Worked: {$total_time_hours} Hours {$total_time_minutes} Mins&nbsp;
+            {/if}
+        </h1>
 </div>
 
 <div style="float:right">
