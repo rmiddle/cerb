@@ -2,12 +2,7 @@
 {$page_context_id = $ticket->id}
 
 <div style="float:left">
-	<h1>
-            {$ticket->subject|truncate:128}
-            {if DevblocksPlatform::isPluginEnabled('cerberusweb.timetracking')}
-                - Total Ticket Time Worked: {$total_time_hours} Hours {$total_time_minutes} Mins&nbsp;
-            {/if}
-        </h1>
+	<h1>{$ticket->subject}</h1>
 </div>
 
 <div style="float:right">
@@ -24,7 +19,12 @@
 {assign var=ticket_bucket value=$ticket_group_bucket_set.$ticket_bucket_id}
 
 <fieldset class="properties">
-	<legend>{'common.conversation'|devblocks_translate|capitalize}</legend>
+	<legend>
+            {'common.conversation'|devblocks_translate|capitalize}
+            {if DevblocksPlatform::isPluginEnabled('cerberusweb.timetracking')}
+                - Total Ticket Time Worked: {$total_time_hours} Hours {$total_time_minutes} Mins&nbsp;
+            {/if}
+        </legend>
 
 	{foreach from=$properties item=v key=k name=props}
 		<div class="property">
