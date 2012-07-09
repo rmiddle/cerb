@@ -100,7 +100,7 @@
 {if ($active_worker->hasPriv('timetracking.actions.create') && (empty($model->id) || $active_worker->id==$model->worker_id))
 	|| $active_worker->hasPriv('timetracking.actions.update_all')}
 	{if empty($model->id)}
-		<button type="button" onclick="timeTrackingTimer.finish();genericAjaxPopupPostCloseReloadView(null,'frmTimeEntry','{$view_id}',false,'timetracking_save');"><span class="cerb-sprite2 sprite-tick-circle"></span> {$translate->_('timetracking.ui.entry_panel.save_finish')}</button>
+		<button type="button" onclick="if(0 == this.form.activity_id.value.length) { alert('Activity is a required field.'); } else if(5 > this.form.comment.value.length) { alert('Comments are a required field.'); } else { timeTrackingTimer.finish();genericAjaxPopupPostCloseReloadView(null,'frmTimeEntry','{$view_id}',false,'timetracking_save'); }"><span class="cerb-sprite2 sprite-tick-circle"></span> {$translate->_('timetracking.ui.entry_panel.save_finish')}</button>
 		<button type="button" onclick="timeTrackingTimer.play();genericAjaxPopupClose('peek');"><span class="cerb-sprite sprite-media_play_green"></span> {$translate->_('timetracking.ui.entry_panel.resume')}</button>
 		<button type="button" onclick="timeTrackingTimer.finish();"><span class="cerb-sprite sprite-media_stop_red"></span> {$translate->_('common.cancel')|capitalize}</button>
 	{else}
