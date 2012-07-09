@@ -88,7 +88,7 @@ class CrmPage extends CerberusPageExtension {
 			// Context Link (if given)
 			@$link_context = DevblocksPlatform::importGPC($_REQUEST['link_context'],'string','');
 			@$link_context_id = DevblocksPlatform::importGPC($_REQUEST['link_context_id'],'integer','');
-			if(!empty($id) && !empty($link_context) && !empty($link_context_id)) {
+			if(!empty($opp_id) && !empty($link_context) && !empty($link_context_id)) {
 				DAO_ContextLink::setLink(CerberusContexts::CONTEXT_OPPORTUNITY, $opp_id, $link_context, $link_context_id);
 			}
 			
@@ -440,7 +440,9 @@ class CrmOrgOppTab extends Extension_ContextProfileTab {
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 
-		$org = DAO_ContactOrg::get($org_id);
+		if(null == ($org = DAO_ContactOrg::get($org_id)))
+			return;
+			
 		$tpl->assign('org_id', $org_id);
 		
 		$defaults = new C4_AbstractViewModel();
@@ -456,7 +458,7 @@ class CrmOrgOppTab extends Extension_ContextProfileTab {
 		$view = C4_AbstractViewLoader::getView('org_opps', $defaults);
 		
 		$view->name = "Org: " . $org->name;
-		$view->addParams(array(
+		$view->addParamsRequired(array(
 			SearchFields_CrmOpportunity::ORG_ID => new DevblocksSearchCriteria(SearchFields_CrmOpportunity::ORG_ID,'=',$org_id) 
 		), true);
 
@@ -464,7 +466,7 @@ class CrmOrgOppTab extends Extension_ContextProfileTab {
 		
 		$tpl->assign('view', $view);
 		
-		$tpl->display('devblocks:cerberusweb.crm::crm/opps/org/tab.tpl');
+		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
 	}
 };
 endif;
@@ -490,7 +492,7 @@ class CrmTicketOppTab extends Extension_ContextProfileTab {
 		}
 
 		$view->name = sprintf("Opportunities: %s recipient(s)", count($requesters));
-		$view->addParams(array(
+		$view->addParamsRequired(array(
 			SearchFields_CrmOpportunity::PRIMARY_EMAIL_ID => new DevblocksSearchCriteria(SearchFields_CrmOpportunity::PRIMARY_EMAIL_ID,'in',array_keys($requesters)), 
 		), true);
 		
@@ -498,7 +500,7 @@ class CrmTicketOppTab extends Extension_ContextProfileTab {
 		
 		$tpl->assign('view', $view);
 		
-		$tpl->display('devblocks:cerberusweb.crm::crm/opps/ticket/tab.tpl');
+		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
 	}
 	
 	function saveTab() {

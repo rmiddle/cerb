@@ -1,6 +1,6 @@
 <html>
 <head>
-	<title>Cerberus Helpdesk 5.x - Server Environment Checker</title>
+	<title>Cerb6 - Server Environment Checker</title>
 	
 	<style>
 	BODY {font-family: Arial, Helvetica, sans-serif; font-size: 12px;}
@@ -10,7 +10,7 @@
 </head>
 
 <body>
-<h1>Cerberus Helpdesk 5.x - Server Environment Checker</h1>
+<h1>Cerb6 - Server Environment Checker</h1>
 
 <?php
 function parse_bytes_string($string) {
@@ -100,6 +100,14 @@ if(extension_loaded("session")) {
 	$fails++;
 }
 
+// Extension: cURL
+if(extension_loaded("curl")) {
+	$results['ext_curl'] = true;
+} else {
+	$results['ext_curl'] = false;
+	$fails++;
+}
+
 // Extension: PCRE
 if(extension_loaded("pcre")) {
 	$results['ext_pcre'] = true;
@@ -181,10 +189,10 @@ if(extension_loaded("spl")) {
 }
 
 if($fails) {
-	echo "The following problems prevent you from running Cerberus Helpdesk 5.x:<span class='fail'><ul>";
+	echo "The following problems prevent you from running Cerb6:<span class='fail'><ul>";
 	
 	if(!$results['php_version'])
-		echo '<li>Cerberus Helpdesk 5.x requires PHP 5.3 or later. Your server PHP version is '.PHP_VERSION.'.</li>';
+		echo '<li>Cerb6 requires PHP 5.3 or later. Your server PHP version is '.PHP_VERSION.'.</li>';
 
 	if(!$results['file_uploads'])
 		echo '<li>file_uploads is disabled in your php.ini file. Please enable it.</li>';
@@ -201,6 +209,9 @@ if($fails) {
 	if(!$results['ext_session'])
 		echo "<li>The 'Session' PHP extension is required.  Please enable it.</li>";
 		
+	if(!$results['ext_curl'])
+		echo "<li>The 'cURL' PHP extension is required.  Please enable it.</li>";
+	
 	if(!$results['ext_pcre'])
 		echo "<li>The 'PCRE' PHP extension is required.  Please enable it.</li>";
 		
@@ -234,7 +245,7 @@ if($fails) {
 	echo "</ul></span><br>Please correct these issues and try again.<br>";
 	
 } else {
-	echo "<span class='pass'>Your server is Cerberus Helpdesk 5.x compatible!</span><br>";
+	echo "<span class='pass'>Your server is Cerb6 compatible!</span><br>";
 	
 }
 

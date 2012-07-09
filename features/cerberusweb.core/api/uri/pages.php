@@ -263,6 +263,7 @@ class Page_Custom extends CerberusPageExtension {
 			$view->addParamsRequired(array(
 				new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS, 'in', array('open')),
 				new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_OWNER_ID, 'in', array(0)),
+				SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER => new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER, '=', '{{current_worker_id}}'),
 			), true);
 			
 			$view_model = C4_AbstractViewLoader::serializeAbstractView($view);		
@@ -803,7 +804,7 @@ class Page_Custom extends CerberusPageExtension {
 		$tpl->display('devblocks:cerberusweb.core::pages/edit_workspace_tab.tpl');
 	}
 	
-	function doEditWorkspaceTabAction() {
+	function doEditWorkspaceTabJsonAction() {
 		@$workspace_tab_id = DevblocksPlatform::importGPC($_POST['id'],'integer', 0);
 		@$name = DevblocksPlatform::importGPC($_POST['name'],'string', '');
 	
@@ -813,17 +814,27 @@ class Page_Custom extends CerberusPageExtension {
 	
 		$active_worker = CerberusApplication::getActiveWorker();
 	
-		if(empty($workspace_tab_id))
+		header('Content-Type: application/json');
+		
+		if(empty($workspace_tab_id)) {
+			echo json_encode(false);
 			return;
+		}
 	
-		if(null == ($workspace_tab = DAO_WorkspaceTab::get($workspace_tab_id)))
+		if(null == ($workspace_tab = DAO_WorkspaceTab::get($workspace_tab_id))) {
+			echo json_encode(false);
 			return;
+		}
 	
-		if(null == ($workspace_page = DAO_WorkspacePage::get($workspace_tab->workspace_page_id)))
+		if(null == ($workspace_page = DAO_WorkspacePage::get($workspace_tab->workspace_page_id))) {
+			echo json_encode(false);
 			return;
+		}
 	
-		if(!$workspace_page->isWriteableByWorker($active_worker))
-			return;
+		if(!$workspace_page->isWriteableByWorker($active_worker)) {
+			echo json_encode(false);
+			return;			
+		}
 	
 		if($do_delete) { // Delete
 			DAO_WorkspaceTab::delete($workspace_tab_id);
@@ -910,6 +921,10 @@ class Page_Custom extends CerberusPageExtension {
 				));
 			}
 		}
+		
+		echo json_encode(array(
+			'name' => $name,
+		));
 	}
 	
 };

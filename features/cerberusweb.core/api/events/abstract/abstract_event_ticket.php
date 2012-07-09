@@ -407,7 +407,12 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			case 'ticket_spam_score':
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
-				@$value = intval($dict->$token * 100);
+				
+				if(!is_numeric($dict->token)) {
+					@$dict->token = intval($dict->$token);
+				}
+				
+				$value = $dict->token * 100;
 
 				switch($oper) {
 					case 'is':
@@ -653,6 +658,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				'send_email' => array('label' => 'Send email'),
 				'send_email_recipients' => array('label' => 'Send email to recipients'),
 				'set_owner' => array('label' =>'Set owner'),
+				'set_reopen_date' => array('label' => 'Set reopen date'),
 				'set_spam_training' => array('label' => 'Set spam training'),
 				'set_status' => array('label' => 'Set status'),
 				'set_subject' => array('label' => 'Set subject'),
@@ -764,6 +770,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_owner/action_send_email_recipients.tpl');
 				break;
 				
+			case 'set_reopen_date':
+				$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_date.tpl');
+				break;
+				
 			case 'set_spam_training':
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_group/action_set_spam_training.tpl');
 				break;
@@ -863,11 +873,24 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				break;
 				
 			case 'send_email_recipients':
+				// Translate message tokens
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+				$content = $tpl_builder->build($params['content'], $dict);
+
+				$out = sprintf(">>> Sending email to receipients\n".
+					"%s\n",
+					$content
+				);
+				
+				return $out;
 				break;
 				
 			case 'set_owner':
 				break;
-			
+				
+			case 'set_reopen_date':
+				break;
+				
 			case 'set_spam_training':
 				break;
 				
@@ -991,6 +1014,16 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				DevblocksEventHelper::runActionSetTicketOwner($params, $dict, $ticket_id, 'ticket_owner_');
 				break;
 			
+			case 'set_reopen_date':
+				@$reopen_date = intval(strtotime($params['value']));
+				
+				DAO_Ticket::update($task_id, array(
+					DAO_Ticket::DUE_DATE => $reopen_date,
+				));
+				
+				$dict->ticket_reopen_date = $reopen_date;
+				break;
+				
 			case 'set_spam_training':
 				@$to_training = $params['value'];
 				@$current_training = $dict->ticket_spam_training;

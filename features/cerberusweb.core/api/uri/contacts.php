@@ -367,7 +367,7 @@ class ChContactsPage extends CerberusPageExtension {
 		
 		$view = C4_AbstractViewLoader::getView('org_contacts', $defaults);
 		$view->name = 'Contacts: ' . (!empty($contact) ? $contact->name : '');
-		$view->addParams(array(
+		$view->addParamsRequired(array(
 			new DevblocksSearchCriteria(SearchFields_Address::CONTACT_ORG_ID,'=',$org)
 		), true);
 		$tpl->assign('view', $view);
@@ -377,7 +377,7 @@ class ChContactsPage extends CerberusPageExtension {
 		$tpl->assign('contacts_page', 'orgs');
 		$tpl->assign('search_columns', SearchFields_Address::getFields());
 		
-		$tpl->display('devblocks:cerberusweb.core::contacts/orgs/tabs/people.tpl');
+		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
 		exit;
 	}
 	
@@ -419,14 +419,14 @@ class ChContactsPage extends CerberusPageExtension {
 		}
 
 		@$view->name = 'Verified Email Addresses';
-		$view->addParams(array(
+		$view->addParamsRequired(array(
 			SearchFields_Address::ID => new DevblocksSearchCriteria(SearchFields_Address::ID,'in',array_keys($contact_addresses)),
 		), true);
 		$tpl->assign('view', $view);
 		
 		C4_AbstractViewLoader::setView($view->id, $view);
 		
-		$tpl->display('devblocks:cerberusweb.core::contacts/people/display/addresses_tab.tpl');
+		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
 		exit;
 	}	
 	
@@ -484,7 +484,7 @@ class ChContactsPage extends CerberusPageExtension {
 	
 		@$view->name = $translate->_('ticket.requesters') . ": " . intval(count($ids)) . ' contact(s)';
 		
-		$view->addParams(array(
+		$view->addParamsRequired(array(
 			SearchFields_Ticket::REQUESTER_ID => new DevblocksSearchCriteria(SearchFields_Ticket::REQUESTER_ID,'in',$ids),
 			SearchFields_Ticket::TICKET_DELETED => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,DevblocksSearchCriteria::OPER_EQ,0)
 		), true);
@@ -492,7 +492,7 @@ class ChContactsPage extends CerberusPageExtension {
 	
 		C4_AbstractViewLoader::setView($view->id, $view);
 	
-		$tpl->display('devblocks:cerberusweb.core::contacts/tab_mail_history.tpl');
+		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
 		exit;
 	}	
 
@@ -522,6 +522,26 @@ class ChContactsPage extends CerberusPageExtension {
 		C4_AbstractViewLoader::setView($search_view->id, $search_view);
 		
 		DevblocksPlatform::setHttpResponse(new DevblocksHttpResponse(array('search','ticket')));
+	}
+	
+	function findAddressesAction() {
+		@$email = DevblocksPlatform::importGPC($_REQUEST['email'],'string','');
+		
+		if(null == ($address_context = Extension_DevblocksContext::get(CerberusContexts::CONTEXT_ADDRESS)))
+			return;
+		
+		if(null == ($search_view = $address_context->getSearchView()))
+			return;
+		
+		$search_view->removeAllParams();
+		
+		$search_view->addParam(new DevblocksSearchCriteria(SearchFields_Address::EMAIL,DevblocksSearchCriteria::OPER_LIKE,$email));
+
+		$search_view->renderPage = 0;
+		
+		C4_AbstractViewLoader::setView($search_view->id, $search_view);
+		
+		DevblocksPlatform::setHttpResponse(new DevblocksHttpResponse(array('search','address')));
 	}
 	
 	function showAddressBatchPanelAction() {
@@ -584,9 +604,23 @@ class ChContactsPage extends CerberusPageExtension {
 	
 	function showOrgMergePeekAction() {
 		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string','');
+		@$org_ids = DevblocksPlatform::importGPC($_REQUEST['org_ids'],'string','');
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('view_id', $view_id);
+
+		if(!empty($org_ids)) {
+			$org_ids = DevblocksPlatform::sanitizeArray(DevblocksPlatform::parseCsvString($org_ids),'integer',array('nonzero','unique'));
+			
+			if(!empty($org_ids)) {
+				$orgs = DAO_ContactOrg::getWhere(sprintf("%s IN (%s)",
+					DAO_ContactOrg::ID,
+					implode(',', $org_ids)
+				));
+				
+				$tpl->assign('orgs', $orgs);
+			}
+		}
 		
 		$tpl->display('devblocks:cerberusweb.core::contacts/orgs/org_merge_peek.tpl');
 	}
@@ -889,7 +923,7 @@ class ChContactsPage extends CerberusPageExtension {
 					'target' => sprintf("%s", $fields[DAO_ContactOrg::NAME]),
 					),
 				'urls' => array(
-					'source' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_ORG, $from_org_id, DevblocksPlatform::strToPermalink($orgs[$from_org_id]->name)),
+					//'source' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_ORG, $from_org_id, DevblocksPlatform::strToPermalink($orgs[$from_org_id]->name)),
 					'target' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_ORG, $merge_to_id, DevblocksPlatform::strToPermalink($fields[DAO_ContactOrg::NAME])),
 					)
 			);

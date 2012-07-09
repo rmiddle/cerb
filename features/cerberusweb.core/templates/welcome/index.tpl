@@ -39,7 +39,7 @@
 		</li>
 		<li>
 			<img src="{devblocks_url}c=resource&p=cerberusweb.core&f=images/komodomedia/twitter_32.png{/devblocks_url}" align="middle">
-			<a href="http://twitter.com/cerb5" target="_blank">Follow our Twitter feed</a>
+			<a href="http://twitter.com/cerb6" target="_blank">Follow our Twitter feed</a>
 		</li>
 		<li>
 			<img src="{devblocks_url}c=resource&p=cerberusweb.core&f=images/komodomedia/linkedin_32.png{/devblocks_url}" align="middle">
@@ -54,7 +54,6 @@
 			<a href="http://blog.cerberusweb.com/" target="_blank">Subscribe to the Cerb6 blog</a>
 		</li>
 	</ul>
-	</div>
 </fieldset>
 
 <form>

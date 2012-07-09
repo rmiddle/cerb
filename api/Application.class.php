@@ -46,8 +46,8 @@
  * - Jeff Standen, Darren Sugita, Dan Hildebrandt, Scott Luther
  *	 WEBGROUP MEDIA LLC. - Developers of Cerberus Helpdesk
  */
-define("APP_BUILD", 2012052401);
-define("APP_VERSION", '6.0.0-rc1');
+define("APP_BUILD", 2012062801);
+define("APP_VERSION", '6.0.2');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -181,7 +181,7 @@ class CerberusApplication extends DevblocksApplication {
 		// PHP Version
 		if(version_compare(PHP_VERSION,"5.3") >=0) {
 		} else {
-			$errors[] = sprintf("Cerberus Helpdesk %s requires PHP 5.3 or later. Your server PHP version is %s",
+			$errors[] = sprintf("Cerb %s requires PHP 5.3 or later. Your server PHP version is %s",
 				APP_VERSION,
 				PHP_VERSION 
 			);
@@ -224,6 +224,12 @@ class CerberusApplication extends DevblocksApplication {
 			$errors[] = "The 'Session' PHP extension is required.  Please enable it.";
 		}
 		
+		// Extension: cURL
+		if(extension_loaded("curl")) {
+		} else {
+			$errors[] = "The 'cURL' PHP extension is required.  Please enable it.";
+		}
+		
 		// Extension: PCRE
 		if(extension_loaded("pcre")) {
 		} else {
@@ -251,7 +257,7 @@ class CerberusApplication extends DevblocksApplication {
 		// Extension: mbstring
 		if(extension_loaded("mbstring")) {
 		} else {
-			$errors[] = "The 'MbString' PHP extension is required.  Please	enable it.";
+			$errors[] = "The 'mbstring' PHP extension is required.  Please enable it.";
 		}
 		
 		// Extension: XML
@@ -819,32 +825,17 @@ class CerberusContexts {
 		return $workers;
 	}
 	
-//	static public function setWatchers($context, $context_id, $worker_ids) {
-//		if(!is_array($worker_ids))
-//			$worker_ids = array($worker_ids);
-//		
-//		$current_workers = self::getWatchers($context, $context_id);
-//		
-//		// Remove
-//		if(is_array($current_workers))
-//		foreach($current_workers as $current_worker_id => $current_worker) {
-//			if(false === array_search($current_worker_id, $worker_ids))
-//				DAO_ContextLink::deleteLink($context, $context_id, CerberusContexts::CONTEXT_WORKER, $current_worker_id);
-//		}
-//		
-//		// Add
-//		if(is_array($worker_ids))
-//		foreach($worker_ids as $worker_id) {
-//			DAO_ContextLink::setLink($context, $context_id, CerberusContexts::CONTEXT_WORKER, $worker_id);
-//		}
-//	}
-
 	static public function addWatchers($context, $context_id, $worker_ids) {
+		$workers = DAO_Worker::getAll();
+		
 		if(!is_array($worker_ids))
 			$worker_ids = array($worker_ids);
 		
-		foreach($worker_ids as $worker_id)
-			DAO_ContextLink::setLink($context, $context_id, CerberusContexts::CONTEXT_WORKER, $worker_id);
+		foreach($worker_ids as $worker_id) {
+			if(null != ($worker = @$workers[$worker_id]) && $worker instanceof Model_Worker && !$worker->is_disabled) {
+				DAO_ContextLink::setLink($context, $context_id, CerberusContexts::CONTEXT_WORKER, $worker_id);
+			}
+		}
 	}
 	
 	static public function removeWatchers($context, $context_id, $worker_ids) {
@@ -948,8 +939,9 @@ class CerberusContexts {
 		
 		$context = $context_pair[0];
 		$context_id = $context_pair[1];
-		
-		$context_ext = Extension_DevblocksContext::get($context);
+
+		if(null == ($context_ext = Extension_DevblocksContext::get($context)))
+			return null;
 		
 		if($context_ext instanceof IDevblocksContextProfile) {
 			$url = $context_ext->profileGetUrl($context_id);
@@ -1487,7 +1479,7 @@ class CerberusSettings {
 };
 
 class CerberusSettingsDefaults {
-	const HELPDESK_TITLE = 'Cerberus Helpdesk :: Group-based Email Management'; // [TODO] Change 
+	const HELPDESK_TITLE = 'Cerb6 - a fast and flexible web-based platform for business collaboration and automation.'; 
 	const SMTP_HOST = 'localhost'; 
 	const SMTP_AUTH_ENABLED = 0; 
 	const SMTP_AUTH_USER = ''; 
