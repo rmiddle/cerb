@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -46,8 +46,8 @@
  * - Jeff Standen, Darren Sugita, Dan Hildebrandt, Scott Luther
  *	 WEBGROUP MEDIA LLC. - Developers of Cerberus Helpdesk
  */
-define("APP_BUILD", 2012082001);
-define("APP_VERSION", '6.0.5');
+define("APP_BUILD", 2012082801);
+define("APP_VERSION", '6.1.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -1213,7 +1213,9 @@ class Context_Application extends Extension_DevblocksContext {
 	}
 	
 	function getMeta($context_id) {
-		$worker_role = DAO_WorkerRole::get($context_id);
+		if(null == ($worker_role = DAO_WorkerRole::get($context_id)))
+			return null;
+			
 		$url_writer = DevblocksPlatform::getUrlService();
 		
 		$who = sprintf("%d-%s",
@@ -1366,7 +1368,7 @@ class CerberusLicense {
 	}
 	
 	public static function getReleases() {
-		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200);/*
+		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600);/*
 		 * Major versions by release date in GMT
 		 */
 		return array(
@@ -1379,6 +1381,7 @@ class CerberusLicense {
 			'5.6.0' => gmmktime(0,0,0,10,4,2011),
 			'5.7.0' => gmmktime(0,0,0,1,9,2012),
 			'6.0.0' => gmmktime(0,0,0,5,28,2012),
+			'6.1.0' => gmmktime(0,0,0,8,27,2012),
 		);
 	}
 	
