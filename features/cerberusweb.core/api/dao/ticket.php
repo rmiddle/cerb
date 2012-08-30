@@ -1202,14 +1202,16 @@ class DAO_Ticket extends C4_ORMHelper {
 
 		// Translate virtual fields
 		
+		$args = array(
+			'join_sql' => &$join_sql,
+			'where_sql' => &$where_sql,
+			'has_multiple_values' => &$has_multiple_values
+		);
+		
 		array_walk_recursive(
 			$params,
 			array('DAO_Ticket', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'has_multiple_values' => &$has_multiple_values
-			)
+			$args
 		);
 
 		// Fulltext has multiple values
@@ -1273,21 +1275,34 @@ class DAO_Ticket extends C4_ORMHelper {
 				if(!is_array($values))
 					$values = array($values);
 					
+				$oper_sql = array();
 				$status_sql = array();
+				
+				switch($param->operator) {
+					default:
+					case DevblocksSearchCriteria::OPER_IN:
+					case DevblocksSearchCriteria::OPER_IN_OR_NULL:
+						$oper = '';
+						break;
+					case DevblocksSearchCriteria::OPER_NIN:
+					case DevblocksSearchCriteria::OPER_NIN_OR_NULL:
+						$oper = 'NOT ';
+						break;
+				}
 				
 				foreach($values as $value) {
 					switch($value) {
 						case 'open':
-							$status_sql[] = "(t.is_waiting = 0 AND t.is_closed = 0)";
+							$status_sql[] = sprintf('%s(t.is_waiting = 0 AND t.is_closed = 0 AND t.is_deleted = 0)', $oper);
 							break;
 						case 'waiting':
-							$status_sql[] = "(t.is_waiting = 1 AND t.is_closed = 0)";
+							$status_sql[] = sprintf('%s(t.is_waiting = 1 AND t.is_closed = 0 AND t.is_deleted = 0)', $oper);
 							break;
 						case 'closed':
-							$status_sql[] = "(t.is_closed = 1 AND t.is_deleted=0)";
+							$status_sql[] = sprintf('%s(t.is_closed = 1 AND t.is_deleted = 0)', $oper);
 							break;
 						case 'deleted':
-							$status_sql[] = "(t.is_closed = 1 AND t.is_deleted=1)";
+							$status_sql[] = sprintf('%s(t.is_deleted = 1)', $oper);
 							break;
 					}
 				}
@@ -1870,7 +1885,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals {
 		$join_sql = $query_parts['join'];
 		$where_sql = $query_parts['where'];				
 		
-		$sql = "SELECT COUNT(IF(t.is_closed=0 AND t.is_waiting=0,1,NULL)) AS open_hits, COUNT(IF(t.is_waiting=1 AND t.is_deleted=0,1,NULL)) AS waiting_hits, COUNT(IF(t.is_closed=1 AND t.is_deleted=0,1,NULL)) AS closed_hits, COUNT(IF(t.is_deleted=1,1,NULL)) AS deleted_hits ".
+		$sql = "SELECT COUNT(IF(t.is_closed=0 AND t.is_waiting=0 AND t.is_deleted=0,1,NULL)) AS open_hits, COUNT(IF(t.is_waiting=1 AND t.is_closed=0 AND t.is_deleted=0,1,NULL)) AS waiting_hits, COUNT(IF(t.is_closed=1 AND t.is_deleted=0,1,NULL)) AS closed_hits, COUNT(IF(t.is_deleted=1,1,NULL)) AS deleted_hits ".
 			$join_sql.
 			$where_sql 
 		;
@@ -2184,7 +2199,21 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals {
 					}
 				}
 				
-				echo sprintf("Status is %s", implode(' or ', $strings));
+				switch($param->operator) {
+					case DevblocksSearchCriteria::OPER_IN:
+						$oper = 'is';
+						break;
+					case DevblocksSearchCriteria::OPER_IN_OR_NULL:
+						$oper = 'is blank or';
+						break;
+					case DevblocksSearchCriteria::OPER_NIN:
+						$oper = 'is not';
+						break;
+					case DevblocksSearchCriteria::OPER_NIN_OR_NULL:
+						$oper = 'is blank or not';
+						break;
+				}
+				echo sprintf("Status %s %s", $oper, implode(' or ', $strings));
 				break;
 		}
 	}	
@@ -2691,18 +2720,20 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 	}
 	
 	function getMeta($context_id) {
-		$url = $this->profileGetUrl($context_id);
-		$friendly = null;
-		
 		if(is_numeric($context_id)) {
 			$ticket = DAO_Ticket::get($context_id);
-			$friendly = DevblocksPlatform::strToPermalink($ticket->mask);
 		} else {
 			$ticket = DAO_Ticket::getTicketByMask($context_id);
 		}
+
+		$friendly = DevblocksPlatform::strToPermalink($ticket->mask);
 		
-		if(!empty($friendly))
-			$url .= ' - ' . $friendly;
+		if(!empty($friendly)) {
+			$url_writer = DevblocksPlatform::getUrlService();
+			$url = $url_writer->writeNoProxy('c=profiles&type=ticket&mask='.$ticket->mask, true);
+		} else {
+			$url = $this->profileGetUrl($context_id);			
+		}
 		
 		return array(
 			'id' => $ticket->id,

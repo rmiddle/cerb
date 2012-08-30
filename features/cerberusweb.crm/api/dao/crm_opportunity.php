@@ -344,16 +344,18 @@ class DAO_CrmOpportunity extends C4_ORMHelper {
 
 		// Translate virtual fields
 		
+		$args = array(
+			'join_sql' => &$join_sql,
+			'where_sql' => &$where_sql,
+			'has_multiple_values' => &$has_multiple_values
+		);
+		
 		array_walk_recursive(
 			$params,
 			array('DAO_CrmOpportunity', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'has_multiple_values' => &$has_multiple_values
-			)
+			$args
 		);
-
+		
 		$result = array(
 			'primary_table' => 'o',
 			'select' => $select_sql,
@@ -1072,7 +1074,7 @@ class Context_Opportunity extends Extension_DevblocksContext implements IDevbloc
 		$friendly = DevblocksPlatform::strToPermalink($opp->name);
 		
 		if(!empty($friendly))
-			$url .= ' - ' . $friendly;
+			$url .= '-' . $friendly;
 		
 		return array(
 			'id' => $opp->id,

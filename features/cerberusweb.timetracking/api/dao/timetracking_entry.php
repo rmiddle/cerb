@@ -326,14 +326,16 @@ class DAO_TimeTrackingEntry extends C4_ORMHelper {
 		
 		// Translate virtual fields
 		
+		$args = array(
+			'join_sql' => &$join_sql,
+			'where_sql' => &$where_sql,
+			'has_multiple_values' => &$has_multiple_values
+		);
+		
 		array_walk_recursive(
 			$params,
 			array('DAO_TimeTrackingEntry', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'has_multiple_values' => &$has_multiple_values
-			)
+			$args
 		);
 		
 		$result = array(
@@ -903,6 +905,8 @@ class View_TimeTracking extends C4_AbstractView implements IAbstractView_Subtota
 				case 'is_closed':
 					$change_fields[DAO_TimeTrackingEntry::IS_CLOSED] = $v;
 					break;
+				case 'activity_id':
+					$change_fields[DAO_TimeTrackingEntry::ACTIVITY_ID] = $v;
 				default:
 					// Custom fields
 					if(substr($k,0,3)=="cf_") {
@@ -1203,8 +1207,15 @@ class Context_TimeTracking extends Extension_DevblocksContext implements IDevblo
 			
 			@$link_context = strtolower($_SESSION['timetracking_context']);
 			@$link_context_id = intval($_SESSION['timetracking_context_id']);
-			$tpl->assign('link_context', $link_context);
-			$tpl->assign('link_context_id', $link_context_id);
+			
+			/* If the session was empty, don't set these since they may have been 
+			 * previously set by the abstract context peek code.
+			 */ 
+			
+			if(!empty($link_context)) {
+				$tpl->assign('link_context', $link_context);
+				$tpl->assign('link_context_id', $link_context_id);
+			}
 			
 			// Template
 			
