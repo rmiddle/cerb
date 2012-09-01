@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -528,10 +528,12 @@ class CerberusParser {
 		    
 			// See if we have a content filename
 			
-			$content_filename = isset($info['content-name']) ? $info['content-name'] : '';
+			$content_filename = isset($info['disposition-filename']) ? $info['disposition-filename'] : '';
 			
 			if(empty($content_filename))
-				$content_filename = isset($info['disposition-filename']) ? $info['disposition-filename'] : '';
+				$content_filename = isset($info['content-name']) ? $info['content-name'] : '';
+			
+			$content_filename = self::fixQuotePrintableString($content_filename, $info['charset']);
 			
 			// Content type
 			
@@ -599,10 +601,31 @@ class CerberusParser {
 			            $handled = true;
 		    			break;
 		    			
+		    		case 'message/delivery-status':
+						@$message_content = mailparse_msg_extract_part_file($section, $full_filename, NULL);
+						$message_counter = empty($message_counter) ? 1 : $message_counter++;
+			        	
+		                $tmpname = ParserFile::makeTempFilename();
+		                $bounce_attach = new ParserFile();
+		                $bounce_attach->setTempFile($tmpname,'message/delivery-status');
+		                @file_put_contents($tmpname, $message_content);
+		                $bounce_attach->file_size = filesize($tmpname);
+		                $bounce_attach->mime_type = 'message/delivery-status';
+		                $bounce_attach_filename = sprintf("delivery_status%s.txt",
+		                	(($message_counter > 1) ? ('_'.$message_counter) : '')
+		                );
+		                $message->files[$bounce_attach_filename] = $bounce_attach;
+		                unset($bounce_attach);
+			            $handled = true;
+			            
+			            // Skip any nested parts in this message/rfc822 parent
+			            $ignore_mime_prefixes[] = $st . '.';
+		    			break;
+		    			
 		    		case 'message/rfc822':
 						@$message_content = mailparse_msg_extract_part_file($section, $full_filename, NULL);
-						
 			        	$message_counter = empty($message_counter) ? 1 : $message_counter++;
+			        	
 		                $tmpname = ParserFile::makeTempFilename();
 		                $rfc_attach = new ParserFile();
 		                $rfc_attach->setTempFile($tmpname,'message/rfc822');
@@ -637,30 +660,16 @@ class CerberusParser {
 				        break;
 				    }
 				    
-				    if(!isset($info['content-name']) || empty($info['content-name'])) {
-				    	if(isset($info['disposition-filename']))
-				    		$info['content-name'] = $info['disposition-filename'];
-				    	else
-				    		$info['content-name'] = '';
-				    }
-				    
-				    // if un-named, call it "unnamed message part"
-				    if (empty($info['content-name'])) { 
-				    	$info['content-name'] = 'unnamed_message_part';
-				    }
-				    
-				    // filenames can be quoted-printable strings, too...
-				    $info['content-name'] = self::fixQuotePrintableString($info['content-name'], $info['charset']);
-
 				    // content-name is not necessarily unique...
-					if (isset($message->files[$info['content-name']])) {
+					if (isset($message->files[$content_filename])) {
 						$j=1;
-						while (isset($message->files[$info['content-name'] . '(' . $j . ')'])) {
+						while (isset($message->files[$content_filename . '(' . $j . ')'])) {
 							$j++;
 						}
-						$info['content-name'] = $info['content-name'] . '(' . $j . ')';
+						$content_filename = $content_filename . '(' . $j . ')';
 					}
-					$message->files[$info['content-name']] = $attach;
+					
+					$message->files[$content_filename] = $attach;
 		        }
 		    }
 		}
@@ -982,25 +991,77 @@ class CerberusParser {
 		
 		// [mdf] Loop through files to insert attachment records in the db, and move temporary files
 		foreach ($message->files as $filename => $file) { /* @var $file ParserFile */
-		    $fields = array(
-		        DAO_Attachment::DISPLAY_NAME => $filename,
-		        DAO_Attachment::MIME_TYPE => $file->mime_type,
-		    );
-		    $file_id = DAO_Attachment::create($fields);
+			$handled = false;
 			
-		    // Link
-		    DAO_AttachmentLink::create($file_id, CerberusContexts::CONTEXT_MESSAGE, $model->getMessageId());
-		    
-		    // Content
-		    if(empty($file_id)) {
-		        @unlink($file->tmpname); // remove our temp file
-			    continue;
+			switch($file->mime_type) {
+				case 'message/delivery-status':
+					$message_content = file_get_contents($file->tmpname);
+					
+					$status_code = 0;
+					
+					if(preg_match('#Diagnostic-Code:(.*);\s*(\d+) (\d\.\d\.\d)(.*)#i', $message_content, $matches)) {
+						$status_code = intval($matches[2]);
+						
+					} elseif(preg_match('#Status:\s*(\d\.\d\.\d)#i', $message_content, $matches)) {
+						$status_code = intval(DevblocksPlatform::strAlphaNum($matches[1]));
+					}
+					
+					// Permanent failure
+					if($status_code >= 500 && $status_code < 600) {
+						$logger->info(sprintf("[Parser] This is a permanent failure delivery-status (%d)", $status_code));
+						
+						if(preg_match('#Original-Recipient:\s*(.*)#i', $message_content, $matches)) {
+							$entry = explode(';', trim($matches[1]));
+							
+							if(2 == count($entry)) {
+								// Set this sender to defunct
+								if(false != ($bouncer = DAO_Address::lookupAddress($entry[1], true))) {
+									DAO_Address::update($bouncer->id, array(
+										DAO_Address::IS_DEFUNCT => 1,
+									));
+									
+									$logger->info(sprintf("[Parser] Setting %s to defunct", $bouncer->email));
+									
+									// ... and add them as a requester
+									DAO_Ticket::createRequester($bouncer->email, $model->getTicketId());
+								}
+							}
+							
+							// [TODO] Find the original message-id ?
+							
+							// Nuke the attachment?
+							$handled = true;
+						}
+					}
+					//}
+					break;				
 			}
-
-			if(null !== ($fp = fopen($file->getTempFile(), 'rb'))) {
-				Storage_Attachments::put($file_id, $fp);
-				fclose($fp);
-				unlink($file->getTempFile());
+			
+			if(!$handled) {
+			    $fields = array(
+			        DAO_Attachment::DISPLAY_NAME => $filename,
+			        DAO_Attachment::MIME_TYPE => $file->mime_type,
+			    );
+			    $file_id = DAO_Attachment::create($fields);
+				
+			    // Link
+			    DAO_AttachmentLink::create($file_id, CerberusContexts::CONTEXT_MESSAGE, $model->getMessageId());
+			    
+			    // Content
+			    if(empty($file_id)) {
+			        @unlink($file->tmpname); // remove our temp file
+				    continue;
+				}
+	
+				if(null !== ($fp = fopen($file->getTempFile(), 'rb'))) {
+					Storage_Attachments::put($file_id, $fp);
+					fclose($fp);
+					unlink($file->getTempFile());
+				}
+				
+			} else {
+				@unlink($file->tmpname); // remove our temp file
+				
 			}				
 		}
 		

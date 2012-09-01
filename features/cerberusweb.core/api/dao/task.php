@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -23,7 +23,7 @@ class DAO_Task extends C4_ORMHelper {
 	const IS_COMPLETED = 'is_completed';
 	const COMPLETED_DATE = 'completed_date';
 
-	static function create($fields) {
+	static function create($fields, $custom_fields=array()) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
 		$sql = sprintf("INSERT INTO task () ".
@@ -34,6 +34,10 @@ class DAO_Task extends C4_ORMHelper {
 		
 		self::update($id, $fields);
 		
+		if(!empty($custom_fields)) {
+			DAO_CustomFieldValue::formatAndSetFieldValues(CerberusContexts::CONTEXT_TASK, $id, $custom_fields);
+		}
+		
 		// New task
 	    $eventMgr = DevblocksPlatform::getEventService();
 	    $eventMgr->trigger(
@@ -42,6 +46,7 @@ class DAO_Task extends C4_ORMHelper {
                 array(
                     'task_id' => $id,
                 	'fields' => $fields,
+                	'custom_fields' => $custom_fields,
                 )
             )
 	    );
@@ -303,14 +308,16 @@ class DAO_Task extends C4_ORMHelper {
 		
 		// Translate virtual fields
 		
+		$args = array(
+			'join_sql' => &$join_sql,
+			'where_sql' => &$where_sql,
+			'has_multiple_values' => &$has_multiple_values
+		);
+		
 		array_walk_recursive(
 			$params,
 			array('DAO_Task', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'has_multiple_values' => &$has_multiple_values
-			)
+			$args
 		);
 		
 		$result = array(

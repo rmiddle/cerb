@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -272,10 +272,6 @@ class ChKbAjaxController extends DevblocksControllerExtension {
 		if(!empty($view_id))
 			$tpl->assign('view_id', $view_id);
 			
-		@$return_uri = DevblocksPlatform::importGPC($_REQUEST['return_uri'],'string','');
-		if(!empty($return_uri))
-			$tpl->assign('return_uri', $return_uri);
-		
 		if(!empty($id)) {
 			$article = DAO_KbArticle::get($id);
 			$tpl->assign('article', $article);
@@ -309,6 +305,7 @@ class ChKbAjaxController extends DevblocksControllerExtension {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		@$id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer',0);
+		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string','');
 		@$do_delete = DevblocksPlatform::importGPC($_REQUEST['do_delete'],'integer',0);
 		@$title = DevblocksPlatform::importGPC($_REQUEST['title'],'string');
 		@$category_ids = DevblocksPlatform::importGPC($_REQUEST['category_ids'],'array',array());
@@ -334,6 +331,11 @@ class ChKbAjaxController extends DevblocksControllerExtension {
 					DAO_KbArticle::UPDATED => time(),
 				);
 				$id = DAO_KbArticle::create($fields);
+				
+				// View marquee
+				if(!empty($id) && !empty($view_id)) {
+					C4_AbstractView::setMarqueeContextCreated($view_id, CerberusContexts::CONTEXT_KB_ARTICLE, $id);
+				}
 				
 			} else { // update
 				$fields = array(

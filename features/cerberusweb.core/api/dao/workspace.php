@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -267,14 +267,17 @@ class DAO_WorkspacePage extends C4_ORMHelper {
 		$sort_sql = $query_parts['sort'];
 
 		// Virtuals
+		
+		$args = array(
+			'join_sql' => &$join_sql,
+			'where_sql' => &$where_sql,
+			'has_multiple_values' => &$has_multiple_values
+		);
+		
 		array_walk_recursive(
 			$params,
 			array('DAO_WorkspacePage', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'has_multiple_values' => &$has_multiple_values
-			)
+			$args
 		);
 		
 		$sql =
@@ -493,6 +496,8 @@ class DAO_WorkspaceTab extends C4_ORMHelper {
 			return;
 		
 		$ids_list = implode(',', $ids);
+		
+		DAO_WorkspaceWidget::deleteByTab($ids);
 		
 		$db->Execute(sprintf("DELETE FROM workspace_list WHERE workspace_tab_id IN (%s)", $ids_list));
 		

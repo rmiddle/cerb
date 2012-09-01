@@ -30,7 +30,7 @@
 
 	<li class="{if $page->id=='core.page.search'}selected{/if}" style="float:right;">
 		<a href="javascript:;" class="submenu">{'common.search'|devblocks_translate|lower} <span class="cerb-sprite {if $page->id=='core.page.search'}sprite-arrow-down-white{else}sprite-arrow-down-black{/if}" style="height:12px;width:12px;"></span></a>
-		<ul class="cerb-popupmenu cerb-float" style="">
+		<ul class="cerb-popupmenu cerb-float">
 			{foreach from=$contexts item=context key=context_id}
 			{if isset($context->params.options.0.workspace)}
 			<li><a href="{devblocks_url}c=search&context={if isset($context->params.alias)}{$context->params.alias}{else}{$context_id}{/if}{/devblocks_url}">{$context->name}</a></li>
@@ -62,6 +62,7 @@
 
 	$menu.sortable({
 		items:'> li.drag',
+		distance: 20,
 		update:function(e) {
 			$pages = $(this).find('li.drag[page_id=*]');
 			page_ids = $pages.map(function(e) {

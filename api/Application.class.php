@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -46,8 +46,8 @@
  * - Jeff Standen, Darren Sugita, Dan Hildebrandt, Scott Luther
  *	 WEBGROUP MEDIA LLC. - Developers of Cerberus Helpdesk
  */
-define("APP_BUILD", 2012062801);
-define("APP_VERSION", '6.0.2');
+define("APP_BUILD", 2012082801);
+define("APP_VERSION", '6.1.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -282,6 +282,12 @@ class CerberusApplication extends DevblocksApplication {
 		if(extension_loaded("spl")) {
 		} else {
 			$errors[] = "The 'SPL' PHP extension is required.  Please enable it.";
+		}
+		
+		// Extension: ctype
+		if(extension_loaded("ctype")) {
+		} else {
+			$errors[] = "The 'ctype' PHP extension is required.  Please enable it.";
 		}
 		
 		// Extension: JSON
@@ -658,9 +664,6 @@ class CerberusContexts {
 		switch($context) {
 			case 'cerberusweb.contexts.attachment':
 				self::_getAttachmentContext($context_object, $labels, $values, $prefix);
-				break;
-			case 'cerberusweb.contexts.bucket':
-				self::_getBucketContext($context_object, $labels, $values, $prefix);
 				break;
 			default:
 				// Migrated
@@ -1186,74 +1189,6 @@ class CerberusContexts {
 		
 		return true;
 	}
-	
-	/**
-	 * 
-	 * @param mixed $bucket
-	 * @param array $token_labels
-	 * @param array $token_values
-	 */
-	private static function _getBucketContext($bucket, &$token_labels, &$token_values, $prefix=null) {
-		if(is_null($prefix))
-			$prefix = 'Bucket:';
-		
-		$translate = DevblocksPlatform::getTranslationService();
-		//$fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ORG);
-
-		// Polymorph
-		if(is_numeric($bucket)) {
-			$bucket = DAO_Bucket::get($bucket); 
-		} elseif($bucket instanceof Model_Bucket) {
-			// It's what we want already.
-		} else {
-			$bucket = null;
-		}
-		/* @var $bucket Model_Bucket */
-		
-		// Token labels
-		$token_labels = array(
-			'id' => $prefix.$translate->_('common.id'),
-			'name|default(\'Inbox\')' => $prefix.$translate->_('common.name'),
-		);
-		
-//		if(is_array($fields))
-//		foreach($fields as $cf_id => $field) {
-//			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-//		}
-
-		// Token values
-		$token_values = array();
-		
-		// Bucket token values
-		if($bucket) {
-			$token_values['id'] = $bucket->id;
-			$token_values['name'] = $bucket->name;
-			//$token_values['custom'] = array();
-			
-//			$field_values = array_shift(DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_ORG, $org->id));
-//			if(is_array($field_values) && !empty($field_values)) {
-//				foreach($field_values as $cf_id => $cf_val) {
-//					if(!isset($fields[$cf_id]))
-//						continue;
-//					
-//					// The literal value
-//					if(null != $org)
-//						$token_values['custom'][$cf_id] = $cf_val;
-//					
-//					// Stringify
-//					if(is_array($cf_val))
-//						$cf_val = implode(', ', $cf_val);
-//						
-//					if(is_string($cf_val)) {
-//						if(null != $org)
-//							$token_values['custom_'.$cf_id] = $cf_val;
-//					}
-//				}
-//			}
-		}
-
-		return true;
-	}
 };
 
 class Context_Application extends Extension_DevblocksContext {
@@ -1278,7 +1213,9 @@ class Context_Application extends Extension_DevblocksContext {
 	}
 	
 	function getMeta($context_id) {
-		$worker_role = DAO_WorkerRole::get($context_id);
+		if(null == ($worker_role = DAO_WorkerRole::get($context_id)))
+			return null;
+			
 		$url_writer = DevblocksPlatform::getUrlService();
 		
 		$who = sprintf("%d-%s",
@@ -1431,7 +1368,7 @@ class CerberusLicense {
 	}
 	
 	public static function getReleases() {
-		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200);/*
+		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600);/*
 		 * Major versions by release date in GMT
 		 */
 		return array(
@@ -1444,6 +1381,7 @@ class CerberusLicense {
 			'5.6.0' => gmmktime(0,0,0,10,4,2011),
 			'5.7.0' => gmmktime(0,0,0,1,9,2012),
 			'6.0.0' => gmmktime(0,0,0,5,28,2012),
+			'6.1.0' => gmmktime(0,0,0,8,27,2012),
 		);
 	}
 	

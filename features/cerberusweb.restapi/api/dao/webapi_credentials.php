@@ -161,16 +161,20 @@ class DAO_WebApiCredentials extends C4_ORMHelper {
 			
 		$sort_sql = (!empty($sortBy)) ? sprintf("ORDER BY %s %s ",$sortBy,($sortAsc || is_null($sortAsc))?"ASC":"DESC") : " ";
 	
+		// Virtuals
+		
+		$args = array(
+			'join_sql' => &$join_sql,
+			'where_sql' => &$where_sql,
+			'has_multiple_values' => &$has_multiple_values
+		);
+		
 		array_walk_recursive(
 			$params,
 			array('DAO_WebApiCredentials', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'has_multiple_values' => &$has_multiple_values
-			)
+			$args
 		);
-	
+		
 		return array(
 			'primary_table' => 'webapi_credentials',
 			'select' => $select_sql,

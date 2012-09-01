@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -130,6 +130,8 @@ class ChDebugController extends DevblocksControllerExtension  {
 					"[PHP:Extension] SimpleXML: %s\n".
 					"[PHP:Extension] DOM: %s\n".
 					"[PHP:Extension] SPL: %s\n".
+					"[PHP:Extension] ctype: %s\n".
+					"[PHP:Extension] JSON: %s\n".
 					"[PHP:Extension] cURL: %s\n".
 					"\n",
 					APP_VERSION,
@@ -162,6 +164,8 @@ class ChDebugController extends DevblocksControllerExtension  {
 					(extension_loaded("simplexml") ? 'YES' : 'NO'),
 					(extension_loaded("dom") ? 'YES' : 'NO'),
 					(extension_loaded("spl") ? 'YES' : 'NO'),
+					(extension_loaded("ctype") ? 'YES' : 'NO'),
+					(extension_loaded("json") ? 'YES' : 'NO'),
 					(extension_loaded("curl") ? 'YES' : 'NO')
 				);
 				

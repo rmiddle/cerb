@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -67,17 +67,22 @@ class ChTasksPage extends CerberusPageExtension {
 	
 			// Comment
 			@$comment = DevblocksPlatform::importGPC($_REQUEST['comment'],'string','');
+
+			// Custom Fields
+			@$field_ids = DevblocksPlatform::importGPC($_POST['field_ids'], 'array', array());
 			
 			// Save
 			if(!empty($id)) {
 				DAO_Task::update($id, $fields);
+				DAO_CustomFieldValue::handleFormPost(CerberusContexts::CONTEXT_TASK, $id, $field_ids);
 				
 			} else {
-				$id = DAO_Task::create($fields);
+				$custom_fields = DAO_CustomFieldValue::parseFormPost(CerberusContexts::CONTEXT_TASK, $field_ids);
+				$id = DAO_Task::create($fields, $custom_fields);
 
-				@$is_watcher = DevblocksPlatform::importGPC($_REQUEST['is_watcher'],'integer',0);
-				if($is_watcher)
-					CerberusContexts::addWatchers(CerberusContexts::CONTEXT_TASK, $id, $active_worker->id);
+				@$add_watcher_ids = DevblocksPlatform::sanitizeArray(DevblocksPlatform::importGPC($_REQUEST['add_watcher_ids'],'array',array()),'integer',array('unique','nonzero'));
+				if(!empty($add_watcher_ids))
+					CerberusContexts::addWatchers(CerberusContexts::CONTEXT_TASK, $id, $add_watcher_ids);
 				
 				// Context Link (if given)
 				@$link_context = DevblocksPlatform::importGPC($_REQUEST['link_context'],'string','');
@@ -85,12 +90,13 @@ class ChTasksPage extends CerberusPageExtension {
 				if(!empty($id) && !empty($link_context) && !empty($link_context_id)) {
 					DAO_ContextLink::setLink(CerberusContexts::CONTEXT_TASK, $id, $link_context, $link_context_id);
 				}
+				
+				// View marquee
+				if(!empty($id) && !empty($view_id)) {
+					C4_AbstractView::setMarqueeContextCreated($view_id, CerberusContexts::CONTEXT_TASK, $id);
+				}
 			}
 
-			// Custom field saves
-			@$field_ids = DevblocksPlatform::importGPC($_POST['field_ids'], 'array', array());
-			DAO_CustomFieldValue::handleFormPost(CerberusContexts::CONTEXT_TASK, $id, $field_ids);
-			
 			// Comments				
 			if(!empty($comment) && !empty($id)) {
 				@$also_notify_worker_ids = DevblocksPlatform::importGPC($_REQUEST['notify_worker_ids'],'array',array());
@@ -104,10 +110,6 @@ class ChTasksPage extends CerberusPageExtension {
 				);
 				$comment_id = DAO_Comment::create($fields, $also_notify_worker_ids);
 			}
-		}
-		
-		if(!empty($view_id) && null != ($view = C4_AbstractViewLoader::getView($view_id))) {
-			$view->render();
 		}
 		
 		exit;

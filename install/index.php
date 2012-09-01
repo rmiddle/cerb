@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -188,6 +188,14 @@ switch($step) {
 			$results['ext_spl'] = true;
 		} else {
 			$results['ext_spl'] = false;
+			$fails++;
+		}
+
+		// Extension: ctype
+		if(extension_loaded("ctype")) {
+			$results['ext_ctype'] = true;
+		} else {
+			$results['ext_ctype'] = false;
 			$fails++;
 		}
 

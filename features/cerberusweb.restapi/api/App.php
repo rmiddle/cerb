@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -124,7 +124,7 @@ class Ch_RestPreferencesTab extends Extension_PreferenceTab {
 		if(!empty($id) && null == ($model = DAO_WebApiCredentials::get($id)))
 			return;
 		
-		if(!$active_worker->is_superuser && $active_worker->id != $model->worker_id)
+		if(!empty($id) && !$active_worker->is_superuser && $active_worker->id != $model->worker_id)
 			return;
 		
 		if(!empty($model))

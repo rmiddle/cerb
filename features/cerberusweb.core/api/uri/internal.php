@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -44,6 +44,17 @@ class ChInternalController extends DevblocksControllerExtension {
 	    }
 	}
 
+	function handleSectionActionAction() {
+		@$section_uri = DevblocksPlatform::importGPC($_REQUEST['section'],'string','');
+		@$action = DevblocksPlatform::importGPC($_REQUEST['action'],'string','');
+
+		$inst = Extension_PageSection::getExtensionByPageUri($this->manifest->id, $section_uri, true);
+		
+		if($inst instanceof Extension_PageSection && method_exists($inst, $action.'Action')) {
+			call_user_func(array($inst, $action.'Action'));
+		}
+	}
+	
 	// Post
 	function doStopTourAction() {
 		$worker = CerberusApplication::getActiveWorker();
@@ -217,14 +228,11 @@ class ChInternalController extends DevblocksControllerExtension {
 	}
 	
 	function parseImportFileAction() {
-		header("Content-Type: application/json");
-		
 		@$csv_file = $_FILES['csv_file'];
 		
 		// [TODO] Return false in JSON if file is empty, etc.
 		
 		if(!is_array($csv_file) || !isset($csv_file['tmp_name']) || empty($csv_file['tmp_name'])) {
-			echo json_encode(false);
 			exit;
 		}
 		
@@ -232,14 +240,12 @@ class ChInternalController extends DevblocksControllerExtension {
 		$newfilename = APP_TEMP_PATH . '/' . $filename;
 		
 		if(!rename($csv_file['tmp_name'], $newfilename)) {
-			echo json_encode(false);
 			exit;
 		}
 		
 		$visit = CerberusApplication::getVisit();
 		$visit->set('import.last.csv', $newfilename);
 		
-		echo json_encode(true);
 		exit;
 	}
 
@@ -568,39 +574,56 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$layer = DevblocksPlatform::importGPC($_REQUEST['layer'],'string');
 		@$trigger_id = DevblocksPlatform::importGPC($_REQUEST['trigger_id'],'integer',0);
 		
-		if(null != ($view = C4_AbstractViewLoader::getView($view_id))) {
-			if(!empty($trigger_id) && null != ($trigger = DAO_TriggerEvent::get($trigger_id))) {
-				$event = $trigger->getEvent();
-				
-				if(method_exists($event,'generateSampleEventModel')) {
-					$event_model = $event->generateSampleEventModel();
-					$event->setEvent($event_model);
-					$values = $event->getValues();
-					$view->setPlaceholderValues($values);
-				}
-				
-				$conditions = $event->getConditions($trigger);
-				$valctx = $event->getValuesContexts($trigger);
-				foreach($valctx as $token => $vtx) {
-					$conditions[$token] = $vtx;
-				}
+		if(null == ($context_ext = Extension_DevblocksContext::get($context))) { /* @var $context_ext Extension_DevblocksContext */
+			return;
+		}
 
-				foreach($conditions as $cond_id => $cond) {
-					if(substr($cond_id,0,1) == '_')
-						unset($conditions[$cond_id]);
-				}
-				
-				$view->setPlaceholderLabels($conditions);
-				
-				C4_AbstractViewLoader::setView($view->id, $view);
+		if(!isset($context_ext->manifest->params['view_class']))
+			return;
+		
+		$view = C4_AbstractViewLoader::getView($view_id);
+		
+		if(!($view instanceof $context_ext->manifest->params['view_class'])) {
+			C4_AbstractViewLoader::deleteView($view_id);
+			$view = null;
+		}
+		
+		if(empty($view)) {
+			if(null == ($view = $context_ext->getChooserView($view_id)))
+				return;
+		}
+		
+		if(!empty($trigger_id) && null != ($trigger = DAO_TriggerEvent::get($trigger_id))) {
+			$event = $trigger->getEvent();
+			
+			if(method_exists($event,'generateSampleEventModel')) {
+				$event_model = $event->generateSampleEventModel();
+				$event->setEvent($event_model);
+				$values = $event->getValues();
+				$view->setPlaceholderValues($values);
 			}
 			
-			$tpl = DevblocksPlatform::getTemplateService();
-			$tpl->assign('context', $context);
-			$tpl->assign('layer', $layer);
-			$tpl->assign('view', $view);
-			$tpl->display('devblocks:cerberusweb.core::internal/choosers/__worklist.tpl');
+			$conditions = $event->getConditions($trigger);
+			$valctx = $event->getValuesContexts($trigger);
+			foreach($valctx as $token => $vtx) {
+				$conditions[$token] = $vtx;
+			}
+
+			foreach($conditions as $cond_id => $cond) {
+				if(substr($cond_id,0,1) == '_')
+					unset($conditions[$cond_id]);
+			}
+			
+			$view->setPlaceholderLabels($conditions);
 		}
+		
+		C4_AbstractViewLoader::setView($view->id, $view);
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->assign('context', $context);
+		$tpl->assign('layer', $layer);
+		$tpl->assign('view', $view);
+		$tpl->display('devblocks:cerberusweb.core::internal/choosers/__worklist.tpl');
 	}
 	
 	function serializeViewAction() {
@@ -1811,6 +1834,29 @@ class ChInternalController extends DevblocksControllerExtension {
 				}
 			}
 
+		} elseif('json' == $export_as) {
+			header("Pragma: public");
+			header("Expires: 0");
+			header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+			header("Content-Type: text/plain; charset=".LANG_CHARSET_CODE);
+
+			$objects = array();
+			
+			// Get data
+			list($results, $null) = $view->getData();
+			if(is_array($results))
+			foreach($results as $row) {
+				$object = array();
+				if(is_array($columns))
+				foreach($columns as $col) {
+					$object[$col] = $row[$col];
+				}
+				
+				$objects[] = $object;
+			}
+			
+			echo json_encode($objects);
+			
 		} elseif('xml' == $export_as) {
 			header("Pragma: public");
 			header("Expires: 0");
@@ -2341,7 +2387,7 @@ class ChInternalController extends DevblocksControllerExtension {
 		$events = Extension_DevblocksEvent::getByContext($context, false);
 		$tpl->assign('events', $events);
 		
-		$triggers = DAO_TriggerEvent::getByOwner($context, $context_id, null, true);
+		$triggers = DAO_TriggerEvent::getByOwner($context, $context_id, null, true, 'pos');
 		$tpl->assign('triggers', $triggers);
 
 		$triggers_by_event = array();
@@ -2497,6 +2543,7 @@ class ChInternalController extends DevblocksControllerExtension {
 	function showDecisionPopupAction() {
 		@$context = DevblocksPlatform::importGPC($_REQUEST['context'],'string', '');
 		@$id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer', 0);
+		@$only_event_ids = DevblocksPlatform::importGPC($_REQUEST['only_event_ids'],'string', '');
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 		
@@ -2534,6 +2581,18 @@ class ChInternalController extends DevblocksControllerExtension {
 				$tpl->assign('context_id', $context_id);
 				
 				$events = Extension_DevblocksEvent::getByContext($context, false);
+				
+				// Are we filtering the available events?
+				if(!empty($only_event_ids)) {
+					$only_event_ids = DevblocksPlatform::parseCsvString($only_event_ids,false,'string');
+					
+					if(is_array($events))
+					foreach($events as $event_id => $event) {
+						if(!in_array($event_id, $only_event_ids))
+							unset($events[$event_id]);
+					}
+				}
+				
 				$tpl->assign('events', $events);
 				
 			} else {
@@ -2740,8 +2799,8 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		$tpl->assign('namePrefix', $name_prefix);
 		
-		$trigger = DAO_TriggerEvent::get($trigger_id);
-		$tpl->assign('macro_params', $trigger->variables);
+		if(null != ($trigger = DAO_TriggerEvent::get($trigger_id)))
+			$tpl->assign('macro_params', $trigger->variables);
 		
 		$tpl->display('devblocks:cerberusweb.core::events/action_schedule_behavior_params.tpl');
 	}

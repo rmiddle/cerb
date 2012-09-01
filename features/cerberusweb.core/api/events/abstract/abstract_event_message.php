@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -979,8 +979,8 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			case 'set_reopen_date':
 				@$reopen_date = intval(strtotime($params['value']));
 			
-				DAO_Ticket::update($task_id, array(
-					DAO_Ticket::DUE_DATE => $reopen_date,
+				DAO_Ticket::update($ticket_id, array(
+					DAO_Ticket::REOPEN_AT => $reopen_date,
 				));
 			
 				$dict->ticket_reopen_date = $reopen_date;

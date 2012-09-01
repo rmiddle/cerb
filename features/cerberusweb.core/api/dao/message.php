@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
-| Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by WebGroup Media, LLC.
 |-----------------------------------------------------------------------
 | All source code & content (c) Copyright 2012, WebGroup Media LLC
 |   unless specifically noted otherwise.
@@ -20,12 +20,14 @@ class DAO_Message extends C4_ORMHelper {
     const TICKET_ID = 'ticket_id';
     const CREATED_DATE = 'created_date';
     const ADDRESS_ID = 'address_id';
+    const IS_BROADCAST = 'is_broadcast';
     const IS_OUTGOING = 'is_outgoing';
     const WORKER_ID = 'worker_id';
     const STORAGE_EXTENSION = 'storage_extension';
     const STORAGE_KEY = 'storage_key';
     const STORAGE_PROFILE_ID = 'storage_profile_id';
     const STORAGE_SIZE = 'storage_size';
+    const RESPONSE_TIME = 'response_time';
 
 	static function create($fields) {
 		$db = DevblocksPlatform::getDatabaseService();
@@ -57,7 +59,7 @@ class DAO_Message extends C4_ORMHelper {
 		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
 		
 		// SQL
-		$sql = "SELECT id, ticket_id, created_date, is_outgoing, worker_id, address_id, storage_extension, storage_key, storage_profile_id, storage_size ".
+		$sql = "SELECT id, ticket_id, created_date, is_outgoing, worker_id, address_id, storage_extension, storage_key, storage_profile_id, storage_size, response_time, is_broadcast ".
 			"FROM message ".
 			$where_sql.
 			$sort_sql.
@@ -106,6 +108,8 @@ class DAO_Message extends C4_ORMHelper {
 			$object->storage_key = $row['storage_key'];
 			$object->storage_profile_id = $row['storage_profile_id'];
 			$object->storage_size = $row['storage_size'];
+			$object->response_time = $row['response_time'];
+			$object->is_broadcast = intval($row['response_time']);
 			$objects[$object->id] = $object;
 		}
 		
@@ -268,6 +272,8 @@ class DAO_Message extends C4_ORMHelper {
 			"m.storage_key as %s, ".
 			"m.storage_profile_id as %s, ".
 			"m.storage_size as %s, ".
+			"m.response_time as %s, ".
+			"m.is_broadcast as %s, ".
 			"t.group_id as %s, ".
 			"t.mask as %s, ".
 			"t.subject as %s, ".
@@ -282,6 +288,8 @@ class DAO_Message extends C4_ORMHelper {
 			    SearchFields_Message::STORAGE_KEY,
 			    SearchFields_Message::STORAGE_PROFILE_ID,
 			    SearchFields_Message::STORAGE_SIZE,
+			    SearchFields_Message::RESPONSE_TIME,
+			    SearchFields_Message::IS_BROADCAST,
 			    SearchFields_Message::TICKET_GROUP_ID,
 			    SearchFields_Message::TICKET_MASK,
 			    SearchFields_Message::TICKET_SUBJECT,
@@ -378,6 +386,8 @@ class SearchFields_Message implements IDevblocksSearchFields {
 	const IS_OUTGOING = 'm_is_outgoing';
 	const TICKET_ID = 'm_ticket_id';
 	const WORKER_ID = 'm_worker_id';
+	const RESPONSE_TIME = 'm_response_time';
+	const IS_BROADCAST = 'm_is_broadcast';
 	
 	// Storage
 	const STORAGE_EXTENSION = 'm_storage_extension';
@@ -414,6 +424,8 @@ class SearchFields_Message implements IDevblocksSearchFields {
 			SearchFields_Message::IS_OUTGOING => new DevblocksSearchField(SearchFields_Message::IS_OUTGOING, 'm', 'is_outgoing', $translate->_('message.is_outgoing'), Model_CustomField::TYPE_CHECKBOX),
 			SearchFields_Message::TICKET_ID => new DevblocksSearchField(SearchFields_Message::TICKET_ID, 'm', 'ticket_id'),
 			SearchFields_Message::WORKER_ID => new DevblocksSearchField(SearchFields_Message::WORKER_ID, 'm', 'worker_id', $translate->_('common.worker'), Model_CustomField::TYPE_WORKER),
+			SearchFields_Message::RESPONSE_TIME => new DevblocksSearchField(SearchFields_Message::RESPONSE_TIME, 'm', 'response_time', $translate->_('message.response_time'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Message::IS_BROADCAST => new DevblocksSearchField(SearchFields_Message::IS_BROADCAST, 'm', 'is_broadcast', $translate->_('message.is_broadcast'), Model_CustomField::TYPE_CHECKBOX),
 			
 			SearchFields_Message::STORAGE_EXTENSION => new DevblocksSearchField(SearchFields_Message::STORAGE_EXTENSION, 'm', 'storage_extension'),
 			SearchFields_Message::STORAGE_KEY => new DevblocksSearchField(SearchFields_Message::STORAGE_KEY, 'm', 'storage_key'),
@@ -454,6 +466,8 @@ class Model_Message {
 	public $storage_key;
 	public $storage_profile_id;
 	public $storage_size;
+	public $response_time;
+	public $is_broadcast;
 	
 	private $_sender_object = null;
 
@@ -985,7 +999,7 @@ class DAO_MessageHeader {
     }
 };
 
-class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_Message extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'messages';
 
 	function __construct() {
@@ -1046,6 +1060,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 			
 			switch($field_key) {
 				case SearchFields_Message::ADDRESS_EMAIL:
+				case SearchFields_Message::IS_BROADCAST:
 				case SearchFields_Message::IS_OUTGOING:
 				case SearchFields_Message::TICKET_GROUP_ID:
 				case SearchFields_Message::TICKET_IS_DELETED:
@@ -1095,6 +1110,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 				$counts = $this->_getSubtotalCountForStringColumn('DAO_Message', $column, $label_map, 'in', 'worker_id[]');
 				break;
 
+			case SearchFields_Message::IS_BROADCAST:
 			case SearchFields_Message::IS_OUTGOING:
 			case SearchFields_Message::TICKET_IS_DELETED:
 				$counts = $this->_getSubtotalCountForBooleanColumn('DAO_Message', $column);
@@ -1110,6 +1126,59 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 		}
 		
 		return $counts;
+	}
+	
+	function isQuickSearchField($token) {
+		switch($token) {
+			case SearchFields_Message::TICKET_GROUP_ID:
+				return true;
+			break;
+		}
+		
+		return false;
+	}
+	
+	function quickSearch($token, $query, &$oper, &$value) {
+		switch($token) {
+			case SearchFields_Message::TICKET_GROUP_ID:
+				$search_ids = array();
+				$oper = DevblocksSearchCriteria::OPER_IN;
+				
+				if(preg_match('#([\!\=]+)(.*)#', $query, $matches)) {
+					$oper_hint = trim($matches[1]);
+					$query = trim($matches[2]);
+					
+					switch($oper_hint) {
+						case '!':
+						case '!=':
+							$oper = DevblocksSearchCriteria::OPER_NIN;
+							break;
+					}
+				}
+				
+				$groups = DAO_Group::getAll();
+				$inputs = DevblocksPlatform::parseCsvString($query);
+
+				if(is_array($inputs))
+				foreach($inputs as $input) {
+					foreach($groups as $group_id => $group) {
+						if(0 == strcasecmp($input, substr($group->name,0,strlen($input))))
+							$search_ids[$group_id] = true;
+					}
+				}
+				
+				if(!empty($search_ids)) {
+					$value = array_keys($search_ids);
+				} else {
+					$value = null;
+				}
+				
+				return true;
+				break;
+				
+		}
+		
+		return false;
 	}	
 	
 	function render() {
@@ -1149,6 +1218,11 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__string.tpl');
 				break;
 				
+			case SearchFields_Message::RESPONSE_TIME:
+				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__number.tpl');
+				break;
+				
+			case SearchFields_Message::IS_BROADCAST:
 			case SearchFields_Message::IS_OUTGOING:
 			case SearchFields_Message::TICKET_IS_DELETED:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__bool.tpl');
@@ -1186,6 +1260,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 		$values = !is_array($param->value) ? array($param->value) : $param->value;
 
 		switch($field) {
+			case SearchFields_Message::IS_BROADCAST:
 			case SearchFields_Message::IS_OUTGOING:
 			case SearchFields_Message::TICKET_IS_DELETED:
 				$this->_renderCriteriaParamBoolean($param);
@@ -1228,10 +1303,15 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 				$criteria = $this->_doSetCriteriaString($field, $oper, $value);
 				break;
 				
+			case SearchFields_Message::RESPONSE_TIME:
+				$criteria = new DevblocksSearchCriteria($field,$oper,$value);
+				break;
+				
 			case SearchFields_Message::CREATED_DATE:
 				$criteria = $this->_doSetCriteriaDate($field, $oper);
 				break;
 				
+			case SearchFields_Message::IS_BROADCAST:
 			case SearchFields_Message::IS_OUTGOING:
 			case SearchFields_Message::TICKET_IS_DELETED:
 				@$bool = DevblocksPlatform::importGPC($_REQUEST['bool'],'integer',1);
@@ -1245,7 +1325,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals {
 				
 			case SearchFields_Message::WORKER_ID:
 				@$worker_ids = DevblocksPlatform::importGPC($_REQUEST['worker_id'],'array',array());
-				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_IN,$worker_ids);
+				$criteria = new DevblocksSearchCriteria($field,$oper,$worker_ids);
 				break;
 				
 			case SearchFields_Message::MESSAGE_CONTENT:
@@ -1393,7 +1473,9 @@ class Context_Message extends Extension_DevblocksContext {
 		$token_labels = array(
 			'content' => $prefix.$translate->_('common.content'),
 			'created|date' => $prefix.$translate->_('common.created'),
+			'is_broadcast' => $prefix.$translate->_('message.is_broadcast'),
 			'is_outgoing' => $prefix.$translate->_('message.is_outgoing'),
+			'response_time' => $prefix.$translate->_('message.response_time'),
 			'storage_size' => $prefix.$translate->_('message.storage_size').' (bytes)',
 		);
 		
@@ -1409,7 +1491,9 @@ class Context_Message extends Extension_DevblocksContext {
 			$token_values['content'] = $message->getContent();
 			$token_values['created'] = $message->created_date;
 			$token_values['id'] = $message->id;
+			$token_values['is_broadcast'] = $message->is_broadcast;
 			$token_values['is_outgoing'] = $message->is_outgoing;
+			$token_values['response_time'] = $message->response_time;
 			$token_values['storage_size'] = $message->storage_size;
 			$token_values['ticket_id'] = $message->ticket_id;
 			$token_values['worker_id'] = $message->worker_id;
@@ -1478,7 +1562,6 @@ class Context_Message extends Extension_DevblocksContext {
 		$view->name = 'Messages';
 //		$view->view_columns = array(
 //			SearchFields_Message::UPDATED_DATE,
-//			SearchFields_Message::DUE_DATE,
 //		);
 		$view->addParams(array(
 //			SearchFields_Task::IS_COMPLETED => new DevblocksSearchCriteria(SearchFields_Task::IS_COMPLETED,'=',0),

@@ -3,6 +3,9 @@
 {assign var=results value=$view->getData()}
 {assign var=total value=$results[1]}
 {assign var=data value=$results[0]}
+
+{include file="devblocks:cerberusweb.core::internal/views/view_marquee.tpl" view=$view}
+
 <table cellpadding="0" cellspacing="0" border="0" class="worklist" width="100%">
 	<tr>
 		<td nowrap="nowrap"><span class="title">{$view->name}</span></td>
@@ -141,6 +144,7 @@
 	<div style="float:left;" id="{$view->id}_actions">
 		<button type="button" class="action-always-show action-explore" onclick="this.form.explore_from.value=$(this).closest('form').find('tbody input:checkbox:checked:first').val();this.form.a.value='viewTimeExplore';this.form.submit();"><span class="cerb-sprite sprite-media_play_green"></span> {'common.explore'|devblocks_translate|lower}</button>
 		<button type="button" class="action-always-show action-bulkupdate" onclick="genericAjaxPopup('peek','c=timetracking&a=showBulkPanel&view_id={$view->id}&ids=' + Devblocks.getFormEnabledCheckboxValues('viewForm{$view->id}','row_id[]'),null,false,'500');"><span class="cerb-sprite2 sprite-folder-gear"></span> {'common.bulk_update'|devblocks_translate|lower}</button>
+		<button type="button" class="action-close" onclick="genericAjaxPost($(this).closest('form'),'view{$view->id}','c=timetracking&a=viewMarkClosed');"><span class="cerb-sprite2 sprite-tick-circle"></span> {$translate->_('common.close')|lower}</button>
 	</div>
 	{/if}
 </div>

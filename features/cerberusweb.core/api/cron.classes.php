@@ -1,6 +1,6 @@
 <?php
 /***********************************************************************
- | Cerberus Helpdesk(tm) developed by WebGroup Media, LLC.
+ | Cerb(tm) developed by WebGroup Media, LLC.
  |-----------------------------------------------------------------------
  | All source code & content (c) Copyright 2012, WebGroup Media LLC
  |   unless specifically noted otherwise.
@@ -1376,6 +1376,9 @@ class Cron_VirtualAttendantScheduledBehavior extends CerberusCronPageExtension {
 						// Load macro
 						if(null == ($macro = DAO_TriggerEvent::get($behavior->behavior_id))) /* @var $macro Model_TriggerEvent */
 							throw new Exception("Invalid macro.");
+						
+						if($macro->is_disabled)
+							throw new Exception("Macro disabled.");
 							
 						// ACL: Ensure the worker owns the macro
 						//if(false == ($macro->owner_context == CerberusContexts::CONTEXT_WORKER && $macro->owner_context_id == $active_worker->id))
