@@ -21,23 +21,23 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 	static function trigger(&$properties, $message_id=null, $ticket_id=null, $group_id=null) {
 		$events = DevblocksPlatform::getEventService();
 		$events->trigger(
-	        new Model_DevblocksEvent(
-	            self::ID,
-                array(
-                    'properties' => &$properties,
-                    'message_id' => $message_id,
-                    'ticket_id' => $ticket_id,
-                    'group_id' => $group_id,
-                	'_whisper' => array(
-                		CerberusContexts::CONTEXT_GROUP => array($group_id),
-                	),
-                )
-            )
+			new Model_DevblocksEvent(
+				self::ID,
+				array(
+					'properties' => &$properties,
+					'message_id' => $message_id,
+					'ticket_id' => $ticket_id,
+					'group_id' => $group_id,
+					'_whisper' => array(
+						CerberusContexts::CONTEXT_GROUP => array($group_id),
+					),
+				)
+			)
 		);
-	} 
+	}
 	
 	/**
-	 * 
+	 *
 	 * @param array $properties
 	 * @param Model_Message $message
 	 * @param Model_Ticket $ticket
@@ -113,7 +113,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 		$prefix = 'Sent message ';
 		
 		$labels['content'] = $prefix.'content';
-		$dict->content =& $properties['content'];
+		$values['content'] =& $properties['content'];
 		
 		$labels['to'] = $prefix.'to';
 		$values['to'] =& $properties['to'];
@@ -233,7 +233,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 		 */
 
 		$this->setLabels($labels);
-		$this->setValues($values);		
+		$this->setValues($values);
 	}
 	
 	function getValuesContexts($trigger) {
@@ -328,7 +328,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 
 		$conditions = $this->_importLabelsTypesAsConditions($labels, $types);
 		
-		return $conditions;		
+		return $conditions;
 	}
 	
 	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
@@ -446,7 +446,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 	}
 	
 	function getActionExtensions() {
-		$actions = 
+		$actions =
 			array(
 				'append_to_content' => array('label' =>'Append text to message content'),
 				'prepend_to_content' => array('label' =>'Prepend text to message content'),
@@ -494,7 +494,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 		
 		$tpl->clearAssign('params');
 		$tpl->clearAssign('namePrefix');
-		$tpl->clearAssign('token_labels');		
+		$tpl->clearAssign('token_labels');
 	}
 	
 	function simulateActionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
@@ -503,12 +503,32 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 		switch($token) {
 			case 'append_to_content':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$dict->content .= "\r\n" . $tpl_builder->build($params['content'], $dict);
+				$content = $tpl_builder->build($params['content'], $dict);
+				$dict->content .= "\r\n" . $content;
+				
+				$out = sprintf(">>> Appending text to message content\n".
+					"Text:\n%s\n".
+					"Message:\n%s\n",
+					$content,
+					$dict->content
+				);
+				
+				return $out;
 				break;
 				
 			case 'prepend_to_content':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$dict->content = $tpl_builder->build($params['content'], $dict) . "\r\n" . $dict->content;
+				$content = $tpl_builder->build($params['content'], $dict);
+				$dict->content = $content . "\r\n" . $dict->content;
+				
+				$out = sprintf(">>> Prepending text to message content\n".
+					"Text:\n%s\n".
+					"Message:\n%s\n",
+					$content,
+					$dict->content
+				);
+				
+				return $out;
 				break;
 				
 			case 'replace_content':
@@ -522,9 +542,20 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 					$value = str_replace($replace, $with, $dict->content);
 				}
 				
+				$before = $dict->body;
+				
 				if(!empty($value)) {
 					$dict->content = trim($value,"\r\n");
 				}
+				
+				$out = sprintf(">>> Replacing content\n".
+					"Before:\n%s\n".
+					"After:\n%s\n",
+					$before,
+					$dict->body
+				);
+				
+				return $out;
 				break;
 		}
 
@@ -554,7 +585,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 					if(!empty($context) && !empty($context_id))
 						return DevblocksEventHelper::simulateActionSetCustomField($custom_field, 'ticket_custom', $params, $dict, $context, $context_id);
 				}
-				break;				
+				break;
 		}
 	}
 	
@@ -615,7 +646,7 @@ class Event_MailBeforeSentByGroup extends Extension_DevblocksEvent {
 					if(!empty($context) && !empty($context_id))
 						DevblocksEventHelper::runActionSetCustomField($custom_field, 'ticket_custom', $params, $dict, $context, $context_id);
 				}
-				break;				
+				break;
 		}
 	}
 };

@@ -34,17 +34,17 @@ class PageSection_SetupMailIncoming extends Extension_PageSection {
 			if(!$worker || !$worker->is_superuser)
 				throw new Exception("You are not an administrator.");
 			
-		    @$parser_autoreq = DevblocksPlatform::importGPC($_POST['parser_autoreq'],'integer',0);
-		    @$parser_autoreq_exclude = DevblocksPlatform::importGPC($_POST['parser_autoreq_exclude'],'string','');
-		    @$attachments_enabled = DevblocksPlatform::importGPC($_POST['attachments_enabled'],'integer',0);
-		    @$attachments_max_size = DevblocksPlatform::importGPC($_POST['attachments_max_size'],'integer',10);
-		    @$ticket_mask_format = DevblocksPlatform::importGPC($_POST['ticket_mask_format'],'string','');
+			@$parser_autoreq = DevblocksPlatform::importGPC($_POST['parser_autoreq'],'integer',0);
+			@$parser_autoreq_exclude = DevblocksPlatform::importGPC($_POST['parser_autoreq_exclude'],'string','');
+			@$attachments_enabled = DevblocksPlatform::importGPC($_POST['attachments_enabled'],'integer',0);
+			@$attachments_max_size = DevblocksPlatform::importGPC($_POST['attachments_max_size'],'integer',10);
+			@$ticket_mask_format = DevblocksPlatform::importGPC($_POST['ticket_mask_format'],'string','');
 			
-		    if(empty($ticket_mask_format))
-		    	$ticket_mask_format = 'LLL-NNNNN-NNN';
-		    	
-		    // Count the number of combinations in ticket mask pattern
-		    
+			if(empty($ticket_mask_format))
+				$ticket_mask_format = 'LLL-NNNNN-NNN';
+				
+			// Count the number of combinations in ticket mask pattern
+			
 			$cardinality = CerberusApplication::generateTicketMaskCardinality($ticket_mask_format);
 			if($cardinality < 10000000)
 				throw new Exception(sprintf("<b>Error!</b> There are only %0.0f ticket mask combinations.",
@@ -52,16 +52,16 @@ class PageSection_SetupMailIncoming extends Extension_PageSection {
 				));
 			
 			// Save
-		    
-		    $settings = DevblocksPlatform::getPluginSettingsService();
-		    $settings->set('cerberusweb.core',CerberusSettings::PARSER_AUTO_REQ, $parser_autoreq);
-		    $settings->set('cerberusweb.core',CerberusSettings::PARSER_AUTO_REQ_EXCLUDE, $parser_autoreq_exclude);
-		    $settings->set('cerberusweb.core',CerberusSettings::ATTACHMENTS_ENABLED, $attachments_enabled);
-		    $settings->set('cerberusweb.core',CerberusSettings::ATTACHMENTS_MAX_SIZE, $attachments_max_size);
-		    $settings->set('cerberusweb.core',CerberusSettings::TICKET_MASK_FORMAT, $ticket_mask_format);
-		    
-		    echo json_encode(array('status'=>true));
-		    return;
+			
+			$settings = DevblocksPlatform::getPluginSettingsService();
+			$settings->set('cerberusweb.core',CerberusSettings::PARSER_AUTO_REQ, $parser_autoreq);
+			$settings->set('cerberusweb.core',CerberusSettings::PARSER_AUTO_REQ_EXCLUDE, $parser_autoreq_exclude);
+			$settings->set('cerberusweb.core',CerberusSettings::ATTACHMENTS_ENABLED, $attachments_enabled);
+			$settings->set('cerberusweb.core',CerberusSettings::ATTACHMENTS_MAX_SIZE, $attachments_max_size);
+			$settings->set('cerberusweb.core',CerberusSettings::TICKET_MASK_FORMAT, $ticket_mask_format);
+			
+			echo json_encode(array('status'=>true));
+			return;
 			
 		} catch (Exception $e) {
 			echo json_encode(array('status'=>false,'error'=>$e->getMessage()));
@@ -82,9 +82,9 @@ class PageSection_SetupMailIncoming extends Extension_PageSection {
 				));
 			
 			$sample_mask = CerberusApplication::generateTicketMask($ticket_mask_format);
-			$output = sprintf("<b>%s</b> &nbsp; There are %0.0f possible ticket mask combinations.",
+			$output = sprintf("<b>%s</b> &nbsp; There are %s possible ticket mask combinations.",
 				$sample_mask,
-				$cardinality
+				strrev(implode(',',str_split(strrev($cardinality),3)))
 			);
 			echo json_encode(array('status'=>true,'message'=>$output));
 			

@@ -50,15 +50,15 @@ class DAO_ContextLink {
 		// Fire an event
 		if($db->Affected_Rows()) {
 			$event->trigger(
-		        new Model_DevblocksEvent(
-		            'context_link.set',
-	                array(
-	                    'from_context' => $src_context,
-	                	'from_context_id' => $src_context_id,
-	                    'to_context' => $dst_context,
-	                	'to_context_id' => $dst_context_id,
-	                )
-	            )
+				new Model_DevblocksEvent(
+					'context_link.set',
+					array(
+						'from_context' => $src_context,
+						'from_context_id' => $src_context_id,
+						'to_context' => $dst_context,
+						'to_context_id' => $dst_context_id,
+					)
+				)
 			);
 			
 		} else {
@@ -77,15 +77,15 @@ class DAO_ContextLink {
 		
 		// Fire an event
 		$event->trigger(
-	        new Model_DevblocksEvent(
-	            'context_link.set',
-                array(
-                    'from_context' => $dst_context,
-                	'from_context_id' => $dst_context_id,
-                    'to_context' => $src_context,
-                	'to_context_id' => $src_context_id,
-                )
-            )
+			new Model_DevblocksEvent(
+				'context_link.set',
+				array(
+					'from_context' => $dst_context,
+					'from_context_id' => $dst_context_id,
+					'to_context' => $src_context,
+					'to_context_id' => $src_context_id,
+				)
+			)
 		);
 		
 		/*
@@ -159,7 +159,7 @@ class DAO_ContextLink {
 					'link' => sprintf("ctx://%s:%d/%s", $src_context, $src_context_id, DevblocksPlatform::strToPermalink($meta_src_context['name'])),
 					)
 			);
-			CerberusContexts::logActivity('connection.link', $dst_context, $dst_context_id, $entry);			
+			CerberusContexts::logActivity('connection.link', $dst_context, $dst_context_id, $entry);
 			
 		}
 		
@@ -230,42 +230,7 @@ class DAO_ContextLink {
 		foreach($to_context_ids as $to_context_id) {
 			DAO_ContextLink::setLink($from_context, $from_context_id, $to_context, $to_context_id);
 		}
-	}	
-	
-//	static public function getContextOutboundLinks($from_context, $from_context_id, $to_context, $to_context_ids) {
-//		$db = DevblocksPlatform::getDatabaseService();
-//		
-//		if(!is_array($to_context_ids))
-//			$to_context_ids = array($to_context_ids);
-//		
-//		if(empty($from_context) || empty($from_context_id) || empty($to_context) || empty($to_context_ids))
-//			return array();
-//		
-//		$sql = sprintf("SELECT from_context, from_context_id, to_context, to_context_id ".
-//			"FROM context_link ".
-//			"WHERE 1 ".
-//			"AND (%s = %s AND %s = %d) ",
-//			"AND (%s = %s AND %s IN (%s)) ",
-//			self::FROM_CONTEXT,
-//			$db->qstr($from_context),
-//			self::FROM_CONTEXT_ID,
-//			$from_context_id,
-//			self::TO_CONTEXT,
-//			$db->qstr($to_context),
-//			self::TO_CONTEXT_ID,
-//			implode(',', $to_context_ids)
-//		);
-//		$rs = $db->Execute($sql);
-//		
-//		$objects = array();
-//		
-//		if(is_resource($rs))
-//		while($row = mysql_fetch_assoc($rs)) {
-//			$objects[$row['to_context_id']] = new Model_ContextLink($row['to_context'], $row['to_context_id']);
-//		}
-//		
-//		return $objects;
-//	}
+	}
 	
 	static public function getAllContextLinks($from_context, $from_context_id) {
 		$db = DevblocksPlatform::getDatabaseService();
@@ -300,6 +265,8 @@ class DAO_ContextLink {
 			$from_context_ids = array($from_context_ids);
 		
 		$db = DevblocksPlatform::getDatabaseService();
+		
+		$from_context_ids = DevblocksPlatform::sanitizeArray($from_context_ids, 'integer', array('nonzero','unique'));
 		
 		if(empty($from_context_ids))
 			return array();
@@ -355,7 +322,7 @@ class DAO_ContextLink {
 			return array();
 		
 		/*
-		 * Performance optimization. Use one of two strategies: (1) source context 
+		 * Performance optimization. Use one of two strategies: (1) source context
 		 * has lots of links; (2) source context has few links
 		 */
 		$link_count = DAO_ContextLink::count($from_context, $from_context_id);
@@ -546,7 +513,7 @@ class DAO_ContextLink {
 					'link' => sprintf("ctx://%s:%d", $dst_context, $dst_context_id),
 					)
 			);
-			CerberusContexts::logActivity('connection.unlink', $src_context, $src_context_id, $entry);		
+			CerberusContexts::logActivity('connection.unlink', $src_context, $src_context_id, $entry);
 			
 			$entry = array(
 				//{{actor}} disconnected {{target_object}} {{target}} from {{link_object}} {{link}}
@@ -563,7 +530,7 @@ class DAO_ContextLink {
 					)
 			);
 			CerberusContexts::logActivity('connection.unlink', $dst_context, $dst_context_id, $entry);
-		}		
+		}
 		
 		return true;
 	}

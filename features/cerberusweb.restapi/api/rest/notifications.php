@@ -12,6 +12,7 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 				case 'list':
 					$this->getList();
 					break;
+					
 				default:
 					break;
 			}
@@ -77,7 +78,7 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 			return $tokens[$token];
 		
 		return NULL;
-	}	
+	}
 	
 	function getContext($id) {
 		$labels = array();
@@ -85,7 +86,7 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 		$context = CerberusContexts::getContext(CerberusContexts::CONTEXT_NOTIFICATION, $id, $labels, $values, null, true);
 
 		return $values;
-	} 
+	}
 	
 	private function getId($id) {
 		$worker = $this->getActiveWorker();
@@ -106,6 +107,8 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 
 		@$page = DevblocksPlatform::importGPC($_REQUEST['page'],'integer',1);
 		@$unread = DevblocksPlatform::importGPC($_REQUEST['unread'],'string','');
+		@$sortAsc = DevblocksPlatform::importGPC($_REQUEST['sortAsc'],'integer',0);
+		@$sortBy = DevblocksPlatform::importGPC($_REQUEST['sortBy'],'string','');
 		
 		$filters = array(
 			array('worker_id', '=', $worker->id),
@@ -117,8 +120,8 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 		
 		$container = $this->search(
 			$filters,
-			null,
-			null,
+			$sortBy,
+			$sortAsc,
 			$page,
 			10
 		);
@@ -169,8 +172,8 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 			'results' => $objects,
 		);
 		
-		return $container;		
-	}	
+		return $container;
+	}
 	
 	function postSearch() {
 		$worker = $this->getActiveWorker();
@@ -287,8 +290,8 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 		
 		// Check required fields
 		$reqfields = array(
-			DAO_Notification::MESSAGE, 
-			DAO_Notification::URL, 
+			DAO_Notification::MESSAGE,
+			DAO_Notification::URL,
 			DAO_Notification::WORKER_ID,
 		);
 		$this->_handleRequiredFields($reqfields, $fields);
@@ -302,5 +305,5 @@ class ChRest_Notifications extends Extension_RestController implements IExtensio
 			
 			$this->getId($id);
 		}
-	}	
+	}
 };

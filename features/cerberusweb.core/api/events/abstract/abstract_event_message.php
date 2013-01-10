@@ -19,7 +19,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 	protected $_event_id = null; // override
 	
 	/**
-	 * 
+	 *
 	 * @param integer $message_id
 	 * @param integer $group_id
 	 * @return Model_DevblocksEvent
@@ -30,7 +30,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			list($results) = DAO_Ticket::search(
 				array(),
 				array(
-					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_CLOSED,'=',0),
+					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,'=',0),
 				),
 				10,
 				0,
@@ -73,7 +73,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		 * Ticket
 		 */
 		
-		@$ticket_id = $values['ticket_id']; 
+		@$ticket_id = $values['ticket_id'];
 		$ticket_labels = array();
 		$ticket_values = array();
 		CerberusContexts::getContext(CerberusContexts::CONTEXT_TICKET, $ticket_id, $ticket_labels, $ticket_values, null, true);
@@ -155,7 +155,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		 */
 			
 		$this->setLabels($labels);
-		$this->setValues($values);		
+		$this->setValues($values);
 	}
 	
 	function getValuesContexts($trigger) {
@@ -188,6 +188,10 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			),
 			'ticket_watchers' => array(
 				'label' => 'Ticket watchers',
+				'context' => CerberusContexts::CONTEXT_WORKER,
+			),
+			'group_watchers' => array(
+				'label' => 'Group watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
 			),
 			'ticket_org_id' => array(
@@ -316,7 +320,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 
 		$conditions = $this->_importLabelsTypesAsConditions($labels, $types);
 		
-		return $conditions;		
+		return $conditions;
 	}
 	
 	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
@@ -577,7 +581,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 					
 				} else {
 					$pass = false;
-				}				
+				}
 				
 				$pass = ($not) ? !$pass : $pass;
 				break;
@@ -629,7 +633,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 	}
 	
 	function getActionExtensions() {
-		$actions = 
+		$actions =
 			array(
 				'add_watchers' => array('label' =>'Add watchers'),
 				'create_comment' => array('label' =>'Create a comment'),
@@ -647,9 +651,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				'set_spam_training' => array('label' => 'Set spam training'),
 				'set_status' => array('label' => 'Set status'),
 				'set_subject' => array('label' => 'Set subject'),
-				'set_sender_links' => array('label' => 'Set links on sender'),
-				'set_sender_org_links' => array('label' => 'Set links on sender org'),
-				'set_ticket_links' => array('label' => 'Set links on ticket'),
+				'set_links' => array('label' => 'Set links'),
 				'unschedule_behavior' => array('label' => 'Unschedule behavior'),
 			)
 			+ DevblocksEventHelper::getActionCustomFields(CerberusContexts::CONTEXT_TICKET)
@@ -721,7 +723,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				$dates = array();
 				$conditions = $this->getConditions($trigger);
 				foreach($conditions as $key => $data) {
-					if($data['type'] == Model_CustomField::TYPE_DATE)
+					if(isset($data['type']) && $data['type'] == Model_CustomField::TYPE_DATE)
 						$dates[$key] = $data['label'];
 				}
 				$tpl->assign('dates', $dates);
@@ -768,12 +770,8 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_string.tpl');
 				break;
 				
-			case 'set_sender_links':
-			case 'set_sender_org_links':
-			case 'set_ticket_links':
-				$contexts = Extension_DevblocksContext::getAll(false);
-				$tpl->assign('contexts', $contexts);
-				$tpl->display('devblocks:cerberusweb.core::events/action_set_links.tpl');
+			case 'set_links':
+				DevblocksEventHelper::renderActionSetLinks($trigger);
 				break;
 				
 			case 'unschedule_behavior':
@@ -791,7 +789,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		
 		$tpl->clearAssign('params');
 		$tpl->clearAssign('namePrefix');
-		$tpl->clearAssign('token_labels');		
+		$tpl->clearAssign('token_labels');
 	}
 	
 	function simulateActionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
@@ -823,6 +821,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 
 			case 'relay_email':
+				return DevblocksEventHelper::simulateActionRelayEmail($params, $dict);
 				break;
 				
 			case 'schedule_email_recipients':
@@ -833,6 +832,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 				
 			case 'set_owner':
+				return DevblocksEventHelper::simulateActionSetTicketOwner($params, $dict);
 				break;
 			
 			case 'set_reopen_date':
@@ -843,33 +843,31 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 				
 			case 'send_email_recipients':
-				// Translate message tokens
-				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$content = $tpl_builder->build($params['content'], $dict);
-
-				$out = sprintf(">>> Sending email to recipients\n".
-					"%s\n",
-					$content
-				);
-				
-				return $out;
+				return DevblocksEventHelper::simulateActionSendEmailRecipients($params, $dict);
 				break;
 				
 			case 'set_spam_training':
+				$out = sprintf(">>> Setting spam training\n".
+					"%s\n",
+					$params['value'] == 'N' ? 'Not Spam' : 'Spam'
+				);
+				return $out;
 				break;
 				
 			case 'set_status':
+				return DevblocksEventHelper::simulateActionSetStatus($params, $dict);
 				break;
 				
 			case 'set_subject':
+				return DevblocksEventHelper::simulateActionSetSubject($params, $dict);
 				break;
 			
 			case 'move_to':
-				break;	
+				return DevblocksEventHelper::simulateActionMoveTo($params, $dict);
+				break;
 
-			case 'set_sender_links':
-			case 'set_sender_org_links':
-			case 'set_ticket_links':
+			case 'set_links':
+				return DevblocksEventHelper::simulateActionSetLinks($trigger, $params, $dict);
 				break;
 				
 			case 'unschedule_behavior':
@@ -894,7 +892,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 					if(!empty($context) && !empty($context_id))
 						return DevblocksEventHelper::simulateActionSetCustomField($custom_field, 'ticket_custom', $params, $dict, $context, $context_id);
 				}
-				break;				
+				break;
 		}
 	}
 	
@@ -1053,10 +1051,16 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 				
 			case 'set_subject':
+				// Translate message tokens
+				@$value = $params['value'];
+				
+				$builder = DevblocksPlatform::getTemplateBuilder();
+				$value = $builder->build($value, $dict);
+				
 				DAO_Ticket::update($ticket_id,array(
-					DAO_Ticket::SUBJECT => $params['value'],
+					DAO_Ticket::SUBJECT => $value,
 				));
-				$dict->ticket_subject = $params['value'];
+				$dict->ticket_subject = $value;
 				break;
 			
 			case 'move_to':
@@ -1127,45 +1131,10 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 					);
 				}
 				*/
-				break;	
+				break;
 
-			case 'set_sender_links':
-			case 'set_sender_org_links':
-			case 'set_ticket_links':
-				@$to_context_strings = $params['context_objects'];
-
-				if(!is_array($to_context_strings) || empty($to_context_strings))
-					break;
-
-				$from_context = null;
-				$from_context_id = null;
-				
-				switch($token) {
-					case 'set_sender_links':
-						$from_context = CerberusContexts::CONTEXT_ADDRESS;
-						@$from_context_id = $dict->sender_id;
-						break;
-					case 'set_sender_org_links':
-						$from_context = CerberusContexts::CONTEXT_ORG;
-						@$from_context_id = $dict->sender_org_id;
-						break;
-					case 'set_ticket_links':
-						$from_context = CerberusContexts::CONTEXT_TICKET;
-						@$from_context_id = $dict->ticket_id;
-						break;
-				}
-				
-				if(empty($from_context) || empty($from_context_id))
-					break;
-				
-				foreach($to_context_strings as $to_context_string) {
-					@list($to_context, $to_context_id) = explode(':', $to_context_string);
-					
-					if(empty($to_context) || empty($to_context_id))
-						continue;
-					
-					DAO_ContextLink::setLink($from_context, $from_context_id, $to_context, $to_context_id);
-				}				
+			case 'set_links':
+				return DevblocksEventHelper::runActionSetLinks($trigger, $params, $dict);
 				break;
 				
 			case 'unschedule_behavior':
@@ -1190,7 +1159,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 					if(!empty($context) && !empty($context_id))
 						DevblocksEventHelper::runActionSetCustomField($custom_field, 'ticket_custom', $params, $dict, $context, $context_id);
 				}
-				break;				
+				break;
 		}
 	}
-};	
+};
