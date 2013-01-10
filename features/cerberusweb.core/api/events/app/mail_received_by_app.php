@@ -19,27 +19,27 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 	const ID = 'event.mail.received.app';
 	
 	/**
-	 * 
+	 *
 	 * Enter description here ...
 	 * @param CerberusParserModel $parser_model
 	 */
 	static function trigger(&$parser_model) { //, Model_Message $message, Model_Ticket $ticket, Model_Group $group
 		$events = DevblocksPlatform::getEventService();
 		$events->trigger(
-	        new Model_DevblocksEvent(
-	            self::ID,
-                array(
-                    'parser_model' => &$parser_model,
-                	'_whisper' => array(
-                		'cerberusweb.contexts.app' => array(0),
-                	),
-                )
-            )
+			new Model_DevblocksEvent(
+				self::ID,
+				array(
+					'parser_model' => &$parser_model,
+					'_whisper' => array(
+					'cerberusweb.contexts.app' => array(0),
+					),
+				)
+			)
 		);
-	} 
-	
+	}
+
 	/**
-	 * 
+	 *
 	 * @param CerberusParserModel $parser_model
 	 * @return Model_DevblocksEvent
 	 */
@@ -101,6 +101,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			$values['recipients'] = $parser_model->getRecipients();
 			$values['attachments'] = $parser_model->getMessage()->files;
 			$values['attachment_count'] = count($values['attachments']);
+			$values['sender_is_worker'] = $parser_model->isSenderWorker();
 		}
 		
 		/**
@@ -130,7 +131,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		 */
 
 		$this->setLabels($labels);
-		$this->setValues($values);		
+		$this->setValues($values);
 	}
 	
 	function getValuesContexts($trigger) {
@@ -163,6 +164,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		$labels['header'] = 'Message header';
 		$labels['is_new'] = 'Message is new';
 		$labels['recipients'] = 'Message recipients';
+		$labels['sender_is_worker'] = 'Sender is worker';
 		
 		$types = array(
 			'subject' => Model_CustomField::TYPE_SINGLE_LINE,
@@ -186,11 +188,12 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			'header' => null,
 			'is_new' => Model_CustomField::TYPE_CHECKBOX,
 			'recipients' => null,
+			'sender_is_worker' => Model_CustomField::TYPE_CHECKBOX,
 		);
 
 		$conditions = $this->_importLabelsTypesAsConditions($labels, $types);
 		
-		return $conditions;		
+		return $conditions;
 	}
 	
 	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
@@ -302,7 +305,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 					}
 				}
 				
-				$pass = ($not) ? !$found : $found;				
+				$pass = ($not) ? !$found : $found;
 				break;
 				
 			case 'recipients':
@@ -369,7 +372,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 				}
 				
 				$pass = ($not) ? !$pass : $pass;
-				break;				
+				break;
 				
 			default:
 				$pass = false;
@@ -380,13 +383,16 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 	}
 	
 	function getActionExtensions() {
-		$actions = 
+		$actions =
 			array(
 				'append_to_content' => array('label' =>'Append text to message content'),
+				'create_notification' => array('label' =>'Create a notification'),
 				'prepend_to_content' => array('label' =>'Prepend text to message content'),
 				'replace_content' => array('label' =>'Replace text in message content'),
 				'reject' => array('label' =>'Reject delivery of message'),
 				'redirect_email' => array('label' =>'Redirect delivery to another email address'),
+				'remove_attachments' => array('label' => 'Remove attachments by filename'),
+				'send_email' => array('label' => 'Send email'),
 				'send_email_sender' => array('label' => 'Reply to sender'),
 				'set_header' => array('label' => 'Set message header'),
 			)
@@ -412,6 +418,11 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 				$tpl->display('devblocks:cerberusweb.core::events/mail_before_sent_by_group/action_add_content.tpl');
 				break;
 				
+			case 'create_notification':
+				$translate = DevblocksPlatform::getTranslationService();
+				DevblocksEventHelper::renderActionCreateNotification($trigger);
+				break;
+				
 			case 'replace_content':
 				$tpl->display('devblocks:cerberusweb.core::events/mail_before_sent_by_group/action_replace_content.tpl');
 				break;
@@ -421,6 +432,14 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 				
 			case 'redirect_email':
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_app/action_redirect_email.tpl');
+				break;
+			
+			case 'remove_attachments':
+				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_app/action_remove_attachments.tpl');
+				break;
+			
+			case 'send_email':
+				DevblocksEventHelper::renderActionSendEmail($trigger);
 				break;
 
 			case 'send_email_sender':
@@ -444,19 +463,43 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		
 		$tpl->clearAssign('params');
 		$tpl->clearAssign('namePrefix');
-		$tpl->clearAssign('token_labels');		
+		$tpl->clearAssign('token_labels');
 	}
 	
 	function simulateActionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
 		switch($token) {
 			case 'append_to_content':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$dict->body .= "\r\n" . $tpl_builder->build($params['content'], $dict);
+				$content = $tpl_builder->build($params['content'], $dict);
+				$dict->body = $dict->body . "\r\n" . $content;
+				
+				$out = sprintf(">>> Prepending text to message content\n".
+					"Text:\n%s\n".
+					"Message:\n%s\n",
+					$content,
+					$dict->body
+				);
+				
+				return $out;
+				break;
+				
+			case 'create_notification':
+				return DevblocksEventHelper::simulateActionCreateNotification($params, $dict);
 				break;
 				
 			case 'prepend_to_content':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$dict->body = $tpl_builder->build($params['content'], $dict) . "\r\n" . $dict->body;
+				$content = $tpl_builder->build($params['content'], $dict);
+				$dict->body = $content . "\r\n" . $dict->body;
+				
+				$out = sprintf(">>> Prepending text to message content\n".
+					"Text:\n%s\n".
+					"Message:\n%s\n",
+					$content,
+					$dict->body
+				);
+				
+				return $out;
 				break;
 				
 			case 'replace_content':
@@ -470,46 +513,83 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 					$value = str_replace($replace, $with, $dict->body);
 				}
 				
+				$before = $dict->body;
+				
 				if(!empty($value)) {
 					$dict->body = trim($value,"\r\n");
 				}
+				
+				$out = sprintf(">>> Replacing content\n".
+					"Before:\n%s\n".
+					"After:\n%s\n",
+					$before,
+					$dict->body
+				);
+				
+				return $out;
 				break;
 				
 			case 'reject':
 				$dict->pre_actions['reject'] = true;
+				$out = ">>> Rejecting message\n";
+				
+				return $out;
 				break;
 			
 			case 'redirect_email':
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+				$to = $tpl_builder->build($params['to'], $dict);
+			
+				$out = sprintf(">>> Redirecting message to:\n%s",
+					$to
+				);
+			
+				return $out;
+				break;
+			
+			case 'remove_attachments':
+				@$oper = $params['match_oper'];
+				@$value = $params['match_value'];
+				
+				$out = sprintf(">>> Removing attachments where filename %s %s\n",
+					$oper,
+					$value
+				);
+				return $out;
+				break;
+				
+			case 'send_email':
+				return DevblocksEventHelper::simulateActionSendEmail($params, $dict);
 				break;
 				
 			case 'send_email_sender':
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+				$subject = $tpl_builder->build($params['subject'], $dict);
+				$content = $tpl_builder->build($params['content'], $dict);
+				
+				$out = sprintf(">>> Sending message to sender\n".
+					"Subject: %s\n".
+					"Content: \n%s\n",
+					$subject,
+					$content
+				);
+				
+				return $out;
 				break;
 				
 			case 'set_header':
-				@$header = strtolower($params['header']);
+				$out = sprintf(">>> Setting header\n".
+					"Header: %s\n".
+					"Value: %s\n",
+					$header,
+					$value
+				);
 				
-				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$value = $tpl_builder->build($params['value'], $dict);
-				
-   				@$parser_model = $dict->_parser_model;
-   				if(empty($parser_model) || !is_a($parser_model,'CerberusParserModel'))
-   					break;
-				
-   				$headers =& $parser_model->getHeaders();
-
-   				if(empty($value)) {
-   					if(isset($headers[$header]))
-   						unset($headers[$header]);
-   					
-   				} else {
-	   				$headers[$header] = $value;
-   				}
-   					
+				return $out;
 				break;
 				
 			default:
 				if('set_cf_' == substr($token,0,7)) {
-					@$parser_model = $dict->_parser_model;
 					
 					$field_id = substr($token,7);
 					$custom_field = DAO_CustomField::get($field_id);
@@ -523,15 +603,29 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 						case Model_CustomField::TYPE_WORKER:
 							$value = $params['worker_id'];
 							break;
-						default:
+						case Model_CustomField::TYPE_DROPDOWN:
+						case Model_CustomField::TYPE_CHECKBOX:
+						case Model_CustomField::TYPE_DATE:
 							$value = $params['value'];
+							break;
+						default:
+							$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+							$value = $tpl_builder->build($params['value'], $dict);
 							break;
 					}
 					
 					if(!empty($parser_model))
-						$parser_model->getMessage()->custom_fields[$field_id] = $value; 
+						$parser_model->getMessage()->custom_fields[$field_id] = $value;
+						
+					$out = sprintf(">>> Setting custom field\n".
+						"Custom Field: %s\n".
+						"Value: %s\n",
+						$custom_field->name,
+						$value
+					);
+					return $out;
 				}
-				break;				
+				break;
 		}
 	}
 	
@@ -540,6 +634,10 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			case 'append_to_content':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 				$dict->body .= "\r\n" . $tpl_builder->build($params['content'], $dict);
+				break;
+				
+			case 'create_notification':
+				DevblocksEventHelper::runActionCreateNotification($params, $dict);
 				break;
 				
 			case 'prepend_to_content':
@@ -569,15 +667,33 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			
 			case 'redirect_email':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-   				@$to = $tpl_builder->build($params['to'], $dict);
-
-   				@$parser_model = $dict->_parser_model;
-   				if(empty($parser_model) || !is_a($parser_model,'CerberusParserModel'))
-   					break;
-   					
-  				CerberusMail::reflect($parser_model, $to);
+				@$to = $tpl_builder->build($params['to'], $dict);
+				
+				@$parser_model = $dict->_parser_model;
+				if(empty($parser_model) || !is_a($parser_model,'CerberusParserModel'))
+					break;
+				
+				CerberusMail::reflect($parser_model, $to);
 				break;
 				
+			case 'remove_attachments':
+				@$oper = $params['match_oper'];
+				@$value = $params['match_value'];
+				
+				if(empty($oper) || empty($value))
+					break;
+				
+				if(!isset($dict->pre_actions['attachment_filters'])) {
+					$dict->pre_actions['attachment_filters'] = array();
+				}
+				
+				$dict->pre_actions['attachment_filters'][] = array('oper' => $oper, 'value' => $value);
+				break;
+				
+			case 'send_email':
+				return DevblocksEventHelper::runActionSendEmail($params, $dict);
+				break;
+
 			case 'send_email_sender':
 				// Translate message tokens
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
@@ -654,14 +770,20 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 						case Model_CustomField::TYPE_WORKER:
 							$value = $params['worker_id'];
 							break;
-						default:
+						case Model_CustomField::TYPE_DROPDOWN:
+						case Model_CustomField::TYPE_CHECKBOX:
+						case Model_CustomField::TYPE_DATE:
 							$value = $params['value'];
+							break;
+						default:
+							$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+							$value = $tpl_builder->build($params['value'], $dict);
 							break;
 					}
 					
-					$parser_model->getMessage()->custom_fields[$field_id] = $value; 
+					$parser_model->getMessage()->custom_fields[$field_id] = $value;
 				}
-				break;				
+				break;
 		}
 	}
 };

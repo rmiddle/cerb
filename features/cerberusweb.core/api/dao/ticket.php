@@ -81,7 +81,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		$sql = sprintf("SELECT t.id FROM ticket t WHERE t.mask = %s",
 			$db->qstr($mask)
 		);
-		$ticket_id = $db->GetOne($sql); 
+		$ticket_id = $db->GetOne($sql);
 
 		// If we found a hit on a ticket record, return the ID
 		if(!empty($ticket_id)) {
@@ -117,21 +117,20 @@ class DAO_Ticket extends C4_ORMHelper {
 	}
 	
 	/**
-	 * 
+	 *
 	 * @param string $message_id
 	 * @return array
 	 */
 	static function getTicketByMessageId($message_id) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		$sql = sprintf("SELECT t.id AS ticket_id, mh.message_id AS message_id ".
+		$sql = sprintf("SELECT m.ticket_id AS ticket_id, mh.message_id AS message_id ".
 			"FROM message_header mh ".
 			"INNER JOIN message m ON (m.id=mh.message_id) ".
-			"INNER JOIN ticket t ON (t.id=m.ticket_id) ".
 			"WHERE mh.header_name = 'message-id' AND mh.header_value = %s",
 			$db->qstr($message_id)
 		);
-		$rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); 
+		$rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 		
 		if($row = mysql_fetch_assoc($rs)) {
 			$ticket_id = intval($row['ticket_id']);
@@ -148,12 +147,86 @@ class DAO_Ticket extends C4_ORMHelper {
 		return null;
 	}
 	
+	static function getViewCountForRequesterHistory($view_id, $ticket, $scope=null) {
+		$view = self::getViewForRequesterHistory($view_id, $ticket, $scope);
+		list($results, $count) = $view->getData();
+		return $count;
+	}
+	
+	static function getViewForRequesterHistory($view_id, $ticket, $scope=null) {
+		$translate = DevblocksPlatform::getTranslationService();
+		
+		// Defaults
+		$defaults = new C4_AbstractViewModel();
+		$defaults->class_name = 'View_Ticket';
+		$defaults->id = $view_id;
+		$defaults->name = $translate->_('addy_book.history.view.title');
+		$defaults->view_columns = array(
+			SearchFields_Ticket::TICKET_LAST_ACTION_CODE,
+			SearchFields_Ticket::TICKET_CREATED_DATE,
+			SearchFields_Ticket::TICKET_GROUP_ID,
+			SearchFields_Ticket::TICKET_BUCKET_ID,
+		);
+		$defaults->renderLimit = 10;
+		$defaults->renderSortBy = SearchFields_Ticket::TICKET_CREATED_DATE;
+		$defaults->renderSortAsc = false;
+		
+		// View
+		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
+		
+		// Sanitize scope options
+		if('org'==$scope) {
+			if(empty($ticket->org_id))
+				$scope = '';
+		}
+		
+		if('domain'==$scope) {
+			$contact = DAO_Address::get($ticket->first_wrote_address_id);
+			
+			$email_parts = explode('@', $contact->email);
+			if(!is_array($email_parts) || 2 != count($email_parts))
+				$scope = '';
+		}
+
+		switch($scope) {
+			case 'org':
+				$view->addParamsRequired(array(
+					SearchFields_Ticket::TICKET_ORG_ID => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_ORG_ID,'=',$ticket->org_id),
+					SearchFields_Ticket::TICKET_DELETED => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,'=',0),
+				), true);
+				$view->name = ucwords($translate->_('contact_org.name'));
+				break;
+				
+			case 'domain':
+				$view->addParamsRequired(array(
+					SearchFields_Ticket::REQUESTER_ADDRESS => new DevblocksSearchCriteria(SearchFields_Ticket::REQUESTER_ADDRESS,'like','*@'.$email_parts[1]),
+					SearchFields_Ticket::TICKET_DELETED => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,'=',0),
+				), true);
+				$view->name = ucwords($translate->_('common.email')) . ": *@" . $email_parts[1];
+				break;
+				
+			default:
+			case 'email':
+				$scope = 'email';
+				$requesters = $ticket->getRequesters();
+				
+				$view->addParamsRequired(array(
+					SearchFields_Ticket::REQUESTER_ID => new DevblocksSearchCriteria(SearchFields_Ticket::REQUESTER_ID,'in',array_keys($requesters)),
+					SearchFields_Ticket::TICKET_DELETED => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,'=',0),
+				), true);
+				$view->name = sprintf("History: %d recipient(s)", count($requesters));
+				break;
+		}
+		
+		return $view;
+	}
+	
 	/**
 	 * creates a new ticket object in the database
 	 *
 	 * @param array $fields
 	 * @return integer
-	 * 
+	 *
 	 */
 	static function create($fields) {
 		$db = DevblocksPlatform::getDatabaseService();
@@ -164,7 +237,7 @@ class DAO_Ticket extends C4_ORMHelper {
 			time()
 		);
 		$db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-		$id = $db->LastInsertId(); 
+		$id = $db->LastInsertId();
 		
 		self::update($id, $fields);
 		
@@ -189,17 +262,17 @@ class DAO_Ticket extends C4_ORMHelper {
 		$logger->info('[Maint] Fixed ' . $db->Affected_Rows() . ' tickets in missing buckets.');
 		
 		// Fire event
-	    $eventMgr = DevblocksPlatform::getEventService();
-	    $eventMgr->trigger(
-	        new Model_DevblocksEvent(
-	            'context.maint',
-                array(
-                	'context' => CerberusContexts::CONTEXT_TICKET,
-                	'context_table' => 'ticket',
-                	'context_key' => 'id',
-                )
-            )
-	    );
+		$eventMgr = DevblocksPlatform::getEventService();
+		$eventMgr->trigger(
+			new Model_DevblocksEvent(
+				'context.maint',
+				array(
+					'context' => CerberusContexts::CONTEXT_TICKET,
+					'context_table' => 'ticket',
+					'context_key' => 'id',
+				)
+			)
+		);
 	}
 	
 	static function merge($ids=array()) {
@@ -336,7 +409,7 @@ class DAO_Ticket extends C4_ORMHelper {
 
 			// Set our destination ticket to the latest touched details
 			DAO_Ticket::update($oldest_id, array(
-				DAO_Ticket::LAST_ACTION_CODE => $most_recent_updated_ticket[SearchFields_Ticket::TICKET_LAST_ACTION_CODE], 
+				DAO_Ticket::LAST_ACTION_CODE => $most_recent_updated_ticket[SearchFields_Ticket::TICKET_LAST_ACTION_CODE],
 				DAO_Ticket::UPDATED_DATE => $most_recent_updated_ticket[SearchFields_Ticket::TICKET_UPDATED_DATE],
 				DAO_Ticket::IS_CLOSED => $most_recent_updated_ticket[SearchFields_Ticket::TICKET_CLOSED],
 				DAO_Ticket::IS_WAITING => $most_recent_updated_ticket[SearchFields_Ticket::TICKET_WAITING],
@@ -389,16 +462,16 @@ class DAO_Ticket extends C4_ORMHelper {
 			/*
 			 * Notify anything that wants to know when tickets merge.
 			 */
-		    $eventMgr = DevblocksPlatform::getEventService();
-		    $eventMgr->trigger(
-		        new Model_DevblocksEvent(
-		            'ticket.action.merge',
-	                array(
-	                    'new_ticket_id' => $oldest_id,
-	                    'old_ticket_ids' => $merge_ticket_ids,
-	                )
-	            )
-		    );
+			$eventMgr = DevblocksPlatform::getEventService();
+			$eventMgr->trigger(
+				new Model_DevblocksEvent(
+					'ticket.action.merge',
+					array(
+						'new_ticket_id' => $oldest_id,
+						'old_ticket_ids' => $merge_ticket_ids,
+					)
+				)
+			);
 			
 			return $oldest_id;
 		}
@@ -430,7 +503,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		// Reindex the first message
 		if($first_message) {
 			$fields[DAO_Ticket::FIRST_MESSAGE_ID] = $first_message->id;
-			$fields[DAO_Ticket::FIRST_WROTE_ID] = $first_message->address_id; 
+			$fields[DAO_Ticket::FIRST_WROTE_ID] = $first_message->address_id;
 		}
 		
 		// Reindex the last message
@@ -505,7 +578,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
 		
 		$sql = "SELECT id , mask, subject, is_waiting, is_closed, is_deleted, group_id, bucket_id, org_id, owner_id, first_message_id, first_outgoing_message_id, last_message_id, ".
-			"first_wrote_address_id, last_wrote_address_id, created_date, updated_date, closed_at, reopen_at, spam_training, ". 
+			"first_wrote_address_id, last_wrote_address_id, created_date, updated_date, closed_at, reopen_at, spam_training, ".
 			"spam_score, interesting_words, num_messages, elapsed_response_first, elapsed_resolution_first ".
 			"FROM ticket ".
 			$where_sql.
@@ -558,7 +631,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		mysql_free_result($rs);
 		
 		return $objects;
-	}	
+	}
 	
 	static function updateWhere($fields, $where) {
 		parent::_updateWhere('ticket', $fields, $where);
@@ -568,84 +641,65 @@ class DAO_Ticket extends C4_ORMHelper {
 		if(!is_array($ids))
 			$ids = array($ids);
 		
-		/*
-		 * Make a diff for the requested objects in batches
-		 */
-    	$chunks = array_chunk($ids, 25, true);
-    	while($batch_ids = array_shift($chunks)) {
-	    	$objects = DAO_Ticket::getTickets($batch_ids);
-	    	$object_changes = array();
-	    	
-	    	foreach($objects as $object_id => $object) {
-	    		$pre_fields = get_object_vars($object);
-	    		$changes = array();
-	    		
-	    		foreach($fields as $field_key => $field_val) {
-	    			// Make sure the value of the field actually changed
-	    			if($pre_fields[$field_key] != $field_val) {
-	    				$changes[$field_key] = array('from' => $pre_fields[$field_key], 'to' => $field_val);
-	    			}
-	    		}
-	    		
-	    		// If we had changes
-	    		if(!empty($changes)) {
-	    			$object_changes[$object_id] = array(
-	    				'model' => array_merge($pre_fields, $fields),
-	    				'changes' => $changes,
-	    			);
-	    		}
-	    	}
-	    	
-	    	parent::_update($batch_ids, 'ticket', $fields);
-	    	
-	    	if(!empty($object_changes)) {
-		    	// Local events
-		    	self::_processUpdateEvents($object_changes);
-		    	
-		        /*
-		         * Trigger an event about the changes
-		         */
-			    $eventMgr = DevblocksPlatform::getEventService();
-			    $eventMgr->trigger(
-			        new Model_DevblocksEvent(
-			            'dao.ticket.update',
-		                array(
-		                    'objects' => $object_changes,
-		                )
-		            )
-			    );
-			    
-			    // Log the context update
-	    		DevblocksPlatform::markContextChanged(CerberusContexts::CONTEXT_TICKET, $ids);
-	    	}
-    	}
-    	
+		// Make a diff for the requested objects in batches
+		
+		$chunks = array_chunk($ids, 100, true);
+		while($batch_ids = array_shift($chunks)) {
+			if(empty($batch_ids))
+				continue;
+			
+			// Get state before changes
+			$object_changes = parent::_getUpdateDeltas($batch_ids, $fields, get_class());
+
+			// Make changes
+			parent::_update($batch_ids, 'ticket', $fields);
+			
+			// Send events
+			if(!empty($object_changes)) {
+				// Local events
+				self::_processUpdateEvents($object_changes);
+				
+				// Trigger an event about the changes
+				$eventMgr = DevblocksPlatform::getEventService();
+				$eventMgr->trigger(
+					new Model_DevblocksEvent(
+						'dao.ticket.update',
+						array(
+							'objects' => $object_changes,
+						)
+					)
+				);
+				
+				// Log the context update
+				DevblocksPlatform::markContextChanged(CerberusContexts::CONTEXT_TICKET, $batch_ids);
+			}
+		}
 	}
 	
 	static function _processUpdateEvents($objects) {
-    	if(is_array($objects))
-    	foreach($objects as $object_id => $object) {
-    		@$model = $object['model'];
-    		@$changes = $object['changes'];
-    		
-    		if(empty($model) || empty($changes))
-    			continue;
-    		
-    		/*
-    		 * Owner changed
-    		 */
-    		if(isset($changes[DAO_Ticket::OWNER_ID])) {
-	    		@$owner_id = $changes[DAO_Ticket::OWNER_ID];
-	    		
-	    		/*
-	    		* Mail assigned in group
-	    		*/
-	    		Event_MailAssignedInGroup::trigger($object_id, $model[DAO_Ticket::GROUP_ID]);
-	    		
+		if(is_array($objects))
+		foreach($objects as $object_id => $object) {
+			@$model = $object['model'];
+			@$changes = $object['changes'];
+			
+			if(empty($model) || empty($changes))
+				continue;
+			
+			/*
+			 * Owner changed
+			 */
+			if(isset($changes[DAO_Ticket::OWNER_ID])) {
+				@$owner_id = $changes[DAO_Ticket::OWNER_ID];
+				
+				/*
+				* Mail assigned in group
+				*/
+				Event_MailAssignedInGroup::trigger($object_id, $model[DAO_Ticket::GROUP_ID]);
+				
 				/*
 				 * Log activity (ticket.unassigned)
 				 */
-	    		if(empty($owner_id['to'])) {
+				if(empty($owner_id['to'])) {
 					$activity_point = 'ticket.owner.unassigned';
 					
 					$entry = array(
@@ -659,12 +713,12 @@ class DAO_Ticket extends C4_ORMHelper {
 							)
 					);
 					CerberusContexts::logActivity($activity_point, CerberusContexts::CONTEXT_TICKET, $object_id, $entry);
-	    		}
-	    		
+				}
+				
 				/*
 				 * Log activity (ticket.assigned)
 				 */
-	    		if(!empty($owner_id['to'])) {
+				if(!empty($owner_id['to'])) {
 					$activity_point = 'ticket.owner.assigned';
 					$target_worker = DAO_Worker::get($changes[DAO_Ticket::OWNER_ID]['to']);
 
@@ -680,10 +734,10 @@ class DAO_Ticket extends C4_ORMHelper {
 							)
 					);
 					CerberusContexts::logActivity($activity_point, CerberusContexts::CONTEXT_TICKET, $object_id, $entry);
-	    			
-	    		}
-    		}
-    		
+					
+				}
+			}
+			
 			/*
 			 * Ticket moved
 			 */
@@ -691,7 +745,32 @@ class DAO_Ticket extends C4_ORMHelper {
 			@$bucket_id = $changes[DAO_Ticket::BUCKET_ID];
 			
 			if(!empty($group_id) || !empty($bucket_id)) {
+				// VAs
+				
 				Event_MailMovedToGroup::trigger($object_id, $model[DAO_Ticket::GROUP_ID]);
+
+				// Activity log
+				
+				@$to_group = DAO_Group::get($group_id['to']);
+				@$to_bucket = DAO_Bucket::get($bucket_id['to']);
+				
+				if(empty($to_group))
+					$to_group = DAO_Group::get($model[DAO_Ticket::GROUP_ID]);
+				
+				$entry = array(
+					//{{actor}} moved ticket {{target}} to {{group}} {{bucket}}
+					'message' => 'activities.ticket.moved',
+					'variables' => array(
+						'target' => sprintf("[%s] %s", $model[DAO_Ticket::MASK], $model[DAO_Ticket::SUBJECT]),
+						'group' => $to_group->name,
+						'bucket' => (empty($to_bucket) ? 'Inbox' : $to_bucket->name),
+						),
+					'urls' => array(
+						'target' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_TICKET, $object_id, $model[DAO_Ticket::MASK]),
+						'group' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_GROUP, $to_group->id, $to_group->name),
+						)
+				);
+				CerberusContexts::logActivity('ticket.moved', CerberusContexts::CONTEXT_TICKET, $object_id, $entry);
 			}
 			
 			/*
@@ -699,7 +778,7 @@ class DAO_Ticket extends C4_ORMHelper {
 			 */
 			if(
 				isset($changes[DAO_Ticket::IS_WAITING])
-				|| isset($changes[DAO_Ticket::IS_CLOSED]) 
+				|| isset($changes[DAO_Ticket::IS_CLOSED])
 				|| isset($changes[DAO_Ticket::IS_DELETED])
 			) {
 				@$waiting = $changes[DAO_Ticket::IS_WAITING];
@@ -714,7 +793,7 @@ class DAO_Ticket extends C4_ORMHelper {
 					if(empty($model['closed_at'])) {
 						DAO_Ticket::update($object_id, array(
 							DAO_Ticket::CLOSED_AT => time(),
-							DAO_Ticket::ELAPSED_RESOLUTION_FIRST => (time()-intval($model['created_date'])), 
+							DAO_Ticket::ELAPSED_RESOLUTION_FIRST => (time()-intval($model['created_date'])),
 						));
 					}
 				}
@@ -768,7 +847,7 @@ class DAO_Ticket extends C4_ORMHelper {
 				}
 				
 			} //foreach
-    	}		
+		}
 	}
 	
 	static function updateMessageCount($id) {
@@ -781,7 +860,7 @@ class DAO_Ticket extends C4_ORMHelper {
 	}
 	
 	/**
-	 * 
+	 *
 	 * @param integer $ticket_id
 	 * @return Model_Address[]
 	 */
@@ -830,7 +909,7 @@ class DAO_Ticket extends C4_ORMHelper {
 			$addys = array_merge($addys, !is_array($cc) ? array($cc) : $cc);
 
 		$exclude_list = DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::PARSER_AUTO_REQ_EXCLUDE, CerberusSettingsDefaults::PARSER_AUTO_REQ_EXCLUDE);
-		@$excludes = DevblocksPlatform::parseCrlfString($exclude_list);		
+		@$excludes = DevblocksPlatform::parseCrlfString($exclude_list);
 		
 		foreach($addys as $addy => $addy_data) {
 			try {
@@ -912,16 +991,16 @@ class DAO_Ticket extends C4_ORMHelper {
 	}
 	
 	static function deleteRequester($id, $address_id) {
-	    if(empty($id) || empty($address_id))
-	        return;
-	        
-        $db = DevblocksPlatform::getDatabaseService();
+		if(empty($id) || empty($address_id))
+			return;
+			
+		$db = DevblocksPlatform::getDatabaseService();
 
-        $sql = sprintf("DELETE QUICK FROM requester WHERE ticket_id = %d AND address_id = %d",
-            $id,
-            $address_id
-        );
-        $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); 
+		$sql = sprintf("DELETE QUICK FROM requester WHERE ticket_id = %d AND address_id = %d",
+			$id,
+			$address_id
+		);
+		$db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 	}
 	
 	static function analyze($params, $limit=15, $mode="senders", $mode_param=null) { // or "subjects"
@@ -947,48 +1026,48 @@ class DAO_Ticket extends C4_ORMHelper {
 			$sql = "SELECT COUNT(*) AS hits, SUBSTRING(a1.email FROM POSITION('@' IN a1.email)) AS domain ".
 				$join_sql.
 				$where_sql.
-		        "GROUP BY domain HAVING count(*) > 1 ".
-		        "ORDER BY hits DESC ";
-		    $rs = $db->SelectLimit($sql, $limit, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-		    
+				"GROUP BY domain HAVING count(*) > 1 ".
+				"ORDER BY hits DESC ";
+			$rs = $db->SelectLimit($sql, $limit, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+			
 			$domains = array(); // [TODO] Temporary
 			while($row = mysql_fetch_assoc($rs)) {
-		        $hash = md5('domain'.$row['domain']);
-		        $domains[] = $row['domain']; // [TODO] Temporary
-		        $tops[$hash] = array('domain',$row['domain'],$row['hits']);
-		    }
-		    
-		    mysql_free_result($rs);
-		    
+				$hash = md5('domain'.$row['domain']);
+				$domains[] = $row['domain']; // [TODO] Temporary
+				$tops[$hash] = array('domain',$row['domain'],$row['hits']);
+			}
+			
+			mysql_free_result($rs);
+			
 			// [JAS]: Most common senders in work pile
 			$sql = "SELECT count(*) AS hits, a1.email ".
 				$join_sql.
-				$where_sql . 
+				$where_sql .
 					sprintf(" AND SUBSTRING(a1.email FROM POSITION('@' IN a1.email)) IN ('%s')",
-		        		implode("','", $domains)
-		    		).
+						implode("','", $domains)
+					).
 				"GROUP BY a1.email HAVING count(*) > 1 ".
 				"ORDER BY hits DESC ";
-		    $rs = $db->SelectLimit($sql, $limit*2, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-		    
-		    while($row = mysql_fetch_assoc($rs)) {
-		        $hash = md5('sender'.$row['email']);
-		        $senders[$hash] = array('sender',$row['email'],$row['hits']);
-		    }
-		    
-		    mysql_free_result($rs);
-		    
-		    uasort($senders, array('DAO_Ticket','sortByCount'));
-	        
-		    // Thread senders into domains
-		    foreach($senders as $hash => $sender) {
-	            $domain = substr($sender[1],strpos($sender[1],'@'));
-	            $domain_hash = md5('domain' . $domain);
-	            if(!isset($tops[$domain_hash])) {
-		            continue; // [TODO] Temporary
-	            }
-	            $tops[$domain_hash][3][$hash] = $sender;
-	        }
+			$rs = $db->SelectLimit($sql, $limit*2, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+			
+			while($row = mysql_fetch_assoc($rs)) {
+				$hash = md5('sender'.$row['email']);
+				$senders[$hash] = array('sender',$row['email'],$row['hits']);
+			}
+			
+			mysql_free_result($rs);
+			
+			uasort($senders, array('DAO_Ticket','sortByCount'));
+			
+			// Thread senders into domains
+			foreach($senders as $hash => $sender) {
+				$domain = substr($sender[1],strpos($sender[1],'@'));
+				$domain_hash = md5('domain' . $domain);
+				if(!isset($tops[$domain_hash])) {
+					continue; // [TODO] Temporary
+				}
+				$tops[$domain_hash][3][$hash] = $sender;
+			}
 		 
 		} elseif ($mode=="subjects") {
 			$query_parts = DAO_Ticket::getSearchQueryComponents(
@@ -1007,58 +1086,58 @@ class DAO_Ticket extends C4_ORMHelper {
 			$sql = "SELECT COUNT(*) AS hits, SUBSTRING(t.subject FROM 1 FOR 8) AS prefix ".
 				$join_sql.
 				$where_sql.
-		        "GROUP BY SUBSTRING(t.subject FROM 1 FOR 8) HAVING hits > 1 ".
-		        "ORDER BY hits DESC ";
-		    $rs = $db->SelectLimit($sql, $limit, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-		    
+				"GROUP BY SUBSTRING(t.subject FROM 1 FOR 8) HAVING hits > 1 ".
+				"ORDER BY hits DESC ";
+			$rs = $db->SelectLimit($sql, $limit, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+			
 			$prefixes = array(); // [TODO] Temporary
 
 			while($row = mysql_fetch_assoc($rs)) {
-		        $prefixes[] = $row['prefix'];
-		    }
-		    
-		    mysql_free_result($rs);
+				$prefixes[] = $row['prefix'];
+			}
+			
+			mysql_free_result($rs);
 
-		    foreach($prefixes as $prefix_idx => $prefix) {
+			foreach($prefixes as $prefix_idx => $prefix) {
 				// [JAS]: Most common subjects in work pile
 				$sql = "SELECT COUNT(t.id) AS hits, t.subject ".
 					$join_sql.
 					$where_sql.
 						sprintf(" AND t.subject LIKE %s ",
-			        		$db->qstr($prefix.'%')
-			    		).
-			        "GROUP BY t.subject HAVING hits > 1 ".
-			        "ORDER BY hits DESC ";
-		    	
-			    $rs = $db->SelectLimit($sql, 15, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-			    $num_rows = mysql_num_rows($rs);
+							$db->qstr($prefix.'%')
+						).
+					"GROUP BY t.subject HAVING hits > 1 ".
+					"ORDER BY hits DESC ";
+				
+				$rs = $db->SelectLimit($sql, 15, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+				$num_rows = mysql_num_rows($rs);
 
-			    $lines = array();
-			    while($row = mysql_fetch_assoc($rs)) {
-			    	$lines[$row['subject']] = $row['hits'];
-			    }
-			    
-			    $prefix = self::findLongestCommonPrefix($lines);
-			    
-			    if(strlen(key($prefix)) < 8)
-			    	continue;
+				$lines = array();
+				while($row = mysql_fetch_assoc($rs)) {
+					$lines[$row['subject']] = $row['hits'];
+				}
+				
+				$prefix = self::findLongestCommonPrefix($lines);
+				
+				if(strlen(key($prefix)) < 8)
+					continue;
 
-		        if(count($lines) > 1) {
-        	        $tophash = md5('subject'.key($prefix).'*');
-			        $tops[$tophash] = array('subject',key($prefix).'*',current($prefix));
-		        	
-			        foreach($lines as $line => $hits) {
-			        	$hash = md5('subject'.$line);
-			        	$tops[$tophash][3][$hash] = array('subject',$line,$hits);
-			        }
-			        
-		        } else {
-			        $tophash = md5('subject'.key($prefix));
-			        $tops[$tophash] = array('subject',key($prefix),current($prefix));
-		        }
-		        
+				if(count($lines) > 1) {
+					$tophash = md5('subject'.key($prefix).'*');
+					$tops[$tophash] = array('subject',key($prefix).'*',current($prefix));
+					
+					foreach($lines as $line => $hits) {
+						$hash = md5('subject'.$line);
+						$tops[$tophash][3][$hash] = array('subject',$line,$hits);
+					}
+					
+				} else {
+					$tophash = md5('subject'.key($prefix));
+					$tops[$tophash] = array('subject',key($prefix),current($prefix));
+				}
+				
 				mysql_free_result($rs);
-		    }
+			}
 
 		} elseif ($mode=="headers") {
 			$params[] = new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_MESSAGE_HEADER,'=',$mode_param);
@@ -1080,27 +1159,27 @@ class DAO_Ticket extends C4_ORMHelper {
 				"GROUP BY mh.header_value HAVING mh.header_value != '' ".
 				"ORDER BY hits DESC ";
 			
-		    $rs = $db->SelectLimit($sql, 25, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+			$rs = $db->SelectLimit($sql, 25, 0) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 
-		    while($row = mysql_fetch_assoc($rs)) {
+			while($row = mysql_fetch_assoc($rs)) {
 				$hash = md5('header'.$row['header_value']);
 				$tops[$hash] = array('header',$row['header_value'],$row['hits'],array(),$mode_param);
-		    }
-		    
-		    mysql_free_result($rs);
-	    }
+			}
+			
+			mysql_free_result($rs);
+		}
 
-	    uasort($tops, array('DAO_Ticket','sortByCount'));
-        
-	    return $tops;
+		uasort($tops, array('DAO_Ticket','sortByCount'));
+		
+		return $tops;
 	}
 	
-    private function sortByCount($a,$b) {
-	    if ($a[2] == $b[2]) {
-	        return 0;
-	    }
-        return ($a[2] > $b[2]) ? -1 : 1;        
-    }
+	private function sortByCount($a,$b) {
+		if ($a[2] == $b[2]) {
+			return 0;
+		}
+		return ($a[2] > $b[2]) ? -1 : 1;
+	}
 
 	private function findLongestCommonPrefix($list) {
 		// Find the longest subject line
@@ -1160,7 +1239,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		if('*'==substr($sortBy,0,1) || !isset($fields[$sortBy]) || !in_array($sortBy,$columns))
 			$sortBy=null;
 		
-        list($tables, $wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
+		list($tables, $wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
 		
 		$select_sql = sprintf("SELECT ".
 			"t.id as %s, ".
@@ -1193,49 +1272,51 @@ class DAO_Ticket extends C4_ORMHelper {
 			"t.group_id as %s, ".
 			"t.bucket_id as %s, ".
 			"t.org_id as %s ",
-			    SearchFields_Ticket::TICKET_ID,
-			    SearchFields_Ticket::TICKET_MASK,
-			    SearchFields_Ticket::TICKET_SUBJECT,
-			    SearchFields_Ticket::TICKET_WAITING,
-			    SearchFields_Ticket::TICKET_CLOSED,
-			    SearchFields_Ticket::TICKET_DELETED,
-			    SearchFields_Ticket::TICKET_FIRST_WROTE_ID,
-			    SearchFields_Ticket::TICKET_LAST_WROTE_ID,
-			    SearchFields_Ticket::TICKET_FIRST_MESSAGE_ID,
-			    SearchFields_Ticket::TICKET_FIRST_OUTGOING_MESSAGE_ID,
-			    SearchFields_Ticket::TICKET_LAST_MESSAGE_ID,
-			    SearchFields_Ticket::TICKET_FIRST_WROTE,
-			    SearchFields_Ticket::TICKET_FIRST_WROTE_SPAM,
-			    SearchFields_Ticket::TICKET_FIRST_WROTE_NONSPAM,
-			    SearchFields_Ticket::TICKET_LAST_WROTE,
-			    SearchFields_Ticket::TICKET_FIRST_CONTACT_ORG_ID,
-			    SearchFields_Ticket::TICKET_CREATED_DATE,
-			    SearchFields_Ticket::TICKET_UPDATED_DATE,
-			    SearchFields_Ticket::TICKET_CLOSED_AT,
-			    SearchFields_Ticket::TICKET_REOPEN_AT,
-			    SearchFields_Ticket::TICKET_SPAM_TRAINING,
-			    SearchFields_Ticket::TICKET_SPAM_SCORE,
-			    SearchFields_Ticket::TICKET_LAST_ACTION_CODE,
-			    SearchFields_Ticket::TICKET_NUM_MESSAGES,
-			    SearchFields_Ticket::TICKET_ELAPSED_RESPONSE_FIRST,
-			    SearchFields_Ticket::TICKET_ELAPSED_RESOLUTION_FIRST,
-			    SearchFields_Ticket::TICKET_OWNER_ID,
-			    SearchFields_Ticket::TICKET_GROUP_ID,
-			    SearchFields_Ticket::TICKET_BUCKET_ID,
-			    SearchFields_Ticket::TICKET_ORG_ID
+				SearchFields_Ticket::TICKET_ID,
+				SearchFields_Ticket::TICKET_MASK,
+				SearchFields_Ticket::TICKET_SUBJECT,
+				SearchFields_Ticket::TICKET_WAITING,
+				SearchFields_Ticket::TICKET_CLOSED,
+				SearchFields_Ticket::TICKET_DELETED,
+				SearchFields_Ticket::TICKET_FIRST_WROTE_ID,
+				SearchFields_Ticket::TICKET_LAST_WROTE_ID,
+				SearchFields_Ticket::TICKET_FIRST_MESSAGE_ID,
+				SearchFields_Ticket::TICKET_FIRST_OUTGOING_MESSAGE_ID,
+				SearchFields_Ticket::TICKET_LAST_MESSAGE_ID,
+				SearchFields_Ticket::TICKET_FIRST_WROTE,
+				SearchFields_Ticket::TICKET_FIRST_WROTE_SPAM,
+				SearchFields_Ticket::TICKET_FIRST_WROTE_NONSPAM,
+				SearchFields_Ticket::TICKET_LAST_WROTE,
+				SearchFields_Ticket::TICKET_FIRST_CONTACT_ORG_ID,
+				SearchFields_Ticket::TICKET_CREATED_DATE,
+				SearchFields_Ticket::TICKET_UPDATED_DATE,
+				SearchFields_Ticket::TICKET_CLOSED_AT,
+				SearchFields_Ticket::TICKET_REOPEN_AT,
+				SearchFields_Ticket::TICKET_SPAM_TRAINING,
+				SearchFields_Ticket::TICKET_SPAM_SCORE,
+				SearchFields_Ticket::TICKET_LAST_ACTION_CODE,
+				SearchFields_Ticket::TICKET_NUM_MESSAGES,
+				SearchFields_Ticket::TICKET_ELAPSED_RESPONSE_FIRST,
+				SearchFields_Ticket::TICKET_ELAPSED_RESOLUTION_FIRST,
+				SearchFields_Ticket::TICKET_OWNER_ID,
+				SearchFields_Ticket::TICKET_GROUP_ID,
+				SearchFields_Ticket::TICKET_BUCKET_ID,
+				SearchFields_Ticket::TICKET_ORG_ID
 		);
 
-		$join_sql = 
+		$join_sql =
 			"FROM ticket t ".
 			"INNER JOIN address a1 ON (t.first_wrote_address_id=a1.id) ".
 			"INNER JOIN address a2 ON (t.last_wrote_address_id=a2.id) ".
 			// [JAS]: Dynamic table joins
 			((isset($tables['r']) || isset($tables['ra'])) ? "INNER JOIN requester r ON (r.ticket_id=t.id) " : " ").
 			(isset($tables['ra']) ? "INNER JOIN address ra ON (ra.id=r.address_id) " : " ").
-			(isset($tables['msg']) || isset($tables['ftmc']) ? "INNER JOIN message msg ON (msg.ticket_id=t.id) " : " ").
+			(isset($tables['msg']) || isset($tables['ftmc']) || isset($tables['ftnc']) ? "INNER JOIN message msg ON (msg.ticket_id=t.id) " : " ").
 			(isset($tables['ftcc']) ? "INNER JOIN comment ON (comment.context = 'cerberusweb.contexts.ticket' AND comment.context_id = t.id) " : " ").
 			(isset($tables['ftcc']) ? "INNER JOIN fulltext_comment_content ftcc ON (ftcc.id=comment.id) " : " ").
 			(isset($tables['ftmc']) ? "INNER JOIN fulltext_message_content ftmc ON (ftmc.id=msg.id) " : " ").
+			(isset($tables['ftnc']) ? "INNER JOIN comment AS note ON (note.context = 'cerberusweb.contexts.message' AND note.context_id = msg.id) " : " ").
+			(isset($tables['ftnc']) ? "INNER JOIN fulltext_comment_content AS ftnc ON (ftnc.id=note.id) " : " ").
 			(isset($tables['mh']) ? "INNER JOIN message_header mh ON (mh.message_id=t.first_message_id) " : " "). // [TODO] Choose between first message and all?
 			(isset($tables['context_link']) ? "INNER JOIN context_link ON (context_link.to_context = 'cerberusweb.contexts.ticket' AND context_link.to_context_id = t.id) " : " ")
 			;
@@ -1280,10 +1361,10 @@ class DAO_Ticket extends C4_ORMHelper {
 			array('DAO_Ticket', '_translateVirtualParameters'),
 			$args
 		);
-
+		
 		// Fulltext has multiple values
 		if(isset($tables['ftmc']))
-			$has_multiple_values = true; 		
+			$has_multiple_values = true;
 
 		$result = array(
 			'primary_table' => 't',
@@ -1323,9 +1404,9 @@ class DAO_Ticket extends C4_ORMHelper {
 				$assignable_bucket_ids = array_keys($assignable_buckets);
 				array_unshift($assignable_bucket_ids, 0);
 				if($param->value) { // true
-					$args['where_sql'] .= sprintf("AND t.bucket_id IN (%s) ", implode(',', $assignable_bucket_ids));	
+					$args['where_sql'] .= sprintf("AND t.bucket_id IN (%s) ", implode(',', $assignable_bucket_ids));
 				} else { // false
-					$args['where_sql'] .= sprintf("AND t.bucket_id NOT IN (%s) ", implode(',', $assignable_bucket_ids));	
+					$args['where_sql'] .= sprintf("AND t.bucket_id NOT IN (%s) ", implode(',', $assignable_bucket_ids));
 				}
 				break;
 				
@@ -1379,12 +1460,12 @@ class DAO_Ticket extends C4_ORMHelper {
 				
 				$args['where_sql'] .= 'AND (' . implode(' OR ', $status_sql) . ') ';
 				break;
-		}		
+		}
 	}
 	
-    static function search($columns, $params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
+	static function search($columns, $params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
 		$db = DevblocksPlatform::getDatabaseService();
-    	
+		
 		// Build search queries
 		$query_parts = self::getSearchQueryComponents($columns,$params,$sortBy,$sortAsc);
 
@@ -1394,14 +1475,14 @@ class DAO_Ticket extends C4_ORMHelper {
 		$has_multiple_values = $query_parts['has_multiple_values'];
 		$sort_sql = $query_parts['sort'];
 		
-		$sql = 
+		$sql =
 			$select_sql.
 			$join_sql.
 			$where_sql.
 			($has_multiple_values ? 'GROUP BY t.id ' : '').
 			$sort_sql;
 
-		$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); 
+		$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 		
 		$results = array();
 		
@@ -1417,7 +1498,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		// [JAS]: Count all
 		$total = -1;
 		if($withCounts) {
-			$count_sql = 
+			$count_sql =
 				(($has_multiple_values) ? "SELECT COUNT(DISTINCT t.id) " : "SELECT COUNT(t.id) ").
 				$join_sql.
 				$where_sql;
@@ -1427,7 +1508,7 @@ class DAO_Ticket extends C4_ORMHelper {
 		mysql_free_result($rs);
 		
 		return array($results, $total);
-    }	
+	}
 	
 };
 
@@ -1466,7 +1547,7 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 	const TICKET_OWNER_ID = 't_owner_id';
 	
 	const TICKET_MESSAGE_HEADER = 'mh_header_name';
-    const TICKET_MESSAGE_HEADER_VALUE = 'mh_header_value';	
+	const TICKET_MESSAGE_HEADER_VALUE = 'mh_header_value';
 
 	// Sender
 	const SENDER_ADDRESS = 'a1_address';
@@ -1483,6 +1564,9 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 
 	// Message Content
 	const FULLTEXT_MESSAGE_CONTENT = 'ftmc_content';
+	
+	// Note Content
+	const FULLTEXT_NOTE_CONTENT = 'ftnc_content';
 	
 	// Context Links
 	const CONTEXT_LINK = 'cl_context_from';
@@ -1502,60 +1586,60 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
-			self::TICKET_ID => new DevblocksSearchField(self::TICKET_ID, 't', 'id', $translate->_('ticket.id'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_MASK => new DevblocksSearchField(self::TICKET_MASK, 't', 'mask', $translate->_('ticket.mask'), Model_CustomField::TYPE_SINGLE_LINE),
-			self::TICKET_SUBJECT => new DevblocksSearchField(self::TICKET_SUBJECT, 't', 'subject', $translate->_('ticket.subject'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_Ticket::TICKET_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_ID, 't', 'id', $translate->_('ticket.id'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_MASK => new DevblocksSearchField(SearchFields_Ticket::TICKET_MASK, 't', 'mask', $translate->_('ticket.mask'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_Ticket::TICKET_SUBJECT => new DevblocksSearchField(SearchFields_Ticket::TICKET_SUBJECT, 't', 'subject', $translate->_('ticket.subject'), Model_CustomField::TYPE_SINGLE_LINE),
 			
-			self::TICKET_FIRST_MESSAGE_ID => new DevblocksSearchField(self::TICKET_FIRST_MESSAGE_ID, 't', 'first_message_id'),
-			self::TICKET_FIRST_OUTGOING_MESSAGE_ID => new DevblocksSearchField(self::TICKET_FIRST_OUTGOING_MESSAGE_ID, 't', 'first_outgoing_message_id'),
-			self::TICKET_LAST_MESSAGE_ID => new DevblocksSearchField(self::TICKET_LAST_MESSAGE_ID, 't', 'last_message_id'),
+			SearchFields_Ticket::TICKET_FIRST_MESSAGE_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_MESSAGE_ID, 't', 'first_message_id'),
+			SearchFields_Ticket::TICKET_FIRST_OUTGOING_MESSAGE_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_OUTGOING_MESSAGE_ID, 't', 'first_outgoing_message_id'),
+			SearchFields_Ticket::TICKET_LAST_MESSAGE_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_LAST_MESSAGE_ID, 't', 'last_message_id'),
 			
-			self::TICKET_FIRST_WROTE_ID => new DevblocksSearchField(self::TICKET_FIRST_WROTE_ID, 't', 'first_wrote_address_id'),
-			self::TICKET_FIRST_WROTE => new DevblocksSearchField(self::TICKET_FIRST_WROTE, 'a1', 'email',$translate->_('ticket.first_wrote'), Model_CustomField::TYPE_SINGLE_LINE),
-			self::TICKET_LAST_WROTE_ID => new DevblocksSearchField(self::TICKET_LAST_WROTE_ID, 't', 'last_wrote_address_id'),
-			self::TICKET_LAST_WROTE => new DevblocksSearchField(self::TICKET_LAST_WROTE, 'a2', 'email',$translate->_('ticket.last_wrote'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_Ticket::TICKET_FIRST_WROTE_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_WROTE_ID, 't', 'first_wrote_address_id'),
+			SearchFields_Ticket::TICKET_FIRST_WROTE => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_WROTE, 'a1', 'email',$translate->_('ticket.first_wrote'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_Ticket::TICKET_LAST_WROTE_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_LAST_WROTE_ID, 't', 'last_wrote_address_id'),
+			SearchFields_Ticket::TICKET_LAST_WROTE => new DevblocksSearchField(SearchFields_Ticket::TICKET_LAST_WROTE, 'a2', 'email',$translate->_('ticket.last_wrote'), Model_CustomField::TYPE_SINGLE_LINE),
 
-			self::ORG_NAME => new DevblocksSearchField(self::ORG_NAME, 'o', 'name', $translate->_('contact_org.name'), Model_CustomField::TYPE_SINGLE_LINE),
-			self::REQUESTER_ADDRESS => new DevblocksSearchField(self::REQUESTER_ADDRESS, 'ra', 'email',$translate->_('ticket.requester'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_Ticket::ORG_NAME => new DevblocksSearchField(SearchFields_Ticket::ORG_NAME, 'o', 'name', $translate->_('contact_org.name'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_Ticket::REQUESTER_ADDRESS => new DevblocksSearchField(SearchFields_Ticket::REQUESTER_ADDRESS, 'ra', 'email',$translate->_('ticket.requester'), Model_CustomField::TYPE_SINGLE_LINE),
 			
-			self::TICKET_ORG_ID => new DevblocksSearchField(self::TICKET_ORG_ID, 't','org_id',$translate->_('contact_org.id')),
-			self::TICKET_OWNER_ID => new DevblocksSearchField(self::TICKET_OWNER_ID,'t','owner_id',$translate->_('common.owner'), Model_CustomField::TYPE_WORKER),
-			self::TICKET_GROUP_ID => new DevblocksSearchField(self::TICKET_GROUP_ID,'t','group_id',$translate->_('common.group')),
-			self::TICKET_BUCKET_ID => new DevblocksSearchField(self::TICKET_BUCKET_ID, 't', 'bucket_id',$translate->_('common.bucket')),
-			self::TICKET_CREATED_DATE => new DevblocksSearchField(self::TICKET_CREATED_DATE, 't', 'created_date',$translate->_('common.created'), Model_CustomField::TYPE_DATE),
-			self::TICKET_UPDATED_DATE => new DevblocksSearchField(self::TICKET_UPDATED_DATE, 't', 'updated_date',$translate->_('common.updated'), Model_CustomField::TYPE_DATE),
-			self::TICKET_CLOSED_AT => new DevblocksSearchField(self::TICKET_CLOSED_AT, 't', 'closed_at',$translate->_('ticket.closed_at'), Model_CustomField::TYPE_DATE),
-			self::TICKET_WAITING => new DevblocksSearchField(self::TICKET_WAITING, 't', 'is_waiting',$translate->_('status.waiting'), Model_CustomField::TYPE_CHECKBOX),
-			self::TICKET_CLOSED => new DevblocksSearchField(self::TICKET_CLOSED, 't', 'is_closed',$translate->_('status.closed'), Model_CustomField::TYPE_CHECKBOX),
-			self::TICKET_DELETED => new DevblocksSearchField(self::TICKET_DELETED, 't', 'is_deleted',$translate->_('status.deleted'), Model_CustomField::TYPE_CHECKBOX),
+			SearchFields_Ticket::TICKET_ORG_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_ORG_ID, 't','org_id',$translate->_('contact_org.id')),
+			SearchFields_Ticket::TICKET_OWNER_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_OWNER_ID,'t','owner_id',$translate->_('common.owner'), Model_CustomField::TYPE_WORKER),
+			SearchFields_Ticket::TICKET_GROUP_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_GROUP_ID,'t','group_id',$translate->_('common.group')),
+			SearchFields_Ticket::TICKET_BUCKET_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_BUCKET_ID, 't', 'bucket_id',$translate->_('common.bucket')),
+			SearchFields_Ticket::TICKET_CREATED_DATE => new DevblocksSearchField(SearchFields_Ticket::TICKET_CREATED_DATE, 't', 'created_date',$translate->_('common.created'), Model_CustomField::TYPE_DATE),
+			SearchFields_Ticket::TICKET_UPDATED_DATE => new DevblocksSearchField(SearchFields_Ticket::TICKET_UPDATED_DATE, 't', 'updated_date',$translate->_('common.updated'), Model_CustomField::TYPE_DATE),
+			SearchFields_Ticket::TICKET_CLOSED_AT => new DevblocksSearchField(SearchFields_Ticket::TICKET_CLOSED_AT, 't', 'closed_at',$translate->_('ticket.closed_at'), Model_CustomField::TYPE_DATE),
+			SearchFields_Ticket::TICKET_WAITING => new DevblocksSearchField(SearchFields_Ticket::TICKET_WAITING, 't', 'is_waiting',$translate->_('status.waiting'), Model_CustomField::TYPE_CHECKBOX),
+			SearchFields_Ticket::TICKET_CLOSED => new DevblocksSearchField(SearchFields_Ticket::TICKET_CLOSED, 't', 'is_closed',$translate->_('status.closed'), Model_CustomField::TYPE_CHECKBOX),
+			SearchFields_Ticket::TICKET_DELETED => new DevblocksSearchField(SearchFields_Ticket::TICKET_DELETED, 't', 'is_deleted',$translate->_('status.deleted'), Model_CustomField::TYPE_CHECKBOX),
 
-			self::TICKET_LAST_ACTION_CODE => new DevblocksSearchField(self::TICKET_LAST_ACTION_CODE, 't', 'last_action_code',$translate->_('ticket.last_action')),
-			self::TICKET_NUM_MESSAGES => new DevblocksSearchField(self::TICKET_NUM_MESSAGES, 't', 'num_messages',$translate->_('ticket.num_messages'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_ELAPSED_RESPONSE_FIRST => new DevblocksSearchField(self::TICKET_ELAPSED_RESPONSE_FIRST, 't', 'elapsed_response_first',$translate->_('ticket.elapsed_response_first'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_ELAPSED_RESOLUTION_FIRST => new DevblocksSearchField(self::TICKET_ELAPSED_RESOLUTION_FIRST, 't', 'elapsed_resolution_first',$translate->_('ticket.elapsed_resolution_first'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_SPAM_TRAINING => new DevblocksSearchField(self::TICKET_SPAM_TRAINING, 't', 'spam_training',$translate->_('ticket.spam_training')),
-			self::TICKET_SPAM_SCORE => new DevblocksSearchField(self::TICKET_SPAM_SCORE, 't', 'spam_score',$translate->_('ticket.spam_score'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_FIRST_WROTE_SPAM => new DevblocksSearchField(self::TICKET_FIRST_WROTE_SPAM, 'a1', 'num_spam',$translate->_('address.num_spam'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_FIRST_WROTE_NONSPAM => new DevblocksSearchField(self::TICKET_FIRST_WROTE_NONSPAM, 'a1', 'num_nonspam',$translate->_('address.num_nonspam'), Model_CustomField::TYPE_NUMBER),
-			self::TICKET_INTERESTING_WORDS => new DevblocksSearchField(self::TICKET_INTERESTING_WORDS, 't', 'interesting_words',$translate->_('ticket.interesting_words')),
-			self::TICKET_REOPEN_AT => new DevblocksSearchField(self::TICKET_REOPEN_AT, 't', 'reopen_at',$translate->_('ticket.reopen_at'), Model_CustomField::TYPE_DATE),
-			self::TICKET_FIRST_CONTACT_ORG_ID => new DevblocksSearchField(self::TICKET_FIRST_CONTACT_ORG_ID, 'a1', 'contact_org_id'),
+			SearchFields_Ticket::TICKET_LAST_ACTION_CODE => new DevblocksSearchField(SearchFields_Ticket::TICKET_LAST_ACTION_CODE, 't', 'last_action_code',$translate->_('ticket.last_action')),
+			SearchFields_Ticket::TICKET_NUM_MESSAGES => new DevblocksSearchField(SearchFields_Ticket::TICKET_NUM_MESSAGES, 't', 'num_messages',$translate->_('ticket.num_messages'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_ELAPSED_RESPONSE_FIRST => new DevblocksSearchField(SearchFields_Ticket::TICKET_ELAPSED_RESPONSE_FIRST, 't', 'elapsed_response_first',$translate->_('ticket.elapsed_response_first'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_ELAPSED_RESOLUTION_FIRST => new DevblocksSearchField(SearchFields_Ticket::TICKET_ELAPSED_RESOLUTION_FIRST, 't', 'elapsed_resolution_first',$translate->_('ticket.elapsed_resolution_first'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_SPAM_TRAINING => new DevblocksSearchField(SearchFields_Ticket::TICKET_SPAM_TRAINING, 't', 'spam_training',$translate->_('ticket.spam_training')),
+			SearchFields_Ticket::TICKET_SPAM_SCORE => new DevblocksSearchField(SearchFields_Ticket::TICKET_SPAM_SCORE, 't', 'spam_score',$translate->_('ticket.spam_score'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_FIRST_WROTE_SPAM => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_WROTE_SPAM, 'a1', 'num_spam',$translate->_('address.num_spam'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_FIRST_WROTE_NONSPAM => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_WROTE_NONSPAM, 'a1', 'num_nonspam',$translate->_('address.num_nonspam'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_INTERESTING_WORDS => new DevblocksSearchField(SearchFields_Ticket::TICKET_INTERESTING_WORDS, 't', 'interesting_words',$translate->_('ticket.interesting_words')),
+			SearchFields_Ticket::TICKET_REOPEN_AT => new DevblocksSearchField(SearchFields_Ticket::TICKET_REOPEN_AT, 't', 'reopen_at',$translate->_('ticket.reopen_at'), Model_CustomField::TYPE_DATE),
+			SearchFields_Ticket::TICKET_FIRST_CONTACT_ORG_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_CONTACT_ORG_ID, 'a1', 'contact_org_id'),
 			
-			self::REQUESTER_ID => new DevblocksSearchField(self::REQUESTER_ID, 'r', 'address_id', $translate->_('ticket.requester')),
+			SearchFields_Ticket::REQUESTER_ID => new DevblocksSearchField(SearchFields_Ticket::REQUESTER_ID, 'r', 'address_id', $translate->_('ticket.requester')),
 			
-			self::SENDER_ADDRESS => new DevblocksSearchField(self::SENDER_ADDRESS, 'a1', 'email'),
+			SearchFields_Ticket::SENDER_ADDRESS => new DevblocksSearchField(SearchFields_Ticket::SENDER_ADDRESS, 'a1', 'email'),
 			
-			self::TICKET_MESSAGE_HEADER => new DevblocksSearchField(self::TICKET_MESSAGE_HEADER, 'mh', 'header_name'),
-			self::TICKET_MESSAGE_HEADER_VALUE => new DevblocksSearchField(self::TICKET_MESSAGE_HEADER_VALUE, 'mh', 'header_value'),
+			SearchFields_Ticket::TICKET_MESSAGE_HEADER => new DevblocksSearchField(SearchFields_Ticket::TICKET_MESSAGE_HEADER, 'mh', 'header_name'),
+			SearchFields_Ticket::TICKET_MESSAGE_HEADER_VALUE => new DevblocksSearchField(SearchFields_Ticket::TICKET_MESSAGE_HEADER_VALUE, 'mh', 'header_value'),
 			
-			self::CONTEXT_LINK => new DevblocksSearchField(self::CONTEXT_LINK, 'context_link', 'from_context', null),
-			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null),
+			SearchFields_Ticket::CONTEXT_LINK => new DevblocksSearchField(SearchFields_Ticket::CONTEXT_LINK, 'context_link', 'from_context', null),
+			SearchFields_Ticket::CONTEXT_LINK_ID => new DevblocksSearchField(SearchFields_Ticket::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null),
 			
-			self::VIRTUAL_ASSIGNABLE => new DevblocksSearchField(self::VIRTUAL_ASSIGNABLE, '*', 'assignable', $translate->_('ticket.assignable')),
-			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null),
-			self::VIRTUAL_GROUPS_OF_WORKER => new DevblocksSearchField(self::VIRTUAL_GROUPS_OF_WORKER, '*', 'groups_of_worker', $translate->_('ticket.groups_of_worker')),
-			self::VIRTUAL_STATUS => new DevblocksSearchField(self::VIRTUAL_STATUS, '*', 'status', $translate->_('ticket.status')),
-			self::VIRTUAL_WATCHERS => new DevblocksSearchField(self::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS'),
+			SearchFields_Ticket::VIRTUAL_ASSIGNABLE => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_ASSIGNABLE, '*', 'assignable', $translate->_('ticket.assignable')),
+			SearchFields_Ticket::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null),
+			SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER, '*', 'groups_of_worker', $translate->_('ticket.groups_of_worker')),
+			SearchFields_Ticket::VIRTUAL_STATUS => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_STATUS, '*', 'status', $translate->_('ticket.status')),
+			SearchFields_Ticket::VIRTUAL_WATCHERS => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS'),
 		);
 
 		$tables = DevblocksPlatform::getDatabaseTables();
@@ -1565,10 +1649,13 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 		if(isset($tables['fulltext_message_content'])) {
 			$columns[self::FULLTEXT_MESSAGE_CONTENT] = new DevblocksSearchField(self::FULLTEXT_MESSAGE_CONTENT, 'ftmc', 'content', $translate->_('message.content'), 'FT');
 		}
+		if(isset($tables['fulltext_comment_content'])) {
+			$columns[self::FULLTEXT_NOTE_CONTENT] = new DevblocksSearchField(self::FULLTEXT_NOTE_CONTENT, 'ftnc', 'content', $translate->_('message.note.content'), 'FT');
+		}
 		
 		// Custom Fields: ticket + org
-		$fields = 
-			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TICKET) + 
+		$fields =
+			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TICKET) +
 			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ORG)
 		;
 		
@@ -1676,6 +1763,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 			SearchFields_Ticket::CONTEXT_LINK_ID,
 			SearchFields_Ticket::FULLTEXT_COMMENT_CONTENT,
 			SearchFields_Ticket::FULLTEXT_MESSAGE_CONTENT,
+			SearchFields_Ticket::FULLTEXT_NOTE_CONTENT,
 			SearchFields_Ticket::REQUESTER_ADDRESS,
 			SearchFields_Ticket::REQUESTER_ID,
 			SearchFields_Ticket::TICKET_CLOSED,
@@ -1784,7 +1872,6 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 			case SearchFields_Ticket::TICKET_SUBJECT:
 				$counts = $this->_getSubtotalCountForStringColumn('DAO_Ticket', $column);
 				break;
-				
 			case SearchFields_Ticket::TICKET_SPAM_TRAINING:
 				$label_map = array(
 					'' => 'Not trained',
@@ -1795,11 +1882,13 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				break;
 				
 			case SearchFields_Ticket::TICKET_OWNER_ID:
-				$label_map = array();
+				$label_map = array(
+					'0' => '(nobody)',
+				);
 				$workers = DAO_Worker::getAll();
 				foreach($workers as $k => $v)
 					$label_map[$k] = $v->getName();
-				$counts = $this->_getSubtotalCountForStringColumn('DAO_Ticket', $column, $label_map, 'in', 'worker_id[]');
+				$counts = $this->_getSubtotalCountForNumberColumn('DAO_Ticket', $column, $label_map, 'in', 'worker_id[]');
 				break;
 				
 			case SearchFields_Ticket::TICKET_GROUP_ID:
@@ -1862,7 +1951,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		);
 		
 		$join_sql = $query_parts['join'];
-		$where_sql = $query_parts['where'];				
+		$where_sql = $query_parts['where'];
 		
 		$sql = sprintf(
 				"SELECT t.group_id, t.bucket_id, count(*) as hits "
@@ -1875,7 +1964,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		$results = $db->GetArray($sql);
 
 		return $results;
-	}	
+	}
 	
 	private function _getSubtotalCountForBuckets() {
 		$translate = DevblocksPlatform::getTranslationService();
@@ -1897,7 +1986,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				$counts[$group_id] = array(
 					'hits' => 0,
 					'label' => $label,
-					'filter' => 
+					'filter' =>
 						array(
 							'field' => SearchFields_Ticket::TICKET_GROUP_ID,
 							'oper' => DevblocksSearchCriteria::OPER_IN,
@@ -1914,7 +2003,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 			$child = array(
 				'hits' => $hits,
 				'label' => $label,
-				'filter' => 
+				'filter' =>
 					array(
 						'field' => SearchFields_Ticket::TICKET_GROUP_ID,
 						'oper' => DevblocksSearchCriteria::OPER_IN,
@@ -1934,7 +2023,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 			uksort($counts[$group_id]['children'], array($this, '_sortByBucketPos'));
 		}
 		
-		return $counts;		
+		return $counts;
 	}
 	
 	protected function _getSubtotalDataForStatus($dao_class, $field_key) {
@@ -1966,17 +2055,17 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		);
 		
 		$join_sql = $query_parts['join'];
-		$where_sql = $query_parts['where'];				
+		$where_sql = $query_parts['where'];
 		
 		$sql = "SELECT COUNT(IF(t.is_closed=0 AND t.is_waiting=0 AND t.is_deleted=0,1,NULL)) AS open_hits, COUNT(IF(t.is_waiting=1 AND t.is_closed=0 AND t.is_deleted=0,1,NULL)) AS waiting_hits, COUNT(IF(t.is_closed=1 AND t.is_deleted=0,1,NULL)) AS closed_hits, COUNT(IF(t.is_deleted=1,1,NULL)) AS deleted_hits ".
 			$join_sql.
-			$where_sql 
+			$where_sql
 		;
 		
 		$results = $db->GetArray($sql);
 
 		return $results;
-	}	
+	}
 	
 	protected function _getSubtotalCountForStatus() {
 		$workers = DAO_Worker::getAll();
@@ -2018,7 +2107,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				$counts[$label] = array(
 					'hits' => $hits,
 					'label' => $label,
-					'filter' => 
+					'filter' =>
 						array(
 							'field' => SearchFields_Ticket::VIRTUAL_STATUS,
 							'oper' => $oper,
@@ -2029,7 +2118,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		}
 		
 		return $counts;
-	}	
+	}
 	
 	function isQuickSearchField($token) {
 		switch($token) {
@@ -2168,10 +2257,10 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		$group_buckets = DAO_Bucket::getGroups();
 		$tpl->assign('group_buckets', $group_buckets);
 
-		$custom_fields = 
-			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TICKET) + 
+		$custom_fields =
+			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TICKET) +
 			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ORG)
-			; 
+			;
 		$tpl->assign('custom_fields', $custom_fields);
 		
 		// Undo?
@@ -2287,6 +2376,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				
 			case SearchFields_Ticket::FULLTEXT_COMMENT_CONTENT:
 			case SearchFields_Ticket::FULLTEXT_MESSAGE_CONTENT:
+			case SearchFields_Ticket::FULLTEXT_NOTE_CONTENT:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__fulltext.tpl');
 				break;
 				
@@ -2339,7 +2429,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 			case SearchFields_Ticket::VIRTUAL_ASSIGNABLE:
 				if(empty($param->value)) {
 					echo "Tickets <b>are not assignable</b>";
-				} else { 
+				} else {
 					echo "Tickets <b>are assignable</b>";
 				}
 				break;
@@ -2405,7 +2495,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				echo sprintf("Status %s %s", $oper, implode(' or ', $strings));
 				break;
 		}
-	}	
+	}
 	
 	function renderCriteriaParam($param) {
 		$field = $param->field;
@@ -2585,6 +2675,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				
 			case SearchFields_Ticket::FULLTEXT_COMMENT_CONTENT:
 			case SearchFields_Ticket::FULLTEXT_MESSAGE_CONTENT:
+			case SearchFields_Ticket::FULLTEXT_NOTE_CONTENT:
 				@$scope = DevblocksPlatform::importGPC($_REQUEST['scope'],'string','expert');
 				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_FULLTEXT,array($value,$scope));
 				break;
@@ -2688,7 +2779,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		foreach($data as $v) {
 			$new_params = array();
 			$do_header = null;
-    
+	
 			switch($filter) {
 				case 'subject':
 					$new_params = array(
@@ -2805,7 +2896,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 						true,
 						false
 					);
-					$is_queued = (isset($broadcast_params['is_queued']) && $broadcast_params['is_queued']) ? true : false; 
+					$is_queued = (isset($broadcast_params['is_queued']) && $broadcast_params['is_queued']) ? true : false;
 					
 					if(is_array($tickets))
 					foreach($tickets as $ticket_id => $row) {
@@ -2848,7 +2939,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 						
 						$draft_id = DAO_MailQueue::create($fields);
 					}
-				}				
+				}
 				
 				unset($batch_ids);
 			}
@@ -2938,7 +3029,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 			$url_writer = DevblocksPlatform::getUrlService();
 			$url = $url_writer->writeNoProxy('c=profiles&type=ticket&mask='.$ticket->mask, true);
 		} else {
-			$url = $this->profileGetUrl($context_id);			
+			$url = $this->profileGetUrl($context_id);
 		}
 		
 		return array(
@@ -3041,7 +3132,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 			$token_values['initial_message_id'] = $ticket->first_message_id;
 			 
 			// First response
-			$token_values['initial_response_message_id'] = $ticket->first_outgoing_message_id; 
+			$token_values['initial_response_message_id'] = $ticket->first_outgoing_message_id;
 			
 			// Last message
 			$token_values['latest_message_id'] = $ticket->last_message_id;
@@ -3192,7 +3283,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		return true;
 	}
-    
+	
 	function lazyLoadContextValues($token, $dictionary) {
 		if(!isset($dictionary['id']))
 			return;
@@ -3310,7 +3401,19 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		}
 		
 		return $values;
-	}	
+	}
+	
+	// Overload the search view for this context
+	function getSearchView($view_id=null) {
+		$active_worker = CerberusApplication::getActiveWorker();
+		
+		if(null != ($view = parent::getSearchView($view_id))) {
+			$view->addParamsRequired(array(
+				SearchFields_Ticket::TICKET_GROUP_ID => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_GROUP_ID,'in',array_keys($active_worker->getMemberships())),
+			), true);
+		}
+		return $view;
+	}
 	
 	function getChooserView($view_id=null) {
 		$active_worker = CerberusApplication::getActiveWorker();
@@ -3349,14 +3452,14 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		$view->renderFilters = false;
 		$view->renderTemplate = 'contextlinks_chooser';
 		C4_AbstractViewLoader::setView($view_id, $view);
-		return $view;		
+		return $view;
 	}
 	
 	function getView($context=null, $context_id=null, $options=array()) {
 		$view_id = str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
-		$defaults->id = $view_id; 
+		$defaults->id = $view_id;
 		$defaults->class_name = $this->getViewClass();
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Tickets';
@@ -3388,7 +3491,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 	function _renderPeekComposePopup($view_id) {
 		@$to = DevblocksPlatform::importGPC($_REQUEST['to'],'string','');
 		@$draft_id = DevblocksPlatform::importGPC($_REQUEST['draft_id'],'integer',0);
-	    
+		
 		$visit = CerberusApplication::getVisit();
 		$active_worker = CerberusApplication::getActiveWorker();
 		
@@ -3437,9 +3540,9 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 				
 				// Overload the defaults of the form
 				if(isset($draft->params['group_id']))
-					$defaults['group_id'] = $draft->params['group_id']; 
+					$defaults['group_id'] = $draft->params['group_id'];
 				if(isset($draft->params['bucket_id']))
-					$defaults['bucket_id'] = $draft->params['bucket_id']; 
+					$defaults['bucket_id'] = $draft->params['bucket_id'];
 			}
 		}
 		
@@ -3458,9 +3561,9 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 	}
 	
 	function _renderPeekTicketPopup($context_id, $view_id) {
-	    @$msgid = DevblocksPlatform::importGPC($_REQUEST['msgid'],'integer',0);
-	    @$edit_mode = DevblocksPlatform::importGPC($_REQUEST['edit'],'integer',0);
-	    
+		@$msgid = DevblocksPlatform::importGPC($_REQUEST['msgid'],'integer',0);
+		@$edit_mode = DevblocksPlatform::importGPC($_REQUEST['edit'],'integer',0);
+		
 		$tpl = DevblocksPlatform::getTemplateService();
 
 		$tpl->assign('view_id', $view_id);
@@ -3470,8 +3573,8 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		if(null != ($ticket = DAO_Ticket::get($context_id))) {
 			/* @var $ticket Model_Ticket */
-		    $tpl->assign('ticket', $ticket);
-		    
+			$tpl->assign('ticket', $ticket);
+			
 			$messages = $ticket->getMessages();
 		}
 		
@@ -3515,7 +3618,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		$group_buckets = DAO_Bucket::getGroups();
 		$tpl->assign('group_buckets', $group_buckets);
-	    
+		
 		// Watchers
 		$object_watchers = DAO_ContextLink::getContextLinks(CerberusContexts::CONTEXT_TICKET, array($ticket->id), CerberusContexts::CONTEXT_WORKER);
 		$tpl->assign('object_watchers', $object_watchers);
@@ -3535,7 +3638,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		$tpl->assign('last_comment', $last_comment);
 			
 		// Display
-		$tpl->display('devblocks:cerberusweb.core::tickets/peek.tpl');				
+		$tpl->display('devblocks:cerberusweb.core::tickets/peek.tpl');
 	}
 };
 

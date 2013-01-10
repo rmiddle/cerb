@@ -4,6 +4,7 @@ class _DevblocksDatabaseManager {
 	static $instance = null;
 	
 	private function __construct(){
+		// [TODO] Implement proper pconnect abstraction for mysqli
 		$persistent = (defined('APP_DB_PCONNECT') && APP_DB_PCONNECT) ? true : false;
 		$this->Connect(APP_DB_HOST, APP_DB_USER, APP_DB_PASS, APP_DB_DATABASE, $persistent);
 	}
@@ -12,7 +13,7 @@ class _DevblocksDatabaseManager {
 		if(null == self::$instance) {
 			// Bail out early for pre-install
 			if('' == APP_DB_DRIVER || '' == APP_DB_HOST)
-			    return null;
+				return null;
 			
 			self::$instance = new _DevblocksDatabaseManager();
 		}
@@ -21,20 +22,15 @@ class _DevblocksDatabaseManager {
 	}
 	
 	function Connect($host, $user, $pass, $database, $persistent=false) {
-		if($persistent) {
-			if(false === (@$this->_db = mysql_pconnect($host, $user, $pass)))
-				return false;
-		} else {
-			if(false === (@$this->_db = mysql_connect($host, $user, $pass, true)))
-				return false;
-		}
+		if(false === (@$this->_db = mysql_pconnect($host, $user, $pass, !$persistent)))
+			return false;
 
 		if(false === mysql_select_db($database, $this->_db)) {
 			return false;
 		}
 		
 		// Encoding
-		//mysql_set_charset(DB_CHARSET_CODE, $this->_db); 
+		//mysql_set_charset(DB_CHARSET_CODE, $this->_db);
 		$this->Execute('SET NAMES ' . DB_CHARSET_CODE);
 		
 		return true;
@@ -113,7 +109,7 @@ class _DevblocksDatabaseManager {
 	
 	function Execute($sql) {
 		if(false === ($rs = mysql_query($sql, $this->_db))) {
-			error_log(sprintf("[%d] %s ::SQL:: %s", 
+			error_log(sprintf("[%d] %s ::SQL:: %s",
 				mysql_errno(),
 				mysql_error(),
 				$sql
@@ -132,6 +128,10 @@ class _DevblocksDatabaseManager {
 			return $this->Execute($sql . sprintf(" LIMIT %d,%d", $start, $limit));
 		else
 			return $this->Execute($sql);
+	}
+	
+	function escape($string) {
+		return mysql_real_escape_string($string, $this->_db);
 	}
 	
 	function qstr($string) {

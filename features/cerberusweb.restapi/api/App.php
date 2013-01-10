@@ -16,31 +16,31 @@
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerberus Helpdesk Team
- * 
- * Sure, it would be so easy to just cheat and edit this file to use the 
- * software without paying for it.  But we trust you anyway.  In fact, we're 
- * writing this software for you! 
- * 
- * Quality software backed by a dedicated team takes money to develop.  We 
- * don't want to be out of the office bagging groceries when you call up 
- * needing a helping hand.  We'd rather spend our free time coding your 
- * feature requests than mowing the neighbors' lawns for rent money. 
- * 
- * We've never believed in hiding our source code out of paranoia over not 
- * getting paid.  We want you to have the full source code and be able to 
- * make the tweaks your organization requires to get more done -- despite 
- * having less of everything than you might need (time, people, money, 
+ *
+ * Sure, it would be so easy to just cheat and edit this file to use the
+ * software without paying for it.  But we trust you anyway.  In fact, we're
+ * writing this software for you!
+ *
+ * Quality software backed by a dedicated team takes money to develop.  We
+ * don't want to be out of the office bagging groceries when you call up
+ * needing a helping hand.  We'd rather spend our free time coding your
+ * feature requests than mowing the neighbors' lawns for rent money.
+ *
+ * We've never believed in hiding our source code out of paranoia over not
+ * getting paid.  We want you to have the full source code and be able to
+ * make the tweaks your organization requires to get more done -- despite
+ * having less of everything than you might need (time, people, money,
  * energy).  We shouldn't be your bottleneck.
- * 
- * We've been building our expertise with this project since January 2002.  We 
- * promise spending a couple bucks [Euro, Yuan, Rupees, Galactic Credits] to 
- * let us take over your shared e-mail headache is a worthwhile investment.  
- * It will give you a sense of control over your inbox that you probably 
- * haven't had since spammers found you in a game of 'E-mail Battleship'. 
+ *
+ * We've been building our expertise with this project since January 2002.  We
+ * promise spending a couple bucks [Euro, Yuan, Rupees, Galactic Credits] to
+ * let us take over your shared e-mail headache is a worthwhile investment.
+ * It will give you a sense of control over your inbox that you probably
+ * haven't had since spammers found you in a game of 'E-mail Battleship'.
  * Miss. Miss. You sunk my inbox!
- * 
- * A legitimate license entitles you to support from the developers,  
- * and the warm fuzzy feeling of feeding a couple of obsessed developers 
+ *
+ * A legitimate license entitles you to support from the developers,
+ * and the warm fuzzy feeling of feeding a couple of obsessed developers
  * who want to help you get more done.
  *
  * - Jeff Standen, Darren Sugita, Dan Hildebrandt, Scott Luther
@@ -53,13 +53,26 @@ class Plugin_RestAPI {
 			return false;
 		
 		if('json' == $format) {
+			// Fix numeric keys
+			if(isset($array['results'])) {
+				$filtered_results = array();
+				
+				foreach($array['results'] as $k => $v) {
+					$filtered_results[] = $v;
+				}
+				
+				$array['results'] = $filtered_results;
+			}
+			
 			header("Content-type: text/javascript; charset=utf-8");
 			echo json_encode($array);
+			
 		} elseif ('xml' == $format) {
 			header("Content-type: text/xml; charset=utf-8");
 			$xml = new SimpleXMLElement("<response/>");
 			self::xml_encode($array, $xml);
 			echo $xml->asXML();
+			
 		} else {
 			header("Content-type: text/plain; charset=utf-8");
 			echo "'" . $format . "' is not implemented.";
@@ -72,11 +85,12 @@ class Plugin_RestAPI {
 		if(is_array($object))
 		foreach($object as $k => $v) {
 			if(is_array($v)) {
-				$e =& $xml->addChild("array", '');
+				$e = $xml->addChild("array", '');
 				$e->addAttribute("key", $k);
 				self::xml_encode($v, $e);
+				
 			} else {
-				$e =& $xml->addChild("string", htmlspecialchars($v, ENT_QUOTES, LANG_CHARSET_CODE));
+				$e = $xml->addChild("string", htmlspecialchars($v, ENT_QUOTES, LANG_CHARSET_CODE));
 				$e->addAttribute("key", (string)$k);
 			}
 		}
@@ -109,7 +123,7 @@ class Ch_RestPreferencesTab extends Extension_PreferenceTab {
 		
 		$tpl->assign('view', $view);
 		
-		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');		
+		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
 	}
 	
 	function showPeekPopupAction() {
@@ -130,7 +144,7 @@ class Ch_RestPreferencesTab extends Extension_PreferenceTab {
 		if(!empty($model))
 			$tpl->assign('model', $model);
 
-		$tpl->display('devblocks:cerberusweb.restapi::peek.tpl');		
+		$tpl->display('devblocks:cerberusweb.restapi::peek.tpl');
 	}
 	
 	function savePeekPopupAction() {
@@ -207,7 +221,11 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 		
 		// **** BEGIN AUTH
 		@$verb = $_SERVER['REQUEST_METHOD'];
-		@$header_date = $_SERVER['HTTP_DATE'];
+		@$header_date = $_SERVER['HTTP_X_DATE'];
+		
+		// If the custom X-Date: header isn't provided, fall back to Date:
+		if(empty($header_date))
+			@$header_date = $_SERVER['HTTP_DATE'];
 		
 		@$header_signature = null;
 		
@@ -253,7 +271,7 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 		
 		// Check this API key's path restrictions
 		$requested_path = implode('/', $stack);
-		@$allowed_paths = $credential->params['allowed_paths'];		
+		@$allowed_paths = $credential->params['allowed_paths'];
 		
 		if(empty($allowed_paths)) {
 			Plugin_RestAPI::render(array('__status'=>'error', 'message'=>"Access denied! (This path is prohibited)"));
@@ -322,9 +340,9 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 	private function _getRawPost() {
 		$contents = "";
 		
-		$putdata = fopen( "php://input" , "rb" ); 
-		while(!feof( $putdata )) 
-			$contents .= fread($putdata, 4096); 
+		$putdata = fopen( "php://input" , "rb" );
+		while(!feof( $putdata ))
+			$contents .= fread($putdata, 4096);
 		fclose($putdata);
 
 		return $contents;
@@ -340,12 +358,12 @@ abstract class Extension_RestController extends DevblocksExtension {
 	const ERRNO_NOT_IMPLEMENTED = 2;
 	const ERRNO_SEARCH_FILTERS_INVALID = 20;
 	
-	private $_activeWorker = null; /* @var $_activeWorker Model_Worker */ 
+	private $_activeWorker = null; /* @var $_activeWorker Model_Worker */
 	private $_format = 'json';
 	private $_payload = '';
 	
 	/**
-	 * 
+	 *
 	 * @param string $message
 	 */
 	protected function error($code, $message='') {
@@ -395,27 +413,55 @@ abstract class Extension_RestController extends DevblocksExtension {
 	}
 	
 	/**
-	 * 
+	 *
 	 * @param array $array
 	 */
 	protected function success($array) {
 		if(!is_array($array))
 			return false;
-			
+
+		@$expand = DevblocksPlatform::parseCsvString(DevblocksPlatform::importGPC($_REQUEST['expand'],'string',null));
+
+		// Do we need to lazy load some fields to be helpful?
+		if(is_array($expand) && !empty($expand)) {
+			if(isset($array['_context'])) {
+				$dict = new DevblocksDictionaryDelegate($array);
+				
+				foreach($expand as $expand_field)
+					$dict->$expand_field;
+				
+				$array = $dict->getDictionary();
+				
+			} elseif(isset($array['results'])) {
+				foreach($array['results'] as $k => $v) {
+					if(!isset($array['results'][$k]['_context']))
+						continue;
+					
+					$dict = new DevblocksDictionaryDelegate($array['results'][$k]);
+					
+					foreach($expand as $expand_field)
+						$dict->$expand_field;
+					
+					$array['results'][$k] = $dict->getDictionary();
+				}
+				
+			}
+		}
+		
 		$out = array(
 			'__status' => 'success',
 			'__version' => APP_VERSION,
 			'__build' => APP_BUILD,
 		) + $array;
 		
-		// These keys aren't needed		
+		// These keys aren't needed
 		unset($out['_loaded']);
 		
 		// Sort by key
 		ksort($out);
 		
 		return Plugin_RestAPI::render($out, $this->_format);
-	} 
+	}
 	
 	/**
 	 * @return Model_Worker
@@ -433,7 +479,7 @@ abstract class Extension_RestController extends DevblocksExtension {
 	}
 	
 	/**
-	 * 
+	 *
 	 * @param Model_Worker $worker
 	 */
 	public function setActiveWorker($worker) {
@@ -531,7 +577,35 @@ abstract class Extension_RestController extends DevblocksExtension {
 			if(null === ($field = $this->translateToken($filter[0], 'search')))
 				$this->error(self::ERRNO_SEARCH_FILTERS_INVALID, sprintf("'%s' is not a valid search token.", $filter[0]));
 			
-			$params[$field] = new DevblocksSearchCriteria($field, $filter[1], $filter[2]);
+			$oper = $filter[1];
+			$value = $filter[2];
+			
+			// Translate OPER_IN from JSON arrays to PHP primitives
+			switch($oper) {
+				case DevblocksSearchCriteria::OPER_IN:
+				case DevblocksSearchCriteria::OPER_IN_OR_NULL:
+				case DevblocksSearchCriteria::OPER_NIN:
+				case DevblocksSearchCriteria::OPER_NIN_OR_NULL:
+					if(!is_array($value) && preg_match('#^\[.*\]$#', $value)) {
+						$value = json_decode($value, true);
+						
+					} elseif(is_array($value)) {
+						$value;
+						
+					} else {
+						$value = array($value);
+						
+					}
+					break;
+				
+				case DevblocksSearchCriteria::OPER_BETWEEN:
+					if(!is_array($value) && preg_match('#^\[.*\]$#', $value)) {
+						$value = json_decode($value, true);
+					}
+					break;
+			}
+			
+			$params[$field] = new DevblocksSearchCriteria($field, $oper, $value);
 		}
 		
 		return $params;
