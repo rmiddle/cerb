@@ -493,6 +493,34 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $str;
 	}
 	
+	static function purifyHTML($dirty_html) {
+		// Register HTMLPurifier
+		require_once(DEVBLOCKS_PATH . 'libs/htmlpurifier/HTMLPurifier.standalone.php');
+		
+		// If we're passed a file pointer, load the literal string
+		if(is_resource($dirty_html)) {
+			$fp = $dirty_html;
+			$dirty_html = null;
+			while(!feof($fp))
+				$dirty_html .= fread($fp, 4096);
+		}
+		
+		$config = HTMLPurifier_Config::createDefault();
+		$config->set('HTML.Doctype', 'HTML 4.01 Transitional');
+		
+		$dir_htmlpurifier_cache = APP_TEMP_PATH . '/cache/htmlpurifier/';
+		
+		if(!is_dir($dir_htmlpurifier_cache)) {
+			mkdir($dir_htmlpurifier_cache, 0755);
+		}
+		
+		$config->set('Cache.SerializerPath', $dir_htmlpurifier_cache);
+		
+		$purifier = new HTMLPurifier($config);
+		
+		return $purifier->purify($dirty_html);
+	}
+	
 	static function parseMarkdown($text) {
 		static $parser = null;
 		
@@ -518,7 +546,7 @@ class DevblocksPlatform extends DevblocksEngine {
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 			
-			$user_agent = 'Cerberus Helpdesk ' . APP_VERSION . ' (Build ' . APP_BUILD . ')';
+			$user_agent = 'Cerb ' . APP_VERSION . ' (Build ' . APP_BUILD . ')';
 			curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
 			
 			$is_safemode = !(ini_get('open_basedir') == '' && ini_get('safe_mode' == 'Off'));
@@ -1825,6 +1853,15 @@ class DevblocksPlatform extends DevblocksEngine {
 	static function setExtensionDelegate($class) {
 		if(!empty($class) && class_exists($class, true))
 			self::$extensionDelegate = $class;
+	}
+	
+	static function setHandlerSession($class) {
+		if(!empty($class) && class_exists($class, true))
+			self::$handlerSession = $class;
+	}
+	
+	static function getHandlerSession() {
+		return self::$handlerSession;
 	}
 	
 	static function redirect(DevblocksHttpIO $httpIO) {

@@ -1,8 +1,8 @@
 <?php
 /***********************************************************************
-| Cerb(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2012, WebGroup Media LLC
+| All source code & content (c) Copyright 2013, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -471,6 +471,7 @@ class Context_Bucket extends Extension_DevblocksContext {
 			$token_values['_label'] = $bucket->name;
 			$token_values['id'] = $bucket->id;
 			$token_values['name'] = $bucket->name;
+			$token_values['reply_address_id'] = $bucket->reply_address_id;
 			
 			// URL
 			//$url_writer = DevblocksPlatform::getUrlService();

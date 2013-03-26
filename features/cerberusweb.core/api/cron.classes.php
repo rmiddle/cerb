@@ -1,8 +1,8 @@
 <?php
 /***********************************************************************
- | Cerb(tm) developed by WebGroup Media, LLC.
+ | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2012, WebGroup Media LLC
+ | All source code & content (c) Copyright 2013, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
@@ -810,7 +810,9 @@ class ImportCron extends CerberusCronPageExtension {
 				DAO_Comment::CONTEXT => CerberusContexts::CONTEXT_TICKET,
 				DAO_Comment::CONTEXT_ID => intval($ticket_id),
 				DAO_Comment::CREATED => intval($iCommentDate),
-				DAO_Comment::ADDRESS_ID => intval($commentAuthorInst->id),
+				// [TODO] Worker?
+				DAO_Comment::OWNER_CONTEXT => CerberusContexts::CONTEXT_ADDRESS,
+				DAO_Comment::OWNER_CONTEXT_ID => intval($commentAuthorInst->id),
 				DAO_Comment::COMMENT => $sCommentText,
 			);
 			$comment_id = DAO_Comment::create($fields);
@@ -1008,7 +1010,8 @@ class ImportCron extends CerberusCronPageExtension {
 				DAO_Comment::CONTEXT => CerberusContexts::CONTEXT_TICKET,
 				DAO_Comment::CONTEXT_ID => $ticket->id,
 				DAO_Comment::COMMENT => $note,
-				DAO_Comment::ADDRESS_ID => $author_address->id,
+				DAO_Comment::OWNER_CONTEXT => CerberusContexts::CONTEXT_ADDRESS,
+				DAO_Comment::OWNER_CONTEXT_ID => $author_address->id,
 			);
 			
 			if(null !== ($comment_id = DAO_Comment::create($fields)))
@@ -1040,7 +1043,7 @@ class Pop3Cron extends CerberusCronPageExtension {
 	function run() {
 		$logger = DevblocksPlatform::getConsoleLog();
 		
-		$logger->info("[POP3] Starting POP3 Task");
+		$logger->info("[POP3] Started POP3 job");
 		
 		if (!extension_loaded("imap")) {
 			$logger->err("[Parser] The 'IMAP' extension is not loaded.  Aborting!");
@@ -1069,10 +1072,15 @@ class Pop3Cron extends CerberusCronPageExtension {
 			return;
 		}
 
+		$runtime = microtime(true);
+		$mailboxes_checked = 0;
+		
 		if(is_array($accounts))
 		foreach ($accounts as $account) { /* @var $account Model_Pop3Account */
 			if(!$account->enabled)
 				continue;
+			
+			$mailboxes_checked++;
 
 			$logger->info('[POP3] Account being parsed is '. $account->nickname);
 			 
@@ -1107,11 +1115,12 @@ class Pop3Cron extends CerberusCronPageExtension {
 					break;
 			}
 
-			$runtime = microtime(true);
+			$mailbox_runtime = microtime(true);
 			 
 			if(false === ($mailbox = @imap_open($connect,
-			!empty($account->username)?$account->username:"",
-			!empty($account->password)?$account->password:""))) {
+				!empty($account->username)?$account->username:"",
+				!empty($account->password)?$account->password:""))) {
+				
 				$logger->error("[POP3] Failed with error: ".imap_last_error());
 				
 				// Increment fails
@@ -1157,9 +1166,9 @@ class Pop3Cron extends CerberusCronPageExtension {
 			// [TODO] Make this an account setting?
 			$total = min($max_downloads, $check->Nmsgs);
 			 
-			$logger->info('[POP3] Init time: '.number_format((microtime(true)-$runtime)*1000,2)," ms");
+			$logger->info("[POP3] Connected to mailbox '".$account->nickname."' (".number_format((microtime(true)-$mailbox_runtime)*1000,2)." ms)");
 
-			$runtime = microtime(true);
+			$mailbox_runtime = microtime(true);
 
 			for($i=1;$i<=$total;$i++) {
 				/*
@@ -1220,8 +1229,13 @@ class Pop3Cron extends CerberusCronPageExtension {
 			imap_close($mailbox);
 			@imap_errors();
 			 
-			$logger->info("[POP3] Total Runtime: ".number_format((microtime(true)-$runtime)*1000,2)." ms");
+			$logger->info("[POP3] Closed mailbox (".number_format((microtime(true)-$mailbox_runtime)*1000,2)." ms)");
 		}
+		
+		if(empty($mailboxes_checked))
+			$logger->info('[POP3] There are no active mailboxes.');
+		
+		$logger->info("[POP3] Finished POP3 job (".number_format((microtime(true)-$runtime)*1000,2)." ms)");
 	}
 
 	function configure($instance) {

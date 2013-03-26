@@ -1,8 +1,8 @@
 <?php
 /***********************************************************************
-| Cerb(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2012, WebGroup Media LLC
+| All source code & content (c) Copyright 2013, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -80,7 +80,7 @@ class DefaultLoginModule extends Extension_LoginAuthenticator {
 			
 			// If we're not an imposter, go to the login form
 			if(!$visit->isImposter()) {
-				$session->clearAll();
+				$session->clear();
 				$query = array(
 					'email' => $worker->email,
 				);

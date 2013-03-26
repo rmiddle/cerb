@@ -1,8 +1,8 @@
 <?php
 /***********************************************************************
-| Cerb(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2012, WebGroup Media LLC
+| All source code & content (c) Copyright 2013, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -159,7 +159,10 @@ class ChSignInPage extends CerberusPageExtension {
 			
 			case 'reset':
 				unset($_COOKIE['cerb_login_email']);
-				setcookie('cerb_login_email', null);
+				
+				$url_writer = DevblocksPlatform::getUrlService();
+				setcookie('cerb_login_email', null, time()-3600, $url_writer->write('c=login',false,false), null, null, true);
+				
 				DevblocksPlatform::redirect(new DevblocksHttpRequest(array('login')));
 				break;
 				
@@ -259,7 +262,7 @@ class ChSignInPage extends CerberusPageExtension {
 			
 			if($remember_me) {
 				$url_writer = DevblocksPlatform::getUrlService();
-				setcookie('cerb_login_email', $email, time()+30*86400, $url_writer->write('c=login',false,false));
+				setcookie('cerb_login_email', $email, time()+30*86400, $url_writer->write('c=login',false,false), null, null, true);
 			}
 			
 			$query = array(
@@ -374,6 +377,12 @@ class ChSignInPage extends CerberusPageExtension {
 	}
 	
 	function signoutAction() {
+		$request = DevblocksPlatform::getHttpRequest();
+		$stack = $request->path;
+		@array_shift($stack); // login
+		@array_shift($stack); // signout
+		@$option = strtolower(array_shift($stack));
+		
 		/*
 		 * Log activity (worker.logged_out)
 		 */
@@ -394,7 +403,16 @@ class ChSignInPage extends CerberusPageExtension {
 		
 		DAO_Worker::logActivity(new Model_Activity(null));
 		
-		$session->clear();
+		switch($option) {
+			case 'all':
+				if(null != ($active_worker = CerberusApplication::getActiveWorker()))
+					Cerb_DevblocksSessionHandler::destroyByWorkerIds($active_worker->id);
+				break;
+				
+			default:
+				$session->clear();
+				break;
+		}
 		
 		DevblocksPlatform::redirect(new DevblocksHttpResponse(array('login')));
 	}
