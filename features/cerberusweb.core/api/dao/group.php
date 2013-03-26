@@ -1,8 +1,8 @@
 <?php
 /***********************************************************************
-| Cerb(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2012, WebGroup Media LLC
+| All source code & content (c) Copyright 2013, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -15,7 +15,7 @@
 |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
 ***********************************************************************/
 
-class DAO_Group extends C4_ORMHelper {
+class DAO_Group extends Cerb_ORMHelper {
 	const CACHE_ALL = 'cerberus_cache_groups_all';
 	const CACHE_ROSTERS = 'ch_group_rosters';
 	
@@ -424,6 +424,7 @@ class DAO_Group extends C4_ORMHelper {
 		$args = array(
 			'join_sql' => &$join_sql,
 			'where_sql' => &$where_sql,
+			'tables' => &$tables,
 			'has_multiple_values' => &$has_multiple_values
 		);
 		
@@ -1164,6 +1165,7 @@ class Context_Group extends Extension_DevblocksContext implements IDevblocksCont
 			$token_values['_label'] = $group->name;
 			$token_values['id'] = $group->id;
 			$token_values['name'] = $group->name;
+			$token_values['reply_address_id'] = $group->reply_address_id;
 			
 			// URL
 			$url_writer = DevblocksPlatform::getUrlService();

@@ -1,8 +1,8 @@
 <?php
 /***********************************************************************
-| Cerb(tm) developed by WebGroup Media, LLC.
+| Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2012, WebGroup Media LLC
+| All source code & content (c) Copyright 2013, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -15,7 +15,7 @@
 |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
- * IMPORTANT LICENSING NOTE from your friends on the Cerberus Helpdesk Team
+ * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
  *
  * Sure, it would be so easy to just cheat and edit this file to use the
  * software without paying for it.  But we trust you anyway.  In fact, we're
@@ -43,8 +43,8 @@
  * and the warm fuzzy feeling of feeding a couple of obsessed developers
  * who want to help you get more done.
  *
- * - Jeff Standen, Darren Sugita, Dan Hildebrandt, Scott Luther
- *	 WEBGROUP MEDIA LLC. - Developers of Cerberus Helpdesk
+ \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
+ *	 Webgroup Media LLC - Developers of Cerb
  */
 
 abstract class Extension_AppPreBodyRenderer extends DevblocksExtension {
@@ -326,11 +326,13 @@ abstract class Extension_WorkspaceTab extends DevblocksExtension {
 			DevblocksPlatform::sortObjects($exts, 'manifest->name');
 		else
 			DevblocksPlatform::sortObjects($exts, 'name');
-	
+		
 		return $exts;
 	}
 
 	abstract function renderTab(Model_WorkspacePage $page, Model_WorkspaceTab $tab);
+	function renderTabConfig(Model_WorkspacePage $page, Model_WorkspaceTab $tab) {}
+	function saveTabConfig(Model_WorkspacePage $page, Model_WorkspaceTab $tab) {}
 };
 
 abstract class Extension_WorkspaceWidgetDatasource extends DevblocksExtension {
@@ -409,7 +411,6 @@ abstract class Extension_WorkspaceWidget extends DevblocksExtension {
 	abstract function renderConfig(Model_WorkspaceWidget $widget);
 	abstract function saveConfig(Model_WorkspaceWidget $widget);
 
-	// [TODO] This probably has a better home
 	public static function getParamsViewModel($widget, $params) {
 		$view_model = null;
 		
@@ -417,7 +418,7 @@ abstract class Extension_WorkspaceWidget extends DevblocksExtension {
 			$view_model_encoded = $params['view_model'];
 			$view_model = unserialize(base64_decode($view_model_encoded));
 		}
-		
+
 		if(empty($view_model)) {
 			@$view_id = $params['view_id'];
 			@$view_context = $params['view_context'];
@@ -435,9 +436,16 @@ abstract class Extension_WorkspaceWidget extends DevblocksExtension {
 				$view->id = $view_id;
 				$view->is_ephemeral = true;
 				$view->renderFilters = false;
-	
+
 				$view_model = C4_AbstractViewLoader::serializeAbstractView($view);
 			}
+		}
+		
+		if(isset($view_model->placeholderValues)
+			&& isset($view_model->placeholderValues['current_worker_id'])) {
+				$active_worker = CerberusApplication::getActiveWorker();
+				
+				$view_model->placeholderValues['current_worker_id'] = !empty($active_worker) ? $active_worker->id : 0;
 		}
 		
 		return $view_model;
