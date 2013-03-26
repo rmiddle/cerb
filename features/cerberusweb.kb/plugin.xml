@@ -4,7 +4,7 @@
 	<name>Knowledgebase</name>
 	<description>Create and categorize articles to share knowledge between workers or your community.</description>
 	<author>WebGroup Media, LLC.</author>
-	<version>6.2.1</version>
+	<version>6.2.2</version>
 	<link>http://wiki.cerb5.com/wiki/Features:Knowledgebase</link>
 	<image>plugin.png</image>
 	
@@ -183,7 +183,7 @@
 		
 		<extension point="cerberusweb.ui.workspace.tab">
 			<id>cerberusweb.kb.tab.browse</id>
-			<name>Browse KB Tab</name>
+			<name>Knowledgebase Browser Tab</name>
 			<class>
 				<file>api/App.php</file>
 				<name>WorkspaceTab_KbBrowse</name>
@@ -191,7 +191,7 @@
 			<params>
 				<param key="label" value="kb.workspace.tab.browser" />
 			</params>
-		</extension>		
+		</extension>
 		
 		<!-- Profile Page Sections -->
 		
