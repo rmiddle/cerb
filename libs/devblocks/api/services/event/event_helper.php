@@ -2321,7 +2321,7 @@ class DevblocksEventHelper {
 			
 			$to = DevblocksPlatform::parseCsvString($to_string);
 		}
-		
+
 		if(is_array($to_vars))
 		foreach($to_vars as $to_var) {
 			if(!isset($dict->$to_var))
@@ -2331,7 +2331,13 @@ class DevblocksEventHelper {
 			if(substr($to_var,0,4) != 'var_')
 				continue;
 			
-			$address_ids = $dict->$to_var;
+			$address_ids = array();
+			
+			if(is_array($dict->$to_var))
+				$address_ids = array_keys($dict->$to_var);
+
+			if(empty($address_ids))
+				continue;
 			
 			$addresses = DAO_Address::getWhere(sprintf("%s IN (%s)",
 				DAO_Address::ID,
@@ -2352,7 +2358,7 @@ class DevblocksEventHelper {
 		
 		@$from_address_id = $params['from_address_id'];
 		
-		if(!is_numeric($from_address_id) || false !== strpos($from_address_id, ',')) {
+		if(!empty($from_address_id) && (!is_numeric($from_address_id) || false !== strpos($from_address_id, ','))) {
 			$from_address_id = 0;
 			$from_placeholders = DevblocksPlatform::parseCsvString($params['from_address_id']);
 			
@@ -2386,7 +2392,7 @@ class DevblocksEventHelper {
 			return "[ERROR] The 'subject' field has invalid placeholders.";
 		}
 		
-		if(false === ($headers_string = $tpl_builder->build($params['headers'], $dict))) {
+		if(false === ($headers_string = isset($params['headers']) ? $tpl_builder->build($params['headers'], $dict) : '')) {
 			return "[ERROR] The 'headers' field has invalid placeholders.";
 		}
 		
@@ -2469,7 +2475,13 @@ class DevblocksEventHelper {
 			if(substr($to_var,0,4) != 'var_')
 				continue;
 			
-			$address_ids = $dict->$to_var;
+			$address_ids = array();
+			
+			if(is_array($dict->$to_var))
+				$address_ids = array_keys($dict->$to_var);
+			
+			if(empty($address_ids))
+				continue;
 			
 			$addresses = DAO_Address::getWhere(sprintf("%s IN (%s)",
 				DAO_Address::ID,
