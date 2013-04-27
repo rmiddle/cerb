@@ -376,7 +376,11 @@ abstract class Extension_WorkspaceWidgetDatasource extends DevblocksExtension {
 	}
 	
 	abstract function renderConfig(Model_WorkspaceWidget $widget, $params=array(), $params_prefix=null);
-	abstract function getData(Model_WorkspaceWidget $widget, array $params=array());
+	abstract function getData(Model_WorkspaceWidget $widget, array $params=array(), $params_prefix=null);
+};
+
+interface ICerbWorkspaceWidget_ExportData {
+	function exportData(Model_WorkspaceWidget $widget, $format=null);
 };
 
 abstract class Extension_WorkspaceWidget extends DevblocksExtension {
@@ -411,44 +415,13 @@ abstract class Extension_WorkspaceWidget extends DevblocksExtension {
 	abstract function renderConfig(Model_WorkspaceWidget $widget);
 	abstract function saveConfig(Model_WorkspaceWidget $widget);
 
-	public static function getParamsViewModel($widget, $params) {
-		$view_model = null;
+	public static function getViewFromParams($widget, $params, $view_id) {
+		if(!isset($params['worklist_model']))
+			return;
 		
-		if(isset($params['view_model'])) {
-			$view_model_encoded = $params['view_model'];
-			$view_model = unserialize(base64_decode($view_model_encoded));
-		}
-
-		if(empty($view_model)) {
-			@$view_id = $params['view_id'];
-			@$view_context = $params['view_context'];
-			
-			if(empty($view_context))
-				return;
-			
-			if(null == ($ctx = Extension_DevblocksContext::get($view_context)))
-				return;
-			
-			if(null == ($view = $ctx->getChooserView($view_id))) /* @var $view C4_AbstractView */
-				return;
-				
-			if($view instanceof C4_AbstractView) {
-				$view->id = $view_id;
-				$view->is_ephemeral = true;
-				$view->renderFilters = false;
-
-				$view_model = C4_AbstractViewLoader::serializeAbstractView($view);
-			}
-		}
+		$view_model = $params['worklist_model'];
 		
-		if(isset($view_model->placeholderValues)
-			&& isset($view_model->placeholderValues['current_worker_id'])) {
-				$active_worker = CerberusApplication::getActiveWorker();
-				
-				$view_model->placeholderValues['current_worker_id'] = !empty($active_worker) ? $active_worker->id : 0;
-		}
-		
-		return $view_model;
+		return C4_AbstractViewLoader::unserializeViewFromAbstractJson($view_model, $view_id);
 	}
 };
 

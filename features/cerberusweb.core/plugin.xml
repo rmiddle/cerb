@@ -4,7 +4,7 @@
 	<name>Cerb6 Core</name>
 	<description>The core functionality of Cerb6.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.3.1</version>
+	<version>6.4.0</version>
 	<link>http://wiki.cerb4.com/wiki/New_Changes</link>
 	
 	<!-- Plugin Dependencies -->
@@ -49,6 +49,7 @@
 		<patch version="6.1.0" revision="1005" file="patches/6.x/6.1.0.php" />
 		<patch version="6.2.0" revision="1016" file="patches/6.x/6.2.0.php" />
 		<patch version="6.3.0" revision="1030" file="patches/6.x/6.3.0.php" />
+		<patch version="6.4.0" revision="1038" file="patches/6.x/6.4.0.php" />
 	</patches>
 
 	<!-- Controller Routing -->
@@ -344,6 +345,8 @@
 		</file>
 		
 		<file path="api/dao/workspace.php">
+			<class name="Context_WorkspacePage" />
+			<class name="Context_WorkspaceTab" />
 			<class name="DAO_WorkspaceList" />
 			<class name="DAO_WorkspacePage" />
 			<class name="DAO_WorkspaceTab" />
@@ -357,6 +360,7 @@
 		</file>
 		
 		<file path="api/dao/workspace_widget.php">
+			<class name="Context_WorkspaceWidget" />
 			<class name="DAO_WorkspaceWidget" />
 			<class name="Model_WorkspaceWidget" />
 			<class name="SearchFields_WorkspaceWidget" />
@@ -1078,6 +1082,75 @@
 						<data key="workspace" />
 					</value>
 					-->
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.workspace.page</id>
+			<name>Workspace Page</name>
+			<class>
+				<file>api/dao/workspace.php</file>
+				<name>Context_WorkspacePage</name>
+			</class>
+			<params>
+				<param key="alias" value="workspace_page" />
+				<param key="dao_class" value="DAO_WorkspacePage" />
+				<param key="view_class" value="View_WorkspacePage" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<!--<data key="find" />-->
+						<!--<data key="snippets" />-->
+						<!--<data key="va_variable" />-->
+						<!--<data key="workspace" />-->
+					</value>
+				</param>
+			</params>
+		</extension>
+
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.workspace.tab</id>
+			<name>Workspace Tab</name>
+			<class>
+				<file>api/dao/workspace.php</file>
+				<name>Context_WorkspaceTab</name>
+			</class>
+			<params>
+				<param key="alias" value="workspace_tab" />
+				<param key="dao_class" value="DAO_WorkspaceTab" />
+				<param key="view_class" value="View_WorkspaceTab" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<!--<data key="find" />-->
+						<!--<data key="snippets" />-->
+						<!--<data key="va_variable" />-->
+						<!--<data key="workspace" />-->
+					</value>
+				</param>
+			</params>
+		</extension>
+
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.workspace.widget</id>
+			<name>Workspace Widget</name>
+			<class>
+				<file>api/dao/workspace_widget.php</file>
+				<name>Context_WorkspaceWidget</name>
+			</class>
+			<params>
+				<param key="alias" value="workspace_widget" />
+				<param key="dao_class" value="DAO_WorkspaceWidget" />
+				<param key="view_class" value="View_WorkspaceWidget" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<!--<data key="find" />-->
+						<!--<data key="snippets" />-->
+						<!--<data key="va_variable" />-->
+						<!--<data key="workspace" />-->
+					</value>
 				</param>
 			</params>
 		</extension>

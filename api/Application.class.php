@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2013041001);
-define("APP_VERSION", '6.3.2');
+define("APP_BUILD", 2013042402);
+define("APP_VERSION", '6.4.0-dev');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -81,6 +81,8 @@ DevblocksPlatform::registerClasses($path . 'Utils.php', array(
  * Application-level Facade
  */
 class CerberusApplication extends DevblocksApplication {
+	private static $_active_worker = null;
+	
 	/**
 	 * @return CerberusVisit
 	 */
@@ -89,10 +91,17 @@ class CerberusApplication extends DevblocksApplication {
 		return $session->getVisit();
 	}
 	
+	static function setActiveWorker($worker) {
+		self::$_active_worker = $worker;
+	}
+	
 	/**
 	 * @return Model_Worker
 	 */
 	static function getActiveWorker() {
+		if(isset(self::$_active_worker))
+			return self::$_active_worker;
+		
 		$visit = self::getVisit();
 		return (null != $visit)
 			? $visit->getWorker()
@@ -302,9 +311,12 @@ class CerberusApplication extends DevblocksApplication {
 		// Clean up missing plugins
 		DAO_Platform::cleanupPluginTables();
 		DAO_Platform::maint();
-		
+
 		// Registry
 		$plugins = DevblocksPlatform::getPluginRegistry();
+		
+		// Download updated plugins from repository
+		DAO_PluginLibrary::downloadUpdatedPluginsFromRepository();
 		
 		// Update the application core (version by version)
 		if(!isset($plugins['cerberusweb.core']))
@@ -654,6 +666,9 @@ class CerberusContexts {
 	const CONTEXT_TICKET = 'cerberusweb.contexts.ticket';
 	const CONTEXT_TIMETRACKING = 'cerberusweb.contexts.timetracking';
 	const CONTEXT_WORKER = 'cerberusweb.contexts.worker';
+	const CONTEXT_WORKSPACE_PAGE = 'cerberusweb.contexts.workspace.page';
+	const CONTEXT_WORKSPACE_TAB = 'cerberusweb.contexts.workspace.tab';
+	const CONTEXT_WORKSPACE_WIDGET = 'cerberusweb.contexts.workspace.widget';
 	
 	public static function getContext($context, $context_object, &$labels, &$values, $prefix=null, $nested=false) {
 		switch($context) {
@@ -1287,7 +1302,7 @@ class Context_Application extends Extension_DevblocksContext {
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
 		}
 		
 		switch($token) {

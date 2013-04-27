@@ -110,6 +110,135 @@ class PageSection_InternalDashboards extends Extension_PageSection {
 		));
 	}
 	
+	function addWidgetImportJsonAction() {
+		@$import_json = DevblocksPlatform::importGPC($_REQUEST['import_json'], 'string', null);
+		@$workspace_tab_id = DevblocksPlatform::importGPC($_REQUEST['workspace_tab_id'], 'integer', 0);
+		@$configure = DevblocksPlatform::importGPC($_REQUEST['configure'],'array', array());
+		
+		header('Content-Type: application/json');
+
+		try {
+		
+			if(empty($workspace_tab_id))
+				throw new Exception("Invalid workspace tab target");
+			
+			if(false == ($widget_json = json_decode($import_json, true)))
+				throw new Exception("Invalid JSON");
+			
+			if(!isset($widget_json['widget']['extension_id']))
+				throw new Exception("JSON doesn't contain widget extension info");
+			
+			if(!isset($widget_json['widget']['params']))
+				throw new Exception("JSON doesn't contain widget params");
+				
+			@$extension_id = $widget_json['widget']['extension_id'];
+			
+			if(empty($extension_id) || null == ($extension = Extension_WorkspaceWidget::get($extension_id)))
+				throw new Exception("Invalid widget extension");
+
+			// [TODO] Do more error checking on acceptable params
+			
+			// Allow prompted configuration of the widget import
+			
+			@$configure_fields = $widget_json['widget']['configure'];
+			
+			// Are there configurable fields in this import file?
+			if(is_array($configure_fields) && !empty($configure_fields)) {
+				// If the worker has provided the configuration, make the changes to JSON array
+				if(!empty($configure)) {
+					foreach($configure_fields as $config_field_idx => $config_field) {
+						if(!isset($config_field['path']))
+							continue;
+						
+						if(!isset($configure[$config_field_idx]))
+							continue;
+						
+						$ptr =& DevblocksPlatform::jsonGetPointerFromPath($widget_json, $config_field['path']);
+						$ptr = $configure[$config_field_idx];
+					}
+					
+				// If the worker hasn't been prompted, do that now
+				} else {
+					$tpl = DevblocksPlatform::getTemplateService();
+					$tpl->assign('import_json', $import_json);
+					$tpl->assign('import_fields', $configure_fields);
+					$config_html = $tpl->fetch('devblocks:cerberusweb.core::internal/import/prompted/configure_json_import.tpl');
+					
+					echo json_encode(array(
+						'config_html' => $config_html,
+					));
+					return;
+				}
+			}
+			
+			$widget_id = DAO_WorkspaceWidget::create(array(
+				DAO_WorkspaceWidget::LABEL => @$widget_json['widget']['label'] ?: 'New widget',
+				DAO_WorkspaceWidget::EXTENSION_ID => $extension_id,
+				DAO_WorkspaceWidget::WORKSPACE_TAB_ID => $workspace_tab_id,
+				DAO_WorkspaceWidget::POS => '0000',
+				DAO_WorkspaceWidget::PARAMS_JSON => json_encode($widget_json['widget']['params'])
+			));
+			
+			echo json_encode(array(
+				'widget_id' => $widget_id,
+				'widget_extension_id' => $extension_id,
+				'widget_tab_id' => $workspace_tab_id,
+			));
+			
+		} catch (Exception $e) {
+			echo json_encode(array(false, $e->getMessage()));
+			return;
+		}
+	}
+	
+	function showWidgetExportPopupAction() {
+		@$widget_id = DevblocksPlatform::importGPC($_REQUEST['widget_id'], 'integer', 0);
+
+		if(null == ($widget = DAO_WorkspaceWidget::get($widget_id)))
+			return;
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		$tpl->assign('widget', $widget);
+		
+		$widget_json = json_encode(array(
+			'widget' => array(
+				'label' => $widget->label,
+				'extension_id' => $widget->extension_id,
+				'params' => $widget->params,
+			),
+		));
+		
+		$tpl->assign('widget_json', DevblocksPlatform::strFormatJson($widget_json));
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/export.tpl');
+	}
+	
+	function showWidgetExportDataPopupAction() {
+		@$widget_id = DevblocksPlatform::importGPC($_REQUEST['widget_id'], 'integer', 0);
+
+		if(null == ($widget = DAO_WorkspaceWidget::get($widget_id)))
+			return;
+		
+		if(null == ($widget_extension = Extension_WorkspaceWidget::get($widget->extension_id)))
+			return;
+		
+		if(!($widget_extension instanceof ICerbWorkspaceWidget_ExportData))
+			return;
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		$tpl->assign('widget', $widget);
+		$tpl->assign('widget_extension', $widget_extension);
+		
+		$tpl->assign('export_data', array(
+			'csv' => $widget_extension->exportData($widget, 'csv'),
+			'json' => $widget_extension->exportData($widget, 'json'),
+		));
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/export_data.tpl');
+	}
+	
 	function getContextFieldsJsonAction() {
 		@$context = DevblocksPlatform::importGPC($_REQUEST['context'], 'string', null);
 		
@@ -255,25 +384,32 @@ class WorkspaceTab_Dashboards extends Extension_WorkspaceTab {
 }
 endif;
 
-class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget {
-	function render(Model_WorkspaceWidget $widget) {
-		$tpl = DevblocksPlatform::getTemplateService();
-
-		// Per series datasources
+class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	private function _loadData(Model_WorkspaceWidget &$widget) {
 		@$datasource_extid = $widget->params['datasource'];
 
 		if(empty($datasource_extid)) {
-			echo "This gauge doesn't have a data source. Configure it and select one.";
-			return;
+			return false;
 		}
 		
 		if(null == ($datasource_ext = Extension_WorkspaceWidgetDatasource::get($datasource_extid)))
-			return;
+			return false;
 		
 		$data = $datasource_ext->getData($widget, $widget->params);
 		
 		if(!empty($data))
 			$widget->params = $data;
+		
+		return true;
+	}
+	
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		if(false == ($this->_loadData($widget))) {
+			echo "This gauge doesn't have a data source. Configure it and select one.";
+			return;
+		}
 		
 		$tpl->assign('widget', $widget);
 		
@@ -305,6 +441,13 @@ class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget {
 	function saveConfig(Model_WorkspaceWidget $widget) {
 		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
 		
+		// Convert the serialized model to proper JSON before saving
+		
+		if(isset($params['worklist_model_json'])) {
+			$params['worklist_model'] = json_decode($params['worklist_model_json'], true);
+			unset($params['worklist_model_json']);
+		}
+		
 		if(isset($params['threshold_values']))
 		foreach($params['threshold_values'] as $idx => $val) {
 			if(empty($val)) {
@@ -335,27 +478,114 @@ class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget {
 		$cache = DevblocksPlatform::getCacheService();
 		$cache->remove(sprintf("widget%d_datasource", $widget->id));
 	}
-};
-
-class WorkspaceWidget_Counter extends Extension_WorkspaceWidget {
-	function render(Model_WorkspaceWidget $widget) {
-		$tpl = DevblocksPlatform::getTemplateService();
-
-		// Per series datasources
-		@$datasource_extid = $widget->params['datasource'];
-
-		if(empty($datasource_extid)) {
-			echo "This counter doesn't have a data source. Configure it and select one.";
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == ($this->_loadData($widget))) {
 			return;
 		}
 		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		$results = array(
+			'Label' => $widget->label,
+			'Value' => $widget->params['metric_value'],
+			'Type' => $widget->params['metric_type'],
+			'Prefix' => $widget->params['metric_prefix'],
+			'Suffix' => $widget->params['metric_suffix'],
+		);
+
+		$fp = fopen("php://temp", 'r+');
+		
+		fputcsv($fp, array_keys($results));
+		fputcsv($fp, array_values($results));
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'gauge',
+				'version' => 'Cerb ' . APP_VERSION,
+				'metric' => array(
+					'value' => $widget->params['metric_value'],
+					'type' => $widget->params['metric_type'],
+					'prefix' => $widget->params['metric_prefix'],
+					'suffix' => $widget->params['metric_suffix'],
+				),
+				'thresholds' => array(),
+			),
+		);
+		
+		if(isset($widget->params['threshold_labels']) && is_array($widget->params['threshold_labels']))
+		foreach(array_keys($widget->params['threshold_labels']) as $idx) {
+			if(
+				empty($widget->params['threshold_labels'][$idx])
+				|| !isset($widget->params['threshold_values'][$idx])
+			)
+				continue;
+		
+			$results['widget']['thresholds'][] = array(
+				'label' => $widget->params['threshold_labels'][$idx],
+				'value' => $widget->params['threshold_values'][$idx],
+				'color' => $widget->params['threshold_colors'][$idx],
+			);
+		}
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
+};
+
+class WorkspaceWidget_Counter extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	private function _loadData(Model_WorkspaceWidget &$widget) {
+		@$datasource_extid = $widget->params['datasource'];
+
+		if(empty($datasource_extid)) {
+			return false;
+		}
+		
 		if(null == ($datasource_ext = Extension_WorkspaceWidgetDatasource::get($datasource_extid)))
-			return;
+			return false;
 		
 		$data = $datasource_ext->getData($widget, $widget->params);
 
 		if(!empty($data))
 			$widget->params = $data;
+		
+		return true;
+	}
+	
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		if(false == ($this->_loadData($widget))) {
+			echo "This counter doesn't have a data source. Configure it and select one.";
+			return;
+		}
 		
 		$tpl->assign('widget', $widget);
 		
@@ -387,6 +617,13 @@ class WorkspaceWidget_Counter extends Extension_WorkspaceWidget {
 	function saveConfig(Model_WorkspaceWidget $widget) {
 		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
 		
+		// Convert the serialized model to proper JSON before saving
+		
+		if(isset($params['worklist_model_json'])) {
+			$params['worklist_model'] = json_decode($params['worklist_model_json'], true);
+			unset($params['worklist_model_json']);
+		}
+		
 		DAO_WorkspaceWidget::update($widget->id, array(
 			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
 		));
@@ -395,27 +632,110 @@ class WorkspaceWidget_Counter extends Extension_WorkspaceWidget {
 		$cache = DevblocksPlatform::getCacheService();
 		$cache->remove(sprintf("widget%d_datasource", $widget->id));
 	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == ($this->_loadData($widget))) {
+			return;
+		}
+		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		$results = array(
+			'Label' => $widget->label,
+			'Value' => $widget->params['metric_value'],
+			'Type' => $widget->params['metric_type'],
+			'Prefix' => $widget->params['metric_prefix'],
+			'Suffix' => $widget->params['metric_suffix'],
+		);
+
+		$fp = fopen("php://temp", 'r+');
+		
+		fputcsv($fp, array_keys($results));
+		fputcsv($fp, array_values($results));
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'counter',
+				'version' => 'Cerb ' . APP_VERSION,
+				'metric' => array(
+					'value' => $widget->params['metric_value'],
+					'type' => $widget->params['metric_type'],
+					'prefix' => $widget->params['metric_prefix'],
+					'suffix' => $widget->params['metric_suffix'],
+				),
+			),
+		);
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
 };
 
-class WorkspaceWidget_Chart extends Extension_WorkspaceWidget {
-	function render(Model_WorkspaceWidget $widget) {
-		$tpl = DevblocksPlatform::getTemplateService();
+class WorkspaceWidget_Chart extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	private function _loadData(Model_WorkspaceWidget &$widget) {
+		@$series = $widget->params['series'];
 
-		// Per series datasources
-		if(is_array($widget->params['series']))
-		foreach($widget->params['series'] as $series_idx => $series) {
-			@$datasource_extid = $series['datasource'];
+		if(empty($series)) {
+			return false;
+		}
+		
+		// Multiple datasources
+		if(is_array($series))
+		foreach($series as $series_idx => $series_params) {
+			@$datasource_extid = $series_params['datasource'];
 
 			if(empty($datasource_extid))
 				continue;
 			
 			if(null == ($datasource_ext = Extension_WorkspaceWidgetDatasource::get($datasource_extid)))
 				continue;
-			
-			$data = $datasource_ext->getData($widget, $series);
-			
+
+			$params_prefix = sprintf("[series][%d]", $series_idx);
+
+			$data = $datasource_ext->getData($widget, $series_params, $params_prefix);
+
 			if(!empty($data))
 				$widget->params['series'][$series_idx] = $data;
+		}
+		
+		return true;
+	}
+	
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		if(false == ($this->_loadData($widget))) {
+			echo "This chart doesn't have any data sources. Configure it and select one.";
+			return;
 		}
 		
 		$tpl->assign('widget', $widget);
@@ -457,7 +777,17 @@ class WorkspaceWidget_Chart extends Extension_WorkspaceWidget {
 	function saveConfig(Model_WorkspaceWidget $widget) {
 		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
 		
+		// [TODO] The extension should be able to filter the properties here
+		
 		foreach($params['series'] as $idx => $series) {
+			// Convert the serialized model to proper JSON before saving
+		
+			if(isset($series['worklist_model_json'])) {
+				$series['worklist_model'] = json_decode($series['worklist_model_json'], true);
+				unset($series['worklist_model_json']);
+				$params['series'][$idx] = $series;
+			}
+			
 			if(isset($series['line_color'])) {
 				if(false != ($rgb = $this->_hex2RGB($series['line_color']))) {
 					$params['series'][$idx]['fill_color'] = sprintf("rgba(%d,%d,%d,0.15)", $rgb['r'], $rgb['g'], $rgb['b']);
@@ -494,17 +824,130 @@ class WorkspaceWidget_Chart extends Extension_WorkspaceWidget {
 	  
 		return $rgb;
 	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == ($this->_loadData($widget))) {
+			return;
+		}
+		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		$series = $widget->params['series'];
+		
+		$results = array();
+		
+		$results[] = array(
+			'Series #',
+			'Series Label',
+			'Data X Label',
+			'Data X Value',
+			'Data Y Label',
+			'Data Y Value',
+		);
+		
+		if(is_array($series))
+		foreach($series as $series_idx => $series_params) {
+			if(!isset($series_params['data']) || empty($series_params['data']))
+				continue;
+		
+			$data = $series_params['data'];
+			
+			if(is_array($data))
+			foreach($data as $k => $v) {
+				$row = array(
+					'series' => $series_idx,
+					'series_label' => $series_params['label'],
+					'x_label' => $v['x_label'],
+					'x' => $v['x'],
+					'y_label' => $v['y_label'],
+					'y' => $v['y'],
+				);
+
+				$results[] = $row;
+			}
+		}
+		
+		$fp = fopen("php://temp", 'r+');
+		
+		foreach($results as $result) {
+			fputcsv($fp, $result);
+		}
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		$series = $widget->params['series'];
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'chart',
+				'version' => 'Cerb ' . APP_VERSION,
+				'series' => array(),
+			),
+		);
+		
+		if(is_array($series))
+		foreach($series as $series_idx => $series_params) {
+			if(!isset($series_params['data']) || empty($series_params['data']))
+				continue;
+		
+			$data = $series_params['data'];
+			
+			$results['widget']['series'][$series_idx] = array(
+				'id' => $series_idx,
+				'label' => $series_params['label'],
+				'data' => array(),
+			);
+			
+			if(is_array($data))
+			foreach($data as $k => $v) {
+				$row = array(
+					'x' => $v['x'],
+					'x_label' => $v['x_label'],
+					'y' => $v['y'],
+					'y_label' => $v['y_label'],
+				);
+				
+				$results['widget']['series'][$series_idx]['data'][] = $row;
+			}
+		}
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
 };
 
-class WorkspaceWidget_Subtotals extends Extension_WorkspaceWidget {
+class WorkspaceWidget_Subtotals extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
 	function render(Model_WorkspaceWidget $widget) {
 		$view_id = sprintf("widget%d_worklist", $widget->id);
 
-		if(null == ($view_model = self::getParamsViewModel($widget, $widget->params)))
-			return;
-		
-		// Force reload parameters (we can't trust the session)
-		if(false == ($view = C4_AbstractViewLoader::unserializeAbstractView($view_model)))
+		if(null == ($view = self::getViewFromParams($widget, $widget->params, $view_id)))
 			return;
 		
 		C4_AbstractViewLoader::setView($view->id, $view);
@@ -611,26 +1054,148 @@ class WorkspaceWidget_Subtotals extends Extension_WorkspaceWidget {
 	function saveConfig(Model_WorkspaceWidget $widget) {
 		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
 		
+		// Convert the serialized model to proper JSON before saving
+		
+		if(isset($params['worklist_model_json'])) {
+			$params['worklist_model'] = json_decode($params['worklist_model_json'], true);
+			unset($params['worklist_model_json']);
+		}
+		
 		// Save the widget
 		
 		DAO_WorkspaceWidget::update($widget->id, array(
 			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
 		));
 	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == $this->_exportDataLoad($widget)) {
+			return;
+		}
+		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataLoad(Model_WorkspaceWidget &$widget) {
+		$view_id = sprintf("widget%d_worklist", $widget->id);
+		
+		if(null == ($view = self::getViewFromParams($widget, $widget->params, $view_id)))
+			return false;
+
+		if(!($view instanceof IAbstractView_Subtotals))
+			return false;
+		
+		$fields = $view->getSubtotalFields();
+		
+		if(empty($view->renderSubtotals) || !isset($fields[$view->renderSubtotals])) {
+			return false;
+		}
+		
+		$counts = $view->getSubtotalCounts($view->renderSubtotals);
+
+		if(null != (@$limit_to = $widget->params['limit_to'])) {
+			$counts = array_slice($counts, 0, $limit_to, true);
+		}
+		
+		DevblocksPlatform::sortObjects($counts, '[hits]', false);
+		
+		$widget->params['counts'] = $counts;
+		return true;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		@$counts = $widget->params['counts'];
+		
+		if(!is_array($counts))
+			return false;
+		
+		$results = array();
+		
+		$results[] = array(
+			'Label',
+			'Count',
+		);
+		
+		foreach($counts as $count) {
+			$results[] = array(
+				$count['label'],
+				$count['hits'],
+			);
+		}
+		
+		$fp = fopen("php://temp", 'r+');
+		
+		foreach($results as $result) {
+			fputcsv($fp, $result);
+		}
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		@$counts = $widget->params['counts'];
+		
+		if(!is_array($counts))
+			return false;
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'subtotals',
+				'version' => 'Cerb ' . APP_VERSION,
+				'counts' => array(),
+			),
+		);
+
+		foreach($counts as $count) {
+			$results['widget']['counts'][] = array(
+				'label' => $count['label'],
+				'count' => $count['hits'],
+			);
+		}
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
 };
 
 class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget {
-	function render(Model_WorkspaceWidget $widget) {
-		if(null == ($view_model = Extension_WorkspaceWidget::getParamsViewModel($widget, $widget->params)))
-			return;
+	private function _getView(Model_WorkspaceWidget $widget) {
+		$view_id = sprintf("widget%d_worklist", $widget->id);
 		
-		// Force reload parameters (we can't trust the session)
-		if(false == ($view = C4_AbstractViewLoader::unserializeAbstractView($view_model)))
-			return;
-		
-		$view->id = sprintf("widget%d_worklist", $widget->id);
+		if(null == ($view = Extension_WorkspaceWidget::getViewFromParams($widget, $widget->params, $view_id)))
+			return false;
 		
 		C4_AbstractViewLoader::setView($view->id, $view);
+		
+		return $view;
+	}
+	
+	function render(Model_WorkspaceWidget $widget) {
+		if(false == ($view = $this->_getView($widget)))
+			return;
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('view_id', $view->id);
@@ -654,19 +1219,14 @@ class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget {
 		$context_mfts = Extension_DevblocksContext::getAll(false, 'workspace');
 		$tpl->assign('context_mfts', $context_mfts);
 		
-		// Mirrored worklist for config (two worklists can render at once)
+		// Grab the latest view and copy it to _config
 		
-		if(
-			null != ($view_model = Extension_WorkspaceWidget::getParamsViewModel($widget, $widget->params))
-			&& false != ($view = C4_AbstractViewLoader::unserializeAbstractView($view_model))
-			) {
-			
-			// Mirror the worklist to the config worklist
-			$view->id = sprintf("widget%d_worklist_config", $widget->id);
-			$view->is_ephemeral = true;
-			
-			C4_AbstractViewLoader::setView($view->id, $view);
-		}
+		if(false == ($view = $this->_getView($widget)))
+			return;
+		
+		$view->id .= '_config';
+		$view->is_ephemeral = true;
+		C4_AbstractViewLoader::setView($view->id, $view);
 		
 		// Template
 		
@@ -675,16 +1235,12 @@ class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget {
 	
 	function saveConfig(Model_WorkspaceWidget $widget) {
 		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
+
+		// Convert the serialized model to proper JSON before saving
 		
-		if(
-			null != ($view_model = self::getParamsViewModel($widget, $params))
-			&& false != ($view = C4_AbstractViewLoader::unserializeAbstractView($view_model))
-		) {
-			// Set the usable worklist
-			$view->id = sprintf("widget%d_worklist", $widget->id);
-			$view->is_ephemeral = false;
-			
-			C4_AbstractViewLoader::setView($view->id, $view);
+		if(isset($params['worklist_model_json'])) {
+			$params['worklist_model'] = json_decode($params['worklist_model_json'], true);
+			unset($params['worklist_model_json']);
 		}
 		
 		// Save
@@ -733,20 +1289,17 @@ class WorkspaceWidget_CustomHTML extends Extension_WorkspaceWidget {
 	}
 };
 
-class WorkspaceWidget_PieChart extends Extension_WorkspaceWidget {
-	function render(Model_WorkspaceWidget $widget) {
-		$tpl = DevblocksPlatform::getTemplateService();
-
+class WorkspaceWidget_PieChart extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	private function _loadData(Model_WorkspaceWidget &$widget) {
 		// Per series datasources
 		@$datasource_extid = $widget->params['datasource'];
 
 		if(empty($datasource_extid)) {
-			echo "This pie chart doesn't have a data source. Configure it and select one.";
-			return;
+			return false;
 		}
 		
 		if(null == ($datasource_ext = Extension_WorkspaceWidgetDatasource::get($datasource_extid)))
-			return;
+			return false;
 		
 		$data = $datasource_ext->getData($widget, $widget->params);
 
@@ -778,6 +1331,17 @@ class WorkspaceWidget_PieChart extends Extension_WorkspaceWidget {
 			'#CCCCCC',
 		);
 		$widget->params['wedge_colors'] = $wedge_colors;
+		
+		return true;
+	}
+	
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		if(false == $this->_loadData($widget)) {
+			echo "This pie chart doesn't have a data source. Configure it and select one.";
+			return;
+		}
 
 		$tpl->assign('widget', $widget);
 		
@@ -817,20 +1381,118 @@ class WorkspaceWidget_PieChart extends Extension_WorkspaceWidget {
 		$cache = DevblocksPlatform::getCacheService();
 		$cache->remove(sprintf("widget%d_datasource", $widget->id));
 	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == $this->_loadData($widget)) {
+			return;
+		}
+		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		if(!isset($widget->params['wedge_labels']))
+			return false;
+		
+		if(!is_array($widget->params['wedge_labels']))
+			return false;
+		
+		$results = array();
+		
+		$results[] = array(
+			'Label',
+			'Count',
+		);
+		
+		foreach(array_keys($widget->params['wedge_labels']) as $idx) {
+			@$wedge_label = $widget->params['wedge_labels'][$idx];
+			@$wedge_value = $widget->params['wedge_values'][$idx];
+
+			$results[] = array(
+				$wedge_label,
+				$wedge_value,
+			);
+		}
+		
+		$fp = fopen("php://temp", 'r+');
+		
+		foreach($results as $result) {
+			fputcsv($fp, $result);
+		}
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		if(!isset($widget->params['wedge_labels']))
+			return false;
+		
+		if(!is_array($widget->params['wedge_labels']))
+			return false;
+		
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'pie',
+				'version' => 'Cerb ' . APP_VERSION,
+				'counts' => array(),
+			),
+		);
+
+		foreach(array_keys($widget->params['wedge_labels']) as $idx) {
+			@$wedge_label = $widget->params['wedge_labels'][$idx];
+			@$wedge_value = $widget->params['wedge_values'][$idx];
+			@$wedge_color = $widget->params['wedge_colors'][$idx];
+
+			// Reuse the last color
+			if(empty($wedge_color))
+				$wedge_color = end($widget->params['wedge_colors']);
+			
+			$results['widget']['counts'][] = array(
+				'label' => $wedge_label,
+				'count' => $wedge_value,
+				'color' => $wedge_color,
+			);
+		}
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
 };
 
-class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget {
-	function render(Model_WorkspaceWidget $widget) {
-		$tpl = DevblocksPlatform::getTemplateService();
-
+class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	private function _loadData(Model_WorkspaceWidget &$widget) {
 		@$series = $widget->params['series'];
 		
 		if(empty($series)) {
-			echo "This scatterplot doesn't have any data sources. Configure it and select one.";
-			return;
+			return false;
 		}
-
+		
 		// Multiple datasources
+		if(is_array($series))
 		foreach($series as $series_idx => $series_params) {
 			@$datasource_extid = $series_params['datasource'];
 
@@ -840,10 +1502,23 @@ class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget {
 			if(null == ($datasource_ext = Extension_WorkspaceWidgetDatasource::get($datasource_extid)))
 				continue;
 			
-			$data = $datasource_ext->getData($widget, $series_params);
+			$params_prefix = sprintf("[series][%d]", $series_idx);
+			
+			$data = $datasource_ext->getData($widget, $series_params, $params_prefix);
 
 			if(!empty($data))
 				$widget->params['series'][$series_idx] = $data;
+		}
+		
+		return true;
+	}
+	
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		if(false == ($this->_loadData($widget))) {
+			echo "This scatterplot doesn't have any data sources. Configure it and select one.";
+			return;
 		}
 		
 		$tpl->assign('widget', $widget);
@@ -876,6 +1551,18 @@ class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget {
 	function saveConfig(Model_WorkspaceWidget $widget) {
 		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
 		
+		// [TODO] The extension should be able to filter the properties here
+		
+		foreach($params['series'] as $idx => $series) {
+			// Convert the serialized model to proper JSON before saving
+		
+			if(isset($series['worklist_model_json'])) {
+				$series['worklist_model'] = json_decode($series['worklist_model_json'], true);
+				unset($series['worklist_model_json']);
+				$params['series'][$idx] = $series;
+			}
+		}
+		
 		DAO_WorkspaceWidget::update($widget->id, array(
 			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
 		));
@@ -883,5 +1570,120 @@ class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget {
 		// Clear caches
 		$cache = DevblocksPlatform::getCacheService();
 		$cache->remove(sprintf("widget%d_datasource", $widget->id));
+	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == ($this->_loadData($widget))) {
+			return;
+		}
+		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		$series = $widget->params['series'];
+		
+		$results = array();
+		
+		$results[] = array(
+			'Series #',
+			'Series Label',
+			'Data X Label',
+			'Data X Value',
+			'Data Y Label',
+			'Data Y Value',
+		);
+		
+		if(is_array($series))
+		foreach($series as $series_idx => $series_params) {
+			if(!isset($series_params['data']) || empty($series_params['data']))
+				continue;
+		
+			$data = $series_params['data'];
+			
+			if(is_array($data))
+			foreach($data as $k => $v) {
+				$results[] = array(
+					'series' => $series_idx,
+					'series_label' => $series_params['label'],
+					'x_label' => $v['x_label'],
+					'x' => $v['x'],
+					'y_label' => $v['y_label'],
+					'y' => $v['y'],
+				);
+			}
+		}
+		
+		$fp = fopen("php://temp", 'r+');
+		
+		foreach($results as $result) {
+			fputcsv($fp, $result);
+		}
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		$series = $widget->params['series'];
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'scatterplot',
+				'version' => 'Cerb ' . APP_VERSION,
+				'series' => array(),
+			),
+		);
+		
+		if(is_array($series))
+		foreach($series as $series_idx => $series_params) {
+			if(!isset($series_params['data']) || empty($series_params['data']))
+				continue;
+		
+			$data = $series_params['data'];
+			
+			$results['widget']['series'][$series_idx] = array(
+				'id' => $series_idx,
+				'label' => $series_params['label'],
+				'data' => array(),
+			);
+			
+			if(is_array($data))
+			foreach($data as $k => $v) {
+				$row = array(
+					'x' => $v['x'],
+					'x_label' => $v['x_label'],
+					'y' => $v['y'],
+					'y_label' => $v['y_label'],
+				);
+				
+				$results['widget']['series'][$series_idx]['data'][] = $row;
+			}
+		}
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
 	}
 };
