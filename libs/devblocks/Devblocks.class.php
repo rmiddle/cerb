@@ -47,7 +47,7 @@ class DevblocksPlatform extends DevblocksEngine {
 			$xml = simplexml_load_string($manifest_data);
 			$plugin_id = (string) $xml->id;
 
-			$list = $zip->extract(PCLZIP_OPT_PATH, APP_STORAGE_PATH . '/plugins/');
+			$list = $zip->extract(PCLZIP_OPT_PATH, APP_STORAGE_PATH . '/plugins/', PCLZIP_OPT_REPLACE_NEWER);
 		}
 		
 		if(empty($plugin_id))
@@ -493,7 +493,7 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $str;
 	}
 	
-	static function purifyHTML($dirty_html) {
+	static function purifyHTML($dirty_html, $options=array()) {
 		// Register HTMLPurifier
 		require_once(DEVBLOCKS_PATH . 'libs/htmlpurifier/HTMLPurifier.standalone.php');
 		
@@ -515,6 +515,11 @@ class DevblocksPlatform extends DevblocksEngine {
 		}
 		
 		$config->set('Cache.SerializerPath', $dir_htmlpurifier_cache);
+		
+		// Set any config overrides
+		if(is_array($options) && !empty($options))
+		foreach($options as $k => $v)
+			$config->set($k, $v);
 		
 		$purifier = new HTMLPurifier($config);
 		
