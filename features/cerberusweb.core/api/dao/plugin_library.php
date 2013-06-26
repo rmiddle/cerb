@@ -410,6 +410,11 @@ class DAO_PluginLibrary extends Cerb_ORMHelper {
 			}
 		}
 		
+		if($updated) {
+			DevblocksPlatform::readPlugins(false);
+			DevblocksPlatform::clearCache();
+		}
+		
 		return array(
 			'count' => $count,
 			'updated' => $updated,
@@ -570,7 +575,7 @@ class View_PluginLibrary extends C4_AbstractView implements IAbstractView_Subtot
 	}
 
 	function getSubtotalFields() {
-		$all_fields = $this->getParamsAvailable();
+		$all_fields = $this->getParamsAvailable(true);
 		
 		$fields = array();
 

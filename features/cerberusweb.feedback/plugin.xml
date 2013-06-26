@@ -63,11 +63,13 @@
 				<param key="options">
 					<value>
 						<data key="create" />
+						<data key="custom_fields" />
 						<!--<data key="find" />-->
 						<data key="snippets" />
 						<data key="workspace" />
 					</value>
 				</param>
+				<param key="context_expand_export" value="author_" />
 			</params>
 		</extension>
 	

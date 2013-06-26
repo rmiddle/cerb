@@ -53,8 +53,6 @@ class DevblocksPlatform extends DevblocksEngine {
 		if(empty($plugin_id))
 			return false;
 		
-		DevblocksPlatform::readPlugins(false);
-		DevblocksPlatform::clearCache();
 		return true;
 	}
 	
@@ -804,9 +802,9 @@ class DevblocksPlatform extends DevblocksEngine {
 			} elseif($diffsecs >= 86400) { // days
 				$whole .= round($diffsecs/86400).' day';
 			} elseif($diffsecs >= 3600) { // hours
-				$whole .= round($diffsecs/3600).' hour';
+				$whole .= floor($diffsecs/3600).' hour';
 			} elseif($diffsecs >= 60) { // mins
-				$whole .= round($diffsecs/60).' min';
+				$whole .= floor($diffsecs/60).' min';
 			} elseif($diffsecs >= 0) { // secs
 				$whole .= $diffsecs.' sec';
 			}
@@ -819,9 +817,9 @@ class DevblocksPlatform extends DevblocksEngine {
 			} elseif($diffsecs <= -86400) { // days
 				$whole .= round($diffsecs/-86400).' day';
 			} elseif($diffsecs <= -3600) { // hours
-				$whole .= round($diffsecs/-3600).' hour';
+				$whole .= floor($diffsecs/-3600).' hour';
 			} elseif($diffsecs <= -60) { // mins
-				$whole .= round($diffsecs/-60).' min';
+				$whole .= floor($diffsecs/-60).' min';
 			} elseif($diffsecs <= 0) { // secs
 				$whole .= round($diffsecs/-1).' sec';
 			}
@@ -965,8 +963,10 @@ class DevblocksPlatform extends DevblocksEngine {
 		$keys = explode('.', $path);
 		$array_keys = array();
 
+		$ptr = null;
+		
 		if(!is_array($keys) || empty($keys))
-			return false;
+			return $ptr;
 		
 		foreach($keys as $idx => $k) {
 			if(preg_match('/(.*)\[(\d+)\]/', $k, $matches)) {
@@ -980,8 +980,10 @@ class DevblocksPlatform extends DevblocksEngine {
 		$ptr =& $array;
 
 		while(null !== ($key = array_shift($array_keys))) {
-			if(!isset($ptr[$key]))
-				return false;
+			if(!isset($ptr[$key])) {
+				$ptr = null;
+				return $ptr;
+			}
 			
 			$ptr =& $ptr[$key];
 		}

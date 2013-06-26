@@ -33,6 +33,31 @@ class DevblocksEventHelper {
 		return $context_to_macros;
 	}
 	
+	private static function _getRelativeDateUsingCalendar($calendar_id, $rel_date) {
+		$today = strtotime('today', time());
+		$cache = DevblocksPlatform::getCacheService();
+		
+		if(empty($calendar_id) || false == ($calendar = DAO_Calendar::get($calendar_id))) {
+			// Fallback to plain 24-hour time
+			$value = strtotime($rel_date);
+			
+		} else {
+			/*
+			 * [TODO] We should probably cache this, but we need an efficient way to invalidate
+			 * even when the datasource is a worklist, or multiple contexts.
+			 */
+			$calendar_events = $calendar->getEvents($today, strtotime('+2 weeks 23:59:59', $today));
+			$availability = $calendar->computeAvailability($today, strtotime('+2 weeks 23:59:59', $today), $calendar_events);
+			
+			// [TODO] Do we have enough available time to schedule this?
+			// 	We should be able to lazy append events + availability as we go
+			
+			$value = $availability->scheduleInRelativeTime(time(), $rel_date);
+		}
+		
+		return $value;
+	}
+	
 	/*
 	 * Action: Custom Fields
 	 */
@@ -104,6 +129,8 @@ class DevblocksEventHelper {
 				break;
 				
 			case Model_CustomField::TYPE_DATE:
+				$calendars = DAO_Calendar::getAll();
+				$tpl->assign('calendars', $calendars);
 				$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_date.tpl');
 				break;
 				
@@ -174,8 +201,9 @@ class DevblocksEventHelper {
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 				$value = $tpl_builder->build($params['value'], $dict);
 				
-				$value = strtotime($value);
-
+				if(!is_numeric($value))
+					$value = intval(@strtotime($value));
+				
 				if(!empty($value)) {
 					$out .= sprintf("%s (%s)\n",
 						date('D M d Y h:ia', $value),
@@ -247,7 +275,7 @@ class DevblocksEventHelper {
 		$context = $custom_field->context;
 		$custom_key_id = $custom_key . '_id';
 		$context_id = $dict->$custom_key_id;
-		
+
 		if(empty($field_id) || empty($context) || empty($context_id))
 			return;
 		
@@ -295,10 +323,30 @@ class DevblocksEventHelper {
 				break;
 			
 			case Model_CustomField::TYPE_DATE:
-				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$value = $tpl_builder->build($params['value'], $dict);
+				@$mode = $params['mode'];
 				
-				$value = strtotime($value);
+				switch($mode) {
+					case 'calendar':
+						@$calendar_id = $params['calendar_id'];
+						@$rel_date = $params['calendar_reldate'];
+
+						$value = DevblocksEventHelper::_getRelativeDateUsingCalendar($calendar_id, $rel_date);
+						
+						if(false !== $value)
+							$dict->$token = $value;
+						
+						break;
+						
+					default:
+						if(!isset($params['value']))
+							return;
+						
+						$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+						$value = $tpl_builder->build($params['value'], $dict);
+						break;
+				}
+				
+				$value = is_numeric($value) ? $value : @strtotime($value);
 
 				if(!empty($value)) {
 					$out .= sprintf("%s (%s)\n",
@@ -376,13 +424,21 @@ class DevblocksEventHelper {
 		
 		if(null == ($custom_field = DAO_CustomField::get($field_id)))
 			return;
-
+		
 		$context = $custom_field->context;
 		$custom_key_id = $custom_key . '_id';
 		$context_id = $dict->$custom_key_id;
 		
 		if(empty($field_id) || empty($context) || empty($context_id))
 			return;
+		
+		/**
+		 * If we have a fieldset-based custom field that doesn't exist in scope yet
+		 * then link it.
+		 */
+		if($custom_field->custom_fieldset_id && !isset($dict->$token)) {
+			DAO_ContextLink::setLink($context, $context_id, CerberusContexts::CONTEXT_CUSTOM_FIELDSET, $custom_field->custom_fieldset_id);
+		}
 		
 		switch($custom_field->type) {
 			case Model_CustomField::TYPE_SINGLE_LINE:
@@ -407,17 +463,37 @@ class DevblocksEventHelper {
 				break;
 			
 			case Model_CustomField::TYPE_DATE:
-				$value = $params['value'];
-				$value = strtotime($value);
+				@$mode = $params['mode'];
+				
+				switch($mode) {
+					case 'calendar':
+						@$calendar_id = $params['calendar_id'];
+						@$rel_date = $params['calendar_reldate'];
+
+						$value = DevblocksEventHelper::_getRelativeDateUsingCalendar($calendar_id, $rel_date);
+						
+						break;
+						
+					default:
+						if(!isset($params['value']))
+							return;
+						
+						$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+						$value = $tpl_builder->build($params['value'], $dict);
+						break;
+				}
+
+				$value = is_numeric($value) ? $value : @strtotime($value);
 				
 				DAO_CustomFieldValue::setFieldValue($context, $context_id, $field_id, $value);
-				
+						
 				if(!empty($value_key)) {
 					$dict->$value_key.'_'.$field_id = $value;
-
+					
 					$array =& $dict->$value_key;
 					$array[$field_id] = $value;
 				}
+				
 				break;
 				
 			case Model_CustomField::TYPE_MULTI_CHECKBOX:
@@ -454,6 +530,34 @@ class DevblocksEventHelper {
 				
 			default:
 				self::runActionExtension($token, $trigger, $params, $dict);
+				break;
+		}
+	}
+	
+	static function runActionSetDate($token, $params, DevblocksDictionaryDelegate $dict) {
+		@$mode = $params['mode'];
+				
+		switch($mode) {
+			case 'calendar':
+				@$calendar_id = $params['calendar_id'];
+				@$rel_date = $params['calendar_reldate'];
+
+				$value = DevblocksEventHelper::_getRelativeDateUsingCalendar($calendar_id, $rel_date);
+				
+				if(false !== $value)
+					$dict->$token = $value;
+				
+				break;
+				
+			default:
+				if(!isset($params['value']))
+					return;
+				
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+				$value = $tpl_builder->build($params['value'], $dict);
+				
+				$value = is_numeric($value) ? $value : @strtotime($value);
+				$dict->$token = $value;
 				break;
 		}
 	}
@@ -599,14 +703,32 @@ class DevblocksEventHelper {
 				break;
 				
 			case Model_CustomField::TYPE_DATE:
-				if(!isset($params['value']))
-					break;
-					
-				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$value = $tpl_builder->build($params['value'], $dict);
+				@$mode = $params['mode'];
 				
-				$value = is_numeric($value) ? $value : @strtotime($value);
-				$dict->$token = $value;
+				switch($mode) {
+					case 'calendar':
+						@$calendar_id = $params['calendar_id'];
+						@$rel_date = $params['calendar_reldate'];
+						
+						$value = DevblocksEventHelper::_getRelativeDateUsingCalendar($calendar_id, $rel_date);
+						
+						if(false !== $value)
+							$dict->$token = $value;
+						
+						break;
+						
+					default:
+						if(!isset($params['value']))
+							return;
+						
+						$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+						$value = $tpl_builder->build($params['value'], $dict);
+						
+						$value = is_numeric($value) ? $value : @strtotime($value);
+						$dict->$token = $value;
+						break;
+				}
+				
 				break;
 				
 			case Model_CustomField::TYPE_NUMBER:
@@ -628,6 +750,7 @@ class DevblocksEventHelper {
 				@$worker_ids = $params['worker_id'];
 				@$group_ids = $params['group_id'];
 				@$mode = $params['mode'];
+				@$opt_is_available = $params['opt_is_available'];
 				@$opt_logged_in = $params['opt_logged_in'];
 				
 				$possible_workers = array();
@@ -647,11 +770,12 @@ class DevblocksEventHelper {
 					}
 				}
 				
-				// Filter
 				$workers = DAO_Worker::getAll();
 				
-				if(!empty($opt_logged_in))
+				// Filter: Logged in
+				if(!empty($opt_logged_in)) {
 					$workers_online = DAO_Worker::getAllOnline();
+				}
 				
 				foreach($possible_workers as $k => $worker) {
 					// Remove non-existent workers
@@ -664,6 +788,38 @@ class DevblocksEventHelper {
 					if(!empty($opt_logged_in) && !isset($workers_online[$k])) {
 						unset($possible_workers[$k]);
 						continue;
+					}
+					
+					if(!empty($opt_is_available)) {
+						@$availability_calendar_id = DAO_WorkerPref::get($k, 'availability_calendar_id', 0);
+					
+						if(empty($availability_calendar_id)) {
+							unset($possible_workers[$k]);
+							continue;
+							
+						} else {
+							if(false == ($calendar = DAO_Calendar::get($availability_calendar_id))) {
+								unset($possible_workers[$k]);
+								continue;
+							}
+							
+							$from = '-5 mins';
+							$to = '+5 mins';
+							
+							@$cal_from = strtotime("today", strtotime($from));
+							@$cal_to = strtotime("tomorrow", strtotime($to));
+							
+							$calendar_events = $calendar->getEvents($cal_from, $cal_to);
+							$availability = $calendar->computeAvailability($cal_from, $cal_to, $calendar_events);
+							
+							$pass = $availability->isAvailableBetween(strtotime($from), strtotime($to));
+							
+							// If the worker is not available, remove them from the list
+							if(!$pass) {
+								unset($possible_workers[$k]);
+								continue;
+							}
+						}
 					}
 				}
 		
@@ -948,10 +1104,13 @@ class DevblocksEventHelper {
 		@$on_dupe = $params['on_dupe'];
 
 		$trigger = $dict->_trigger;
-
+		
 		if(empty($behavior_id)) {
 			return "[ERROR] No behavior is selected. Skipping...";
 		}
+		
+		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+		$run_date = $tpl_builder->build($run_date, $dict);
 		
 		@$run_timestamp = strtotime($run_date);
 		
@@ -962,7 +1121,7 @@ class DevblocksEventHelper {
 			"Behavior: %s\n".
 			"When: %s (%s)\n",
 			$behavior->title,
-			date('Y-m-d h:ip', $run_timestamp),
+			date('Y-m-d h:ia', $run_timestamp),
 			$run_date
 		);
 		
@@ -1007,13 +1166,16 @@ class DevblocksEventHelper {
 		@$run_date = $params['run_date'];
 		@$on_dupe = $params['on_dupe'];
 		
-		@$run_timestamp = strtotime($run_date);
-		
 		if(empty($behavior_id))
 			return FALSE;
 		
-		// Variables as parameters
 		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+		$run_date = $tpl_builder->build($run_date, $dict);
+		
+		
+		@$run_timestamp = strtotime($run_date);
+		
+		// Variables as parameters
 		$vars = array();
 		foreach($params as $k => $v) {
 			if(substr($k,0,4) == 'var_') {
@@ -1899,8 +2061,14 @@ class DevblocksEventHelper {
 		$notify_worker_ids = DevblocksEventHelper::mergeWorkerVars($notify_worker_ids, $dict);
 				
 		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+		
 		$title = $tpl_builder->build($params['title'], $dict);
-		$due_date = intval(@strtotime($tpl_builder->build($params['due_date'], $dict)));
+
+		$due_date = $tpl_builder->build($params['due_date'], $dict);
+		
+		if(!is_numeric($due_date))
+			$due_date = intval(@strtotime($due_date));
+		
 		$comment = $tpl_builder->build($params['comment'], $dict);
 
 		$out = sprintf(">>> Creating task\n".
@@ -1924,6 +2092,8 @@ class DevblocksEventHelper {
 			
 			if(is_array($val))
 				$val = implode('; ', $val);
+			
+			$val = $tpl_builder->build($val, $dict);
 			
 			$out .= $custom_fields[$cf_id]->name . ': ' . $val . "\n";
 		}
@@ -2005,7 +2175,12 @@ class DevblocksEventHelper {
 				
 		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 		$title = $tpl_builder->build($params['title'], $dict);
-		$due_date = intval(@strtotime($tpl_builder->build($params['due_date'], $dict)));
+		
+		$due_date = $tpl_builder->build($params['due_date'], $dict);
+		
+		if(!is_numeric($due_date))
+			$due_date = intval(@strtotime($due_date));
+		
 		$comment = $tpl_builder->build($params['comment'], $dict);
 
 		// On
@@ -2132,6 +2307,8 @@ class DevblocksEventHelper {
 			
 			if(is_array($val))
 				$val = implode('; ', $val);
+			
+			$val = $tpl_builder->build($val, $dict);
 			
 			$out .= $custom_fields[$cf_id]->name . ': ' . $val . "\n";
 		}

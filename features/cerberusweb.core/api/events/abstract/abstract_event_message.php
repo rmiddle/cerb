@@ -660,12 +660,12 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				'schedule_behavior' => array('label' => 'Schedule behavior'),
 				'send_email' => array('label' => 'Send email'),
 				'send_email_recipients' => array('label' => 'Send email to recipients'),
-				'set_org' => array('label' =>'Set organization'),
-				'set_owner' => array('label' =>'Set owner'),
-				'set_reopen_date' => array('label' => 'Set reopen date'),
-				'set_spam_training' => array('label' => 'Set spam training'),
-				'set_status' => array('label' => 'Set status'),
-				'set_subject' => array('label' => 'Set subject'),
+				'set_org' => array('label' =>'Set ticket organization'),
+				'set_owner' => array('label' =>'Set ticket owner'),
+				'set_reopen_date' => array('label' => 'Set ticket reopen date'),
+				'set_spam_training' => array('label' => 'Set ticket spam training'),
+				'set_status' => array('label' => 'Set ticket status'),
+				'set_subject' => array('label' => 'Set ticket subject'),
 				'set_links' => array('label' => 'Set links'),
 				'unschedule_behavior' => array('label' => 'Unschedule behavior'),
 			)
@@ -819,6 +819,8 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		@$message_id = $dict->id;
 		@$ticket_id = $dict->ticket_id;
 
+		$translate = DevblocksPlatform::getTranslationService();
+		
 		if(empty($message_id) || empty($ticket_id))
 			return;
 		
@@ -848,7 +850,8 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 
 			case 'relay_email':
-				return DevblocksEventHelper::simulateActionRelayEmail($params, $dict);
+				// [TODO] This doesn't exist
+				//return DevblocksEventHelper::simulateActionRelayEmail($params, $dict);
 				break;
 				
 			case 'schedule_email_recipients':
@@ -867,8 +870,15 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 			
 			case 'set_reopen_date':
+				DevblocksEventHelper::runActionSetDate('ticket_reopen_date', $params, $dict);
+				$out = sprintf(">>> Setting ticket reopen date to:\n".
+					"%s (%d)\n",
+					date('D M d Y h:ia', $dict->ticket_reopen_date),
+					$dict->ticket_reopen_date
+				);
+				return $out;
 				break;
-			
+				
 			case 'send_email':
 				return DevblocksEventHelper::simulateActionSendEmail($params, $dict);
 				break;
@@ -878,7 +888,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 				
 			case 'set_spam_training':
-				$out = sprintf(">>> Setting spam training\n".
+				$out = sprintf(">>> Setting spam training:\n".
 					"%s\n",
 					$params['value'] == 'N' ? 'Not Spam' : 'Spam'
 				);
@@ -886,15 +896,41 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 				
 			case 'set_status':
-				return DevblocksEventHelper::simulateActionSetStatus($params, $dict);
+				$out = sprintf(">>> Setting status to:\n%s\n",
+					$params['status']
+				);
+				return $out;
 				break;
 				
 			case 'set_subject':
-				return DevblocksEventHelper::simulateActionSetSubject($params, $dict);
+				$out = sprintf(">>> Setting subject to:\n%s\n",
+					$params['value']
+				);
+				return $out;
 				break;
-			
+				
 			case 'move_to':
-				return DevblocksEventHelper::simulateActionMoveTo($params, $dict);
+				$groups = DAO_Group::getAll();
+				$buckets = DAO_Bucket::getAll();
+
+				if(!isset($params['group_id']) || !isset($params['bucket_id']))
+					return false;
+
+				$group_id = $params['group_id'];
+				$bucket_id = $params['bucket_id'];
+				
+				if(!isset($groups[$group_id]))
+					return false;
+				
+				if($bucket_id && !isset($buckets[$bucket_id]))
+					return false;
+				
+				$out = sprintf(">>> Moving to:\n%s: %s\n",
+					$groups[$group_id]->name,
+					($bucket_id ? $buckets[$bucket_id]->name : $translate->_('common.inbox'))
+				);
+				
+				return $out;
 				break;
 
 			case 'set_links':
@@ -1011,13 +1047,11 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 
 			case 'set_reopen_date':
-				@$reopen_date = intval(strtotime($params['value']));
-			
+				DevblocksEventHelper::runActionSetDate('ticket_reopen_date', $params, $dict);
+				
 				DAO_Ticket::update($ticket_id, array(
-					DAO_Ticket::REOPEN_AT => $reopen_date,
+					DAO_Ticket::REOPEN_AT => intval($dict->ticket_reopen_date),
 				));
-			
-				$dict->ticket_reopen_date = $reopen_date;
 				break;
 			
 			case 'set_spam_training':

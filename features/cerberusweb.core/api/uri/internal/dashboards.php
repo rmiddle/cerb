@@ -381,6 +381,55 @@ class WorkspaceTab_Dashboards extends Extension_WorkspaceTab {
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/tab.tpl');
 	}
+	
+	function exportTabConfigJson(Model_WorkspacePage $page, Model_WorkspaceTab $tab) {
+		$json = array(
+			'tab' => array(
+				'name' => $tab->name,
+				'extension_id' => $tab->extension_id,
+				'params' => $tab->params,
+				'widgets' => array(),
+			),
+		);
+		
+		$widgets = DAO_WorkspaceWidget::getByTab($tab->id);
+		
+		foreach($widgets as $widget) {
+			$widget_json = array(
+				'widget' => array(
+					'label' => $widget->label,
+					'extension_id' => $widget->extension_id,
+					'pos' => $widget->pos,
+					'params' => $widget->params,
+				),
+			);
+			
+			$json['tab']['widgets'][] = $widget_json;
+		}
+		
+		return json_encode($json);
+	}
+	
+	function importTabConfigJson($json, Model_WorkspaceTab $tab) {
+		if(empty($tab->id) || !is_array($json) || !isset($json['tab']))
+			return false;
+		
+		if(!isset($json['tab']['widgets']) || !is_array($json['tab']['widgets']))
+			return false;
+		
+		foreach($json['tab']['widgets'] as $widget) {
+			DAO_WorkspaceWidget::create(array(
+				DAO_WorkspaceWidget::LABEL => $widget['widget']['label'],
+				DAO_WorkspaceWidget::EXTENSION_ID => $widget['widget']['extension_id'],
+				DAO_WorkspaceWidget::POS => $widget['widget']['pos'],
+				DAO_WorkspaceWidget::PARAMS_JSON => json_encode($widget['widget']['params']),
+				DAO_WorkspaceWidget::WORKSPACE_TAB_ID => $tab->id,
+				DAO_WorkspaceWidget::UPDATED_AT => time(),
+			));
+		}
+		
+		return true;
+	}
 }
 endif;
 
@@ -560,6 +609,311 @@ class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget implements ICerbWo
 	}
 };
 
+class WorkspaceWidget_Calendar extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	function render(Model_WorkspaceWidget $widget) {
+		$active_worker = CerberusApplication::getActiveWorker();
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		@$month = DevblocksPlatform::importGPC($_REQUEST['month'], 'integer', null);
+		@$year = DevblocksPlatform::importGPC($_REQUEST['year'], 'integer', null);
+		
+		$tpl->assign('widget', $widget);
+		
+		@$calendar_id = $widget->params['calendar_id'];
+		
+		if(empty($calendar_id) || null == ($calendar = DAO_Calendar::get($calendar_id))) { /* @var Model_Calendar $calendar */
+			echo "A calendar isn't linked to this widget. Configure it to select one.";
+			return;
+		}
+		
+		$calendar_properties = DevblocksCalendarHelper::getCalendar($month, $year);
+		$calendar_events = $calendar->getEvents($calendar_properties['date_range_from'], $calendar_properties['date_range_to']);
+		
+		// Contexts (for creating events)
+
+		if($calendar->isWriteableByWorker($active_worker)) {
+			$create_contexts = $calendar->getCreateContexts();
+			$tpl->assign('create_contexts', $create_contexts);
+		}
+		
+		// Template scope
+		
+		$tpl->assign('calendar', $calendar);
+		$tpl->assign('calendar_events', $calendar_events);
+		$tpl->assign('calendar_properties', $calendar_properties);
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/calendar/calendar.tpl');
+	}
+	
+	// Config
+	
+	function renderConfig(Model_WorkspaceWidget $widget) {
+		if(empty($widget))
+			return;
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		
+		// Widget
+		
+		$tpl->assign('widget', $widget);
+		
+		// Calendars
+		
+		$calendars = DAO_Calendar::getAll();
+		$tpl->assign('calendars', $calendars);
+		
+		// Template
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/calendar/config.tpl');
+	}
+	
+	function saveConfig(Model_WorkspaceWidget $widget) {
+		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
+		
+		DAO_WorkspaceWidget::update($widget->id, array(
+			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
+		));
+	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		@$calendar_id = $widget->params['calendar_id'];
+		
+		if(false == ($calendar = DAO_Calendar::get($calendar_id)))
+			return false;
+		
+		$calendar_properties = DevblocksCalendarHelper::getCalendar(null, null);
+		
+		$fp = fopen("php://temp", 'r+');
+		
+		$headings = array(
+			'Date',
+			'Label',
+			'Start',
+			'End',
+			'Is Available',
+			'Color',
+			//Link',
+		);
+		
+		fputcsv($fp, $headings);
+		
+		// [TODO] This needs to use the selected month/year from widget
+		$calendar_events = $calendar->getEvents($calendar_properties['date_range_from'], $calendar_properties['date_range_to']);
+		
+		foreach($calendar_events as $events) {
+			foreach($events as $event) {
+				fputcsv($fp, array(
+					date('r', $event['ts']),
+					$event['label'],
+					$event['ts'],
+					$event['ts_end'],
+					$event['is_available'],
+					$event['color'],
+					//$event['link'], // [TODO] Translate ctx:// links
+				));
+			}
+		}
+		
+		unset($calendar_events);
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		@$calendar_id = $widget->params['calendar_id'];
+		
+		if(false == ($calendar = DAO_Calendar::get($calendar_id)))
+			return false;
+		
+		$calendar_properties = DevblocksCalendarHelper::getCalendar(null, null);
+		
+		// [TODO] This needs to use the selected month/year from widget
+		$calendar_events = $calendar->getEvents($calendar_properties['date_range_from'], $calendar_properties['date_range_to']);
+		
+		$json_events = array();
+		
+		// [TODO] This should export a fully formed calendar (headings, weeks, days)
+		// [TODO] The widget export should give the date range used as well
+		
+		foreach($calendar_events as $events) {
+			foreach($events as $event) {
+				$json_events[] = array(
+					'label' => $event['label'],
+					'date' => date('r', $event['ts']),
+					'ts' => $event['ts'],
+					'ts_end' => $event['ts_end'],
+					'is_available' => $event['is_available'],
+					'color' => $event['color'],
+					//'link' => $event['link'], // [TODO] Translate ctx:// links
+				);
+			}
+		}
+		
+		unset($calendar_events);
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'calendar',
+				'version' => 'Cerb ' . APP_VERSION,
+				'events' => $json_events,
+			),
+		);
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
+};
+
+class WorkspaceWidget_Clock extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		@$timezone = $widget->params['timezone'];
+		
+		if(empty($timezone)) {
+			echo "This clock doesn't have a timezone. Configure it and set one.";
+			return;
+		}
+		
+		$datetimezone = new DateTimeZone($timezone);
+		$datetime = new DateTime('now', $datetimezone);
+
+		$offset = $datetimezone->getOffset($datetime);
+		$tpl->assign('offset', $offset);
+		
+		$tpl->assign('widget', $widget);
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/clock/clock.tpl');
+	}
+	
+	// Config
+	
+	function renderConfig(Model_WorkspaceWidget $widget) {
+		if(empty($widget))
+			return;
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		
+		// Widget
+		
+		$tpl->assign('widget', $widget);
+		
+		// Timezones
+		
+		$date = DevblocksPlatform::getDateService();
+		
+		$timezones = $date->getTimezones();
+		$tpl->assign('timezones', $timezones);
+		
+		// Template
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/clock/config.tpl');
+	}
+	
+	function saveConfig(Model_WorkspaceWidget $widget) {
+		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
+		
+		DAO_WorkspaceWidget::update($widget->id, array(
+			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
+		));
+	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		@$timezone = $widget->params['timezone'];
+		$datetimezone = new DateTimeZone($timezone);
+		$datetime = new DateTime('now', $datetimezone);
+		
+		$results = array(
+			'Label' => $widget->label,
+			'Timezone' => $widget->params['timezone'],
+			'Timestamp' => $datetime->getTimestamp(),
+			'Output' => $datetime->format('r'),
+		);
+
+		$fp = fopen("php://temp", 'r+');
+		
+		fputcsv($fp, array_keys($results));
+		fputcsv($fp, array_values($results));
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		@$timezone = $widget->params['timezone'];
+		$datetimezone = new DateTimeZone($timezone);
+		$datetime = new DateTime('now', $datetimezone);
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'clock',
+				'version' => 'Cerb ' . APP_VERSION,
+				'time' => array(
+					'timezone' => $widget->params['timezone'],
+					'timestamp' => $datetime->getTimestamp(),
+					'output' => $datetime->format('r'),
+				),
+			),
+		);
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
+};
+
 class WorkspaceWidget_Counter extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
 	private function _loadData(Model_WorkspaceWidget &$widget) {
 		@$datasource_extid = $widget->params['datasource'];
@@ -692,6 +1046,113 @@ class WorkspaceWidget_Counter extends Extension_WorkspaceWidget implements ICerb
 					'type' => $widget->params['metric_type'],
 					'prefix' => $widget->params['metric_prefix'],
 					'suffix' => $widget->params['metric_suffix'],
+				),
+			),
+		);
+		
+		return DevblocksPlatform::strFormatJson(json_encode($results));
+	}
+};
+
+class WorkspaceWidget_Countdown extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
+	function render(Model_WorkspaceWidget $widget) {
+		$tpl = DevblocksPlatform::getTemplateService();
+
+		if(!isset($widget->params['target_timestamp'])) {
+			echo "This countdown doesn't have a target date. Configure it and set one.";
+			return;
+		}
+		
+		$tpl->assign('widget', $widget);
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/countdown/countdown.tpl');
+	}
+	
+	// Config
+	
+	function renderConfig(Model_WorkspaceWidget $widget) {
+		if(empty($widget))
+			return;
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		
+		// Widget
+		
+		$tpl->assign('widget', $widget);
+		
+		// Template
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/workspaces/widgets/countdown/config.tpl');
+	}
+	
+	function saveConfig(Model_WorkspaceWidget $widget) {
+		@$params = DevblocksPlatform::importGPC($_REQUEST['params'], 'array', array());
+		
+		if(isset($params['target_timestamp'])) {
+			@$timestamp = intval(strtotime($params['target_timestamp']));
+			$params['target_timestamp'] = $timestamp;
+		}
+		
+		DAO_WorkspaceWidget::update($widget->id, array(
+			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
+		));
+	}
+	
+	// Export
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCsv($widget);
+				break;
+				
+			default:
+			case 'json':
+				return $this->_exportDataAsJson($widget);
+				break;
+		}
+		
+		return false;
+	}
+	
+	private function _exportDataAsCsv(Model_WorkspaceWidget $widget) {
+		@$diff = max(0, intval($widget->params['target_timestamp']) - time());
+		
+		$results = array(
+			'Label' => $widget->label,
+			'Timestamp' => $widget->params['target_timestamp'],
+			'Output' => DevblocksPlatform::strSecsToString($diff, 2),
+		);
+
+		$fp = fopen("php://temp", 'r+');
+		
+		fputcsv($fp, array_keys($results));
+		fputcsv($fp, array_values($results));
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget) {
+		@$diff = max(0, intval($widget->params['target_timestamp']) - time());
+		
+		$results = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'countdown',
+				'version' => 'Cerb ' . APP_VERSION,
+				'countdown' => array(
+					'output' => DevblocksPlatform::strSecsToString($diff, 2),
+					'timestamp' => $widget->params['target_timestamp'],
 				),
 			),
 		);
@@ -1181,7 +1642,7 @@ class WorkspaceWidget_Subtotals extends Extension_WorkspaceWidget implements ICe
 	}
 };
 
-class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget {
+class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget implements ICerbWorkspaceWidget_ExportData {
 	private function _getView(Model_WorkspaceWidget $widget) {
 		$view_id = sprintf("widget%d_worklist", $widget->id);
 		
@@ -1220,13 +1681,12 @@ class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget {
 		$tpl->assign('context_mfts', $context_mfts);
 		
 		// Grab the latest view and copy it to _config
-		
-		if(false == ($view = $this->_getView($widget)))
-			return;
-		
-		$view->id .= '_config';
-		$view->is_ephemeral = true;
-		C4_AbstractViewLoader::setView($view->id, $view);
+
+		if(false !== ($view = $this->_getView($widget))) {
+			$view->id .= '_config';
+			$view->is_ephemeral = true;
+			C4_AbstractViewLoader::setView($view->id, $view);
+		}
 		
 		// Template
 		
@@ -1247,6 +1707,134 @@ class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget {
 		DAO_WorkspaceWidget::update($widget->id, array(
 			DAO_WorkspaceWidget::PARAMS_JSON => json_encode($params),
 		));
+	}
+	
+	function exportData(Model_WorkspaceWidget $widget, $format=null) {
+		if(false == ($view = $this->_getView($widget)))
+			return false;
+		
+		switch(strtolower($format)) {
+			case 'csv':
+				return $this->_exportDataAsCSV($widget, $view);
+				break;
+				
+			case 'json':
+			default:
+				return $this->_exportDataAsJson($widget, $view);
+				break;
+		}
+	}
+	
+	private function _exportDataLoadAsContexts(Model_WorkspaceWidget $widget, $view) {
+		$results = array();
+		
+		@$context_ext = Extension_DevblocksContext::getByViewClass(get_class($view));
+
+		if(empty($context_ext))
+			return array();
+		
+		$models = $view->getDataAsObjects();
+		
+		/*
+		 * [TODO] This should be able to reuse lazy loads (e.g. every calendar_event may share
+		 * a calendar_event.calendar_id link to the same record
+		 *
+		 */
+		
+		foreach($models as $model) {
+			$labels = array();
+			$values = array();
+			CerberusContexts::getContext($context_ext->id, $model, $labels, $values, null, true);
+			
+			unset($values['_loaded']);
+			
+			$dict = new DevblocksDictionaryDelegate($values);
+			
+			if(isset($context_ext->params['context_expand_export'])) {
+				@$context_expand = DevblocksPlatform::parseCsvString($context_ext->params['context_expand_export']);
+				
+				foreach($context_expand as $expand)
+					$dict->$expand;
+			}
+			
+			$values = $dict->getDictionary();
+			
+			foreach($values as $k => $v) {
+				// Hide complex values
+				if(!is_string($v) && !is_numeric($v)) {
+					unset($values[$k]);
+					continue;
+				}
+				
+				// Hide any failed key lookups
+				if(substr($k,0,1) == '_' && is_null($v)) {
+					unset($values[$k]);
+					continue;
+				}
+				
+				// Hide meta data
+				if(preg_match('/__context$/', $k)) {
+					unset($values[$k]);
+					continue;
+				}
+			}
+			
+			$results[] = $values;
+		}
+		
+		return $results;
+	}
+	
+	private function _exportDataAsJson(Model_WorkspaceWidget $widget, $view) {
+		$export_data = array(
+			'widget' => array(
+				'label' => $widget->label,
+				'type' => 'worklist',
+				'version' => 'Cerb ' . APP_VERSION,
+				'page' => $view->renderPage,
+				'count' => 0,
+				'results' => array(),
+			),
+		);
+		
+		$results = $this->_exportDataLoadAsContexts($widget, $view);
+		
+		$export_data['widget']['count'] = count($results);
+		$export_data['widget']['results'] = $results;
+			
+		return DevblocksPlatform::strFormatJson(json_encode($export_data));
+	}
+	
+	private function _exportDataAsCSV(Model_WorkspaceWidget $widget, $view) {
+		$results = $this->_exportDataLoadAsContexts($widget, $view);
+		
+		$fp = fopen("php://temp", 'r+');
+
+		if(!empty($results)) {
+			$first_result = current($results);
+			$headings = array();
+			
+			foreach(array_keys($first_result) as $k)
+				$headings[] = $k;
+			
+			fputcsv($fp, $headings);
+		}
+		
+		foreach($results as $result) {
+			fputcsv($fp, $result);
+		}
+		
+		rewind($fp);
+
+		$output = "";
+		
+		while(!feof($fp)) {
+			$output .= fgets($fp);
+		}
+		
+		fclose($fp);
+		
+		return $output;
 	}
 };
 

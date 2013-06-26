@@ -722,6 +722,16 @@ class Model_WorkspacePage {
 	public $owner_context_id;
 	public $extension_id;
 	
+	function getExtension() {
+		$extension = Extension_WorkspacePage::get($this->extension_id);
+		return $extension;
+	}
+	
+	/**
+	 *
+	 * @param Model_Worker $as_worker
+	 * @return Model_WorkspaceTab[]
+	 */
 	function getTabs(Model_Worker $as_worker=null) {
 		$tabs = DAO_WorkspaceTab::getByPage($this->id);
 		
@@ -830,6 +840,19 @@ class Model_WorkspaceTab {
 	public $pos;
 	public $extension_id;
 	public $params=array();
+	
+	/**
+	 * @return Extension_WorkspaceTab
+	 */
+	function getExtension() {
+		$extension_id = $this->extension_id;
+		
+		
+		if(null != ($extension = DevblocksPlatform::getExtension($extension_id, true)))
+			return $extension;
+		
+		return null;
+	}
 	
 	function getWorklists() {
 		return DAO_WorkspaceList::getByTab($this->id);
@@ -1205,11 +1228,10 @@ class Context_WorkspacePage extends Extension_DevblocksContext {
 			'record_url' => $prefix.$translate->_('common.url.record'),
 		);
 		
-		if(is_array($fields))
-		foreach($fields as $cf_id => $field) {
-			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-		}
-
+		// Custom field/fieldset token labels
+		if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
+			$token_labels = array_merge($token_labels, $custom_field_labels);
+		
 		// Token values
 		$token_values = array();
 		
@@ -1418,11 +1440,10 @@ class Context_WorkspaceTab extends Extension_DevblocksContext {
 			'extension_id' => $prefix.$translate->_('common.extension'),
 		);
 		
-		if(is_array($fields))
-		foreach($fields as $cf_id => $field) {
-			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-		}
-
+		// Custom field/fieldset token labels
+		if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
+			$token_labels = array_merge($token_labels, $custom_field_labels);
+		
 		// Token values
 		$token_values = array();
 		

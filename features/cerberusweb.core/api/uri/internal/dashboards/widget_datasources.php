@@ -78,7 +78,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 			return;
 		
 		@$view_context = $params['worklist_model']['context'];
-		
+
 		if(empty($view_context))
 			return;
 		
@@ -93,6 +93,21 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 		$view->renderPage = 0;
 		$view->renderLimit = 1;
 		
+		$db = DevblocksPlatform::getDatabaseService();
+		
+		// We need to know what date fields we have
+		$fields = $view->getFields();
+		@$metric_func = $params['metric_func'];
+		@$metric_field = $fields[$params['metric_field']];
+
+		// If we're subtotalling on a custom field, make sure it's joined
+		
+		if(!$view->hasParam($metric_field->token, $view->getParams())) {
+			$view->addParam(new DevblocksSearchCriteria($metric_field->token, DevblocksSearchCriteria::OPER_TRUE), $metric_field->token);
+		}
+
+		// Build the query
+		
 		$query_parts = $dao_class::getSearchQueryComponents(
 			$view->view_columns,
 			$view->getParams(),
@@ -100,13 +115,6 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 			$view->renderSortAsc
 		);
 		
-		$db = DevblocksPlatform::getDatabaseService();
-		
-		// We need to know what date fields we have
-		$fields = $view->getFields();
-		@$metric_func = $params['metric_func'];
-		@$metric_field = $fields[$params['metric_field']];
-				
 		if(empty($metric_func))
 			$metric_func = 'count';
 		
@@ -144,7 +152,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 				$select_func = 'COUNT(*)';
 				break;
 		}
-			
+		
 		$sql = sprintf("SELECT %s AS counter_value " .
 			str_replace('%','%%',$query_parts['join']).
 			str_replace('%','%%',$query_parts['where']),
@@ -190,20 +198,23 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 		$view->renderPage = 0;
 		$view->renderLimit = 30;
 			
+		$db = DevblocksPlatform::getDatabaseService();
+
+		// Initial query planner
+		
 		$query_parts = $dao_class::getSearchQueryComponents(
 			$view->view_columns,
 			$view->getParams(),
 			$view->renderSortBy,
 			$view->renderSortAsc
 		);
-			
-		$db = DevblocksPlatform::getDatabaseService();
-			
+		
 		// We need to know what date fields we have
+		
 		$fields = $view->getFields();
 		$xaxis_field = null;
 		$xaxis_field_type = null;
-			
+		
 		switch($params['xaxis_field']) {
 			case '_id':
 				$xaxis_field = new DevblocksSearchField('_id', $query_parts['primary_table'], 'id', null, Model_CustomField::TYPE_NUMBER);
@@ -213,8 +224,41 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 				@$xaxis_field = $fields[$params['xaxis_field']];
 				break;
 		}
-			
+		
 		if(!empty($xaxis_field))
+			$params_changed = false;
+			
+			// If we're subtotalling on a custom field, make sure it's joined
+			if($xaxis_field != '_id' && !$view->hasParam($xaxis_field->token, $view->getParams())) {
+				$view->addParam(new DevblocksSearchCriteria($xaxis_field->token, DevblocksSearchCriteria::OPER_TRUE));
+				$params_changed = true;
+			}
+			
+			@$yaxis_func = $params['yaxis_func'];
+			@$yaxis_field = $fields[$params['yaxis_field']];
+				
+			if(empty($yaxis_field)) {
+				$yaxis_func = 'count';
+				
+			} else {
+				// If we're subtotalling on a custom field, make sure it's joined
+				if(!$view->hasParam($yaxis_field->token, $view->getParams())) {
+					$view->addParam(new DevblocksSearchCriteria($yaxis_field->token, DevblocksSearchCriteria::OPER_TRUE));
+					$params_changed = true;
+				}
+			}
+			
+			if($params_changed) {
+				$query_parts = $dao_class::getSearchQueryComponents(
+					$view->view_columns,
+					$view->getParams(),
+					$view->renderSortBy,
+					$view->renderSortAsc
+				);
+			}
+			
+			unset($params_changed);
+			
 			switch($xaxis_field->type) {
 				case Model_CustomField::TYPE_DATE:
 					// X-axis tick
@@ -250,39 +294,40 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 							$date_label = '%Y';
 							break;
 					}
-						
-					@$yaxis_func = $params['yaxis_func'];
-					@$yaxis_field = $fields[$params['yaxis_field']];
-						
-					if(empty($yaxis_field))
-						$yaxis_func = 'count';
-						
+					
 					switch($yaxis_func) {
 						case 'sum':
 							$select_func = sprintf("SUM(%s.%s)",
-							$yaxis_field->db_table,
-							$yaxis_field->db_column
+								$yaxis_field->db_table,
+								$yaxis_field->db_column
 							);
 							break;
 								
 						case 'avg':
 							$select_func = sprintf("AVG(%s.%s)",
-							$yaxis_field->db_table,
-							$yaxis_field->db_column
+								$yaxis_field->db_table,
+								$yaxis_field->db_column
 							);
 							break;
 								
 						case 'min':
 							$select_func = sprintf("MIN(%s.%s)",
-							$yaxis_field->db_table,
-							$yaxis_field->db_column
+								$yaxis_field->db_table,
+								$yaxis_field->db_column
 							);
 							break;
 								
 						case 'max':
 							$select_func = sprintf("MAX(%s.%s)",
-							$yaxis_field->db_table,
-							$yaxis_field->db_column
+								$yaxis_field->db_table,
+								$yaxis_field->db_column
+							);
+							break;
+							
+						case 'value':
+							$select_func = sprintf("%s.%s",
+								$yaxis_field->db_table,
+								$yaxis_field->db_column
 							);
 							break;
 								
@@ -291,7 +336,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 							$select_func = 'COUNT(*)';
 							break;
 					}
-						
+					
 					$sql = sprintf("SELECT %s AS hits, DATE_FORMAT(FROM_UNIXTIME(%s.%s), '%s') AS histo ",
 						$select_func,
 						$xaxis_field->db_table,
@@ -383,12 +428,6 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 					break;
 
 				case Model_CustomField::TYPE_NUMBER:
-					@$yaxis_func = $params['yaxis_func'];
-					@$yaxis_field = $fields[$params['yaxis_field']];
-						
-					if(empty($yaxis_func))
-						$yaxis_func = 'count';
-						
 					switch($xaxis_field->token) {
 						case '_id':
 							$order_by = null;
@@ -409,8 +448,8 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 
 						default:
 							$group_by = sprintf("GROUP BY %s.%s",
-							$xaxis_field->db_table,
-							$xaxis_field->db_column
+								$xaxis_field->db_table,
+								$xaxis_field->db_column
 							);
 							
 							$order_by = 'ORDER BY xaxis ASC';
@@ -448,7 +487,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 							break;
 								
 						case 'value':
-							$select_func = sprintf("DISTINCT %s.%s",
+							$select_func = sprintf("%s.%s",
 								$yaxis_field->db_table,
 								$yaxis_field->db_column
 							);
@@ -467,7 +506,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 							$group_by = null;
 							break;
 					}
-						
+					
 					$sql = sprintf("SELECT %s AS yaxis, %s.%s AS xaxis " .
 						str_replace('%','%%',$query_parts['join']).
 						str_replace('%','%%',$query_parts['where']).

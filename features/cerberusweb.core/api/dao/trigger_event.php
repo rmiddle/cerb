@@ -478,15 +478,6 @@ class SearchFields_TriggerEvent implements IDevblocksSearchFields {
 			self::EVENT_POINT => new DevblocksSearchField(self::EVENT_POINT, 'trigger_event', 'event_point', $translate->_('common.event')),
 		);
 		
-		// Custom Fields
-		//$fields = DAO_CustomField::getByContext(CerberusContexts::XXX);
-
-		//if(is_array($fields))
-		//foreach($fields as $field_id => $field) {
-		//	$key = 'cf_'.$field_id;
-		//	$columns[$key] = new DevblocksSearchField($key,$key,'field_value',$field->name,$field->type);
-		//}
-		
 		// Sort by label (translation-conscious)
 		DevblocksPlatform::sortObjects($columns, 'db_label');
 
@@ -515,6 +506,14 @@ class Model_TriggerEvent {
 			return NULL;
 		
 		return $event;
+	}
+	
+	public function getOwnerMeta() {
+		$context_ext = Extension_DevblocksContext::get($this->owner_context);
+		$meta = $context_ext->getMeta($this->owner_context_id);
+		$meta['context'] = $context_ext->id;
+		$meta['context_label'] = $context_ext->manifest->name;
+		return $meta;
 	}
 	
 	private function _getNodes() {
