@@ -572,15 +572,25 @@ class DevblocksEventHelper {
 		$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_var_string.tpl');
 	}
 	
-	static function renderActionSetVariableWorker() {
+	static function renderActionSetVariableWorker($token, $trigger, $params) {
 		$tpl = DevblocksPlatform::getTemplateService();
-		
+
 		// Workers
 		$tpl->assign('workers', DAO_Worker::getAll());
 		
 		// Groups
 		$tpl->assign('groups', DAO_Group::getAll());
+
+		// Variables
+		$worker_variables = array();
+		if(is_array($trigger->variables))
+		foreach($trigger->variables as $var_key => $var) {
+			if($var['type'] == 'ctx_' . CerberusContexts::CONTEXT_WORKER)
+				$worker_variables[$var_key] = $var['label'];
+		}
+		$tpl->assign('worker_variables', $worker_variables);
 		
+		// Template
 		$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_var_worker.tpl');
 	}
 	
@@ -679,6 +689,13 @@ class DevblocksEventHelper {
 						$value
 					);
 					break;
+					
+				case Model_CustomField::TYPE_WORKER:
+					$workers = DAO_Worker::getAll();
+					
+					if(isset($workers[$value]))
+						$value = $workers[$value]->getName();
+					break;
 			}
 			
 			$out = sprintf(">>> Setting '%s' to:\n%s",
@@ -749,6 +766,7 @@ class DevblocksEventHelper {
 			case Model_CustomField::TYPE_WORKER:
 				@$worker_ids = $params['worker_id'];
 				@$group_ids = $params['group_id'];
+				@$variables = $params['vars'];
 				@$mode = $params['mode'];
 				@$opt_is_available = $params['opt_is_available'];
 				@$opt_logged_in = $params['opt_logged_in'];
@@ -769,6 +787,19 @@ class DevblocksEventHelper {
 						$possible_workers[$member->id] = true;
 					}
 				}
+
+				// Add Worker variables
+				if(is_array($variables)) {
+					foreach($variables as $var_key) {
+						if(isset($dict->$var_key) && is_array($dict->$var_key)) {
+							foreach($dict->$var_key as $worker_id => $worker_context) {
+								$possible_workers[$worker_id] = true;
+							}
+						}
+					}
+				}
+				
+				//
 				
 				$workers = DAO_Worker::getAll();
 				
@@ -2748,13 +2779,17 @@ class DevblocksEventHelper {
 		$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_relay_email.tpl');
 	}
 	
-	// [TODO] Move this to an event parent so we can presume values
+	static function simulateActionRelayEmail($params, DevblocksDictionaryDelegate $dict, $context, $context_id, $group_id, $bucket_id, $message_id, $owner_id, $sender_email, $sender_name, $subject) {
+	}
 	
 	static function runActionRelayEmail($params, DevblocksDictionaryDelegate $dict, $context, $context_id, $group_id, $bucket_id, $message_id, $owner_id, $sender_email, $sender_name, $subject) {
 		$logger = DevblocksPlatform::getConsoleLog('Attendant');
 		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 		$mail_service = DevblocksPlatform::getMailService();
 		$mailer = $mail_service->getMailer(CerberusMail::getMailerDefaults());
+		
+		// Our main record can either be a comment or a message
+		$comment_id = (isset($dict->comment_id) && !empty($dict->comment_id)) ? $dict->comment_id : null;
 		
 		if(empty($group_id) || null == ($group = DAO_Group::get($group_id))) {
 			$logger->error("Can't load the ticket's group. Aborting action.");
@@ -2766,8 +2801,13 @@ class DevblocksEventHelper {
 		
 		// Attachments
 		$attachment_data = array();
-		if(!empty($message_id)) {
-			if(isset($params['include_attachments']) && !empty($params['include_attachments'])) {
+		
+		if(isset($params['include_attachments']) && !empty($params['include_attachments'])) {
+			// If our main record is a comment, use those attachments instead
+			if($comment_id) {
+				$attachment_data = DAO_AttachmentLink::getLinksAndAttachments(CerberusContexts::CONTEXT_COMMENT, $comment_id);
+				
+			} elseif($message_id) {
 				$attachment_data = DAO_AttachmentLink::getLinksAndAttachments(CerberusContexts::CONTEXT_MESSAGE, $message_id);
 			}
 		}

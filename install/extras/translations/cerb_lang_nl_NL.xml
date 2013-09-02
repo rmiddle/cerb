@@ -821,6 +821,16 @@
         <seg>importeer</seg>
       </tuv>
     </tu>
+    <tu tuid="common.import.upload_csv">
+      <tuv xml:lang="nl_NL">
+        <seg>Upload .CSV bestand</seg>
+      </tuv>
+    </tu>
+    <tu tuid="common.import.upload_csv.tip">
+      <tuv xml:lang="nl_NL">
+        <seg>(willekeurige kolom volgorde; de volgende stap laat u kiezen waar de data naartoe gaat)</seg>
+      </tuv>
+    </tu>
     <tu tuid="common.inbox">
       <tuv xml:lang="nl_NL">
         <seg>inbox</seg>
@@ -1311,16 +1321,6 @@
         <seg>Voeg Opportunity toe</seg>
       </tuv>
     </tu>
-    <tu tuid="crm.opp.import.upload_csv">
-      <tuv xml:lang="nl_NL">
-        <seg>Upload .CSV bestand</seg>
-      </tuv>
-    </tu>
-    <tu tuid="crm.opp.import.upload_csv.tip">
-      <tuv xml:lang="nl_NL">
-        <seg>(willekeurige kolom volgorde; de volgende stap laat u kiezen waar de data naartoe gaat)</seg>
-      </tuv>
-    </tu>
     <tu tuid="crm.opp.status.closed.lost">
       <tuv xml:lang="nl_NL">
         <seg>Gesloten/verloren</seg>
@@ -1614,11 +1614,6 @@
     <tu tuid="display.convo.unknown_format">
       <tuv xml:lang="nl_NL">
         <seg>Onbekend formaat</seg>
-      </tuv>
-    </tu>
-    <tu tuid="display.invalid_ticket">
-      <tuv xml:lang="nl_NL">
-        <seg>Ongeldig ticket!</seg>
       </tuv>
     </tu>
     <tu tuid="display.reply.attachments_add">

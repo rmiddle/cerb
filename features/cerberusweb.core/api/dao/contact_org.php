@@ -1027,7 +1027,7 @@ class Context_Org extends Extension_DevblocksContext implements IDevblocksContex
 			'name' => $prefix.$translate->_('contact_org.name'),
 			'city' => $prefix.$translate->_('contact_org.city'),
 			'country' => $prefix.$translate->_('contact_org.country'),
-			'created' => $prefix.$translate->_('contact_org.created'),
+			'created|date' => $prefix.$translate->_('contact_org.created'),
 			'phone' => $prefix.$translate->_('contact_org.phone'),
 			'postal' => $prefix.$translate->_('contact_org.postal'),
 			'province' => $prefix.$translate->_('contact_org.province'),
@@ -1246,16 +1246,9 @@ class Context_Org extends Extension_DevblocksContext implements IDevblocksContex
 			),
 		);
 	
-		$cfields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ORG);
-	
-		foreach($cfields as $cfield_id => $cfield) {
-			$keys['cf_' . $cfield_id] = array(
-				'label' => $cfield->name,
-				'type' => $cfield->type,
-				'param' => 'cf_' . $cfield_id,
-			);
-		}
-	
+		$fields = SearchFields_ContactOrg::getFields();
+		self::_getImportCustomFields($fields, $keys);
+		
 		DevblocksPlatform::sortObjects($keys, '[label]', true);
 	
 		return $keys;

@@ -226,12 +226,7 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		if(null == ($context_ext = Extension_DevblocksContext::get($context)))
 			return;
-
-		// [TODO] ACL
-// 		$active_worker = CerberusApplication::getActiveWorker();
-// 		if(!$active_worker->hasPriv('crm.opp.actions.import'))
-// 			return;
-
+		
 		if(!($context_ext instanceof IDevblocksContextImport))
 			return;
 		
@@ -279,11 +274,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		if(null == ($context_ext = Extension_DevblocksContext::get($context)))
 			return;
 	
-		// [TODO] ACL
-		// 		$active_worker = CerberusApplication::getActiveWorker();
-		// 		if(!$active_worker->hasPriv('crm.opp.actions.import'))
-		// 			return;
-	
 		if(!($context_ext instanceof IDevblocksContextImport))
 			return;
 
@@ -318,9 +308,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		$active_worker = CerberusApplication::getActiveWorker();
 		
-// 		if(!$active_worker->hasPriv('crm.opp.actions.import'))
-// 			return;
-		
 		@$field = DevblocksPlatform::importGPC($_REQUEST['field'],'array',array());
 		@$column = DevblocksPlatform::importGPC($_REQUEST['column'],'array',array());
 		@$column_custom = DevblocksPlatform::importGPC($_REQUEST['column_custom'],'array',array());
@@ -354,8 +341,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		@fgetcsv($fp, 8192, ',', '"');
 		
 		while(!feof($fp)) {
-			$line_number++;
-			
 			$parts = fgetcsv($fp, 8192, ',', '"');
 
 			if($is_preview && $line_number > 25)
@@ -363,6 +348,8 @@ class ChInternalController extends DevblocksControllerExtension {
 			
 			if(empty($parts) || (1==count($parts) && is_null($parts[0])))
 				continue;
+			
+			$line_number++;
 
 			// Snippets dictionary
 			$tpl_builder = DevblocksPlatform::getTemplateBuilder();
@@ -417,6 +404,12 @@ class ChInternalController extends DevblocksControllerExtension {
 					case 'ctx_' . CerberusContexts::CONTEXT_ADDRESS:
 						if(null != ($addy = DAO_Address::lookupAddress($val, true))) {
 							$value = $addy->id;
+						}
+						break;
+						
+					case 'ctx_' . CerberusContexts::CONTEXT_ORG:
+						if(null != ($org_id = DAO_ContactOrg::lookup($val, true))) {
+							$value = $org_id;
 						}
 						break;
 						
@@ -560,6 +553,10 @@ class ChInternalController extends DevblocksControllerExtension {
 		if(!$is_preview) {
 			@unlink($csv_file); // nuke the imported file}
 			$visit->set('import.last.csv',null);
+		}
+		
+		if(!empty($view_id) && !empty($context)) {
+			C4_AbstractView::setMarqueeContextImported($view_id, $context, $line_number);
 		}
 	}
 	
@@ -1863,6 +1860,7 @@ class ChInternalController extends DevblocksControllerExtension {
 		$list_view->params_required = $view->getParamsRequired();
 		$list_view->sort_by = $view->renderSortBy;
 		$list_view->sort_asc = $view->renderSortAsc;
+		$list_view->subtotals = $view->renderSubtotals;
 
 		// Save the new worklist
 		$fields = array(
@@ -2090,6 +2088,7 @@ class ChInternalController extends DevblocksControllerExtension {
 			$list_view->params_required = $view->getParamsRequired();
 			$list_view->sort_by = $view->renderSortBy;
 			$list_view->sort_asc = $view->renderSortAsc;
+			$list_view->subtotals = $view->renderSubtotals;
 
 			DAO_WorkspaceList::update($list_view_id, array(
 				DAO_WorkspaceList::LIST_VIEW => serialize($list_view)
@@ -3557,13 +3556,7 @@ class ChInternalController extends DevblocksControllerExtension {
 			DAO_Comment::COMMENT => $comment,
 			DAO_Comment::CREATED => time(),
 		);
-		$comment_id = DAO_Comment::create($fields, $also_notify_worker_ids);
-
-		// Attachments
-		if(!empty($file_ids))
-		foreach($file_ids as $file_id) {
-			DAO_AttachmentLink::create(intval($file_id), CerberusContexts::CONTEXT_COMMENT, $comment_id);
-		}
+		$comment_id = DAO_Comment::create($fields, $also_notify_worker_ids, $file_ids);
 	}
 
 	function commentDeleteAction() {

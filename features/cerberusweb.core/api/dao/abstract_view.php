@@ -409,6 +409,23 @@ abstract class C4_AbstractView {
 			self::setMarquee($view_id, $string);
 	}
 	
+	static function setMarqueeContextImported($view_id, $context, $count) {
+		$string = null;
+		
+		if(null != ($ctx = Extension_DevblocksContext::get($context))) {
+			$string = sprintf("Imported <b>%d %s</b> record%s.",
+				$count,
+				strtolower($ctx->manifest->name),
+				($count == 1 ? '' : 's')
+			);
+		}
+		
+		if(empty($string))
+			self::unsetMarquee($view_id);
+		else
+			self::setMarquee($view_id, $string);
+	}
+	
 	static function setMarquee($view_id, $string) {
 		$visit = CerberusApplication::getVisit();
 		$visit->set($view_id . '_marquee', $string);
@@ -2309,11 +2326,12 @@ class C4_AbstractViewLoader {
 		$view->renderSubtotals = $view_model['subtotals'];
 		
 		// Convert JSON params back to objects
-		$func = function(&$e) {
+		$func = function(&$e) use (&$func) {
 			if(isset($e['field']) && isset($e['operator']) && isset($e['value'])) {
 				$e = new DevblocksSearchCriteria($e['field'], $e['operator'], $e['value']);
+				
 			} else {
-				// [TODO] If the value is another style of array, we need to recurse
+				if(is_array($e))
 				array_walk(
 					$e,
 					$func

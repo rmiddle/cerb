@@ -615,6 +615,17 @@ class Model_Address {
 			$this->last_name
 		);
 	}
+	
+	function getNameWithEmail() {
+		$name = $this->getName();
+		
+		if(!empty($name))
+			$name .= ' <' . $this->email . '>';
+		else
+			$name = $this->email;
+		
+		return $name;
+	}
 };
 
 class View_Address extends C4_AbstractView implements IAbstractView_Subtotals {
@@ -1459,16 +1470,9 @@ class Context_Address extends Extension_DevblocksContext implements IDevblocksCo
 			),
 		);
 	
-		$cfields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ADDRESS);
-	
-		foreach($cfields as $cfield_id => $cfield) {
-			$keys['cf_' . $cfield_id] = array(
-					'label' => $cfield->name,
-					'type' => $cfield->type,
-					'param' => 'cf_' . $cfield_id,
-			);
-		}
-	
+		$fields = SearchFields_Address::getFields();
+		self::_getImportCustomFields($fields, $keys);
+		
 		DevblocksPlatform::sortObjects($keys, '[label]', true);
 	
 		return $keys;

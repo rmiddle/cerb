@@ -4,7 +4,7 @@
 	<name>Cerb6 Core</name>
 	<description>The core functionality of Cerb6.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.4.0</version>
+	<version>6.4.4</version>
 	<link>http://wiki.cerb4.com/wiki/New_Changes</link>
 	
 	<!-- Plugin Dependencies -->
@@ -49,7 +49,7 @@
 		<patch version="6.1.0" revision="1005" file="patches/6.x/6.1.0.php" />
 		<patch version="6.2.0" revision="1016" file="patches/6.x/6.2.0.php" />
 		<patch version="6.3.0" revision="1030" file="patches/6.x/6.3.0.php" />
-		<patch version="6.4.0" revision="1045" file="patches/6.x/6.4.0.php" />
+		<patch version="6.4.0" revision="1046" file="patches/6.x/6.4.0.php" />
 	</patches>
 
 	<!-- Controller Routing -->
@@ -400,6 +400,10 @@
 			<class name="AbstractEvent_Comment" />
 		</file>
 		
+		<file path="api/events/abstract/abstract_event_contact.php">
+			<class name="AbstractEvent_ContactPerson" />
+		</file>
+
 		<file path="api/events/abstract/abstract_event_group.php">
 			<class name="AbstractEvent_Group" />
 		</file>
@@ -676,9 +680,6 @@
 	<!-- Permissions -->
 
 	<acl>
-		<!-- Activity -->
-		<priv id="core.activity" label="acl.core.activity" />
-	
 		<!-- Addy Book -->
 		<priv id="core.addybook" label="acl.core.addybook" />
 		<priv id="core.addybook.addy.actions.update" label="acl.core.addybook.addy.actions.update" />
@@ -702,7 +703,6 @@
 		<priv id="core.display.message.actions.delete" label="acl.core.display.message.actions.delete" />
 
 		<!-- Mail page -->
-		<priv id="core.mail" label="acl.core.mail" />
 		<priv id="core.mail.send" label="acl.core.mail.send" />
 		<priv id="core.mail.draft.delete_all" label="acl.core.mail.draft.delete_all" />
 
@@ -2020,7 +2020,6 @@
 			<params>
 				<param key="uri" value="mail" />
 				<param key="menutitle" value="common.mail" />
-				<param key="acl" value="core.mail" />
 			</params>
 		</extension>
 		
@@ -2049,7 +2048,6 @@
 			<params>
 				<param key="uri" value="tickets" />
 				<param key="menutitle" value="" />
-				<param key="acl" value="core.mail" />
 			</params>
 		</extension>
 		
@@ -2103,7 +2101,6 @@
 			<params>
 				<param key="uri" value="display" />
 				<param key="menutitle" value="" />
-				<param key="acl" value="core.mail" />
 			</params>
 		</extension>
 

@@ -269,6 +269,24 @@ abstract class Extension_DevblocksContext extends DevblocksExtension {
 		
 		return $labels;
 	}
+	
+	protected function _getImportCustomFields($fields, &$keys) {
+		if(is_array($fields))
+		foreach($fields as $token => $cfield) {
+			if('cf_' != substr($token, 0, 3))
+				continue;
+			
+			$cfield_id = intval(substr($token, 3));
+			
+			$keys['cf_' . $cfield_id] = array(
+				'label' => $cfield->db_label,
+				'type' => $cfield->type,
+				'param' => $cfield->token,
+			);
+		}
+		
+		return true;
+	}
 };
 
 abstract class Extension_DevblocksEvent extends DevblocksExtension {
@@ -417,9 +435,10 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 	// [TODO] Cache results for this request
 	function getConditions($trigger) {
 		$conditions = array(
-			'_month_of_year' => array('label' => 'Month of year', 'type' => ''),
-			'_day_of_week' => array('label' => 'Day of week', 'type' => ''),
-			'_time_of_day' => array('label' => 'Time of day', 'type' => ''),
+			'_custom_script' => array('label' => '(Custom script)', 'type' => ''),
+			'_month_of_year' => array('label' => '(Month of year)', 'type' => ''),
+			'_day_of_week' => array('label' => '(Day of week)', 'type' => ''),
+			'_time_of_day' => array('label' => '(Time of day)', 'type' => ''),
 		);
 		$custom = $this->getConditionExtensions();
 		
@@ -460,6 +479,10 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 			$tpl->assign('namePrefix','condition'.$seq);
 		
 		switch($token) {
+			case '_custom_script':
+				return $tpl->display('devblocks:cerberusweb.core::internal/decisions/conditions/_custom_script.tpl');
+				break;
+				
 			case '_month_of_year':
 				return $tpl->display('devblocks:cerberusweb.core::internal/decisions/conditions/_month_of_year.tpl');
 				break;
@@ -543,6 +566,49 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 		
 		// Built-in actions
 		switch($token) {
+			case '_custom_script':
+				@$tpl = DevblocksPlatform::importVar($params['tpl'],'string','');
+				
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+				$value = $tpl_builder->build($tpl, $dict);
+
+				if(false === $value) {
+					$logger->error(sprintf("[Script] Syntax error:\n\n%s",
+						implode("\n", $tpl_builder->getErrors())
+					));
+					return false;
+				}
+				
+				$value = trim($value);
+				
+				@$not = (substr($params['oper'],0,1) == '!');
+				@$oper = ltrim($params['oper'],'!');
+				@$param_value = $params['value'];
+				
+				$logger->info(sprintf("Script: `%s` %s%s `%s`",
+					$value,
+					(!empty($not) ? 'not ' : ''),
+					$oper,
+					$param_value
+				));
+				
+				switch($oper) {
+					case 'is':
+						$pass = (0==strcasecmp($value,$param_value));
+						break;
+					case 'like':
+						$regexp = DevblocksPlatform::strToRegExp($param_value);
+						$pass = @preg_match($regexp, $value);
+						break;
+					case 'contains':
+						$pass = (false !== stripos($value, $param_value)) ? true : false;
+						break;
+					case 'regexp':
+						$pass = @preg_match($param_value, $value);
+						break;
+				}
+				break;
+				
 			case '_month_of_year':
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
@@ -658,10 +724,6 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 								case 'regexp':
 									$pass = @preg_match($param_value, $value);
 									break;
-								//case 'words_all':
-								//	break;
-								//case 'words_any':
-								//	break;
 							}
 							
 							// Handle operator negation
@@ -845,7 +907,9 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 	}
 	
 	function getActions($trigger) { /* @var $trigger Model_TriggerEvent */
-		$actions = array();
+		$actions = array(
+			'_set_custom_var' => array('label' => '(Set a custom placeholder)'),
+		);
 		$custom = $this->getActionExtensions();
 		
 		if(!empty($custom) && is_array($custom))
@@ -893,6 +957,10 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 		// Nope, it's a global action
 		} else {
 			switch($token) {
+				case '_set_custom_var':
+					return $tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_custom_var.tpl');
+					break;
+				
 				default:
 					// Variables
 					if(substr($token,0,4) == 'var_') {
@@ -914,7 +982,7 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 								return DevblocksEventHelper::renderActionSetVariableString($this->getLabels());
 								break;
 							case Model_CustomField::TYPE_WORKER:
-								return DevblocksEventHelper::renderActionSetVariableWorker();
+								return DevblocksEventHelper::renderActionSetVariableWorker($token, $trigger, $params);
 								break;
 							default:
 								if(substr(@$var['type'],0,4) == 'ctx_') {
@@ -948,6 +1016,16 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 			
 		} else {
 			switch($token) {
+				case '_set_custom_var':
+					@$var = $params['var'];
+					
+					return sprintf(">>> Setting custom variable {{%s}}:\n%s\n\n",
+						$var,
+						$dict->$var
+					);
+					
+					break;
+					
 				default:
 					// Variables
 					if(substr($token,0,4) == 'var_') {
@@ -980,6 +1058,22 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 			
 		} else {
 			switch($token) {
+				case '_set_custom_var':
+					$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+					
+					@$var = $params['var'];
+					@$value = $params['value'];
+					
+					if(!empty($var) && !empty($value))
+						$dict->$var = $tpl_builder->build($value, $dict);
+					
+					if($dry_run) {
+						$out = $this->simulateAction($token, $trigger, $params, $dict);
+					} else {
+						return;
+					}
+					break;
+					
 				default:
 					// Variables
 					if(substr($token,0,4) == 'var_') {

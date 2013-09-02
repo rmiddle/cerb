@@ -151,6 +151,19 @@ class DAO_Calendar extends Cerb_ORMHelper {
 		return $calendars;
 	}
 	
+	static function getOwnedByWorker($worker) {
+		$calendars = DAO_Calendar::getAll();
+
+		foreach($calendars as $calendar_id => $calendar) { /* @var $calendar Model_Calendar */
+			if($calendar->owner_context == CerberusContexts::CONTEXT_WORKER && $calendar->owner_context_id == $worker->id)
+				continue;
+			
+			unset($calendars[$calendar_id]);
+		}
+		
+		return $calendars;
+	}
+	
 	/**
 	 * @param resource $rs
 	 * @return Model_Calendar[]
@@ -193,6 +206,9 @@ class DAO_Calendar extends Cerb_ORMHelper {
 		// Delete linked records
 		DAO_CalendarEvent::deleteByCalendarIds($ids);
 		DAO_CalendarRecurringProfile::deleteByCalendarIds($ids);
+		
+		// Delete worker prefs
+		DAO_WorkerPref::deleteByKeyValues('availability_calendar_id', $ids);
 		
 		// Fire event
 		$eventMgr = DevblocksPlatform::getEventService();
@@ -628,8 +644,8 @@ class Model_Calendar {
 				$start = $event['ts'];
 				$end = @$event['ts_end'] ?: $start;
 
-				$start_mins = ceil(($start - $date_from)/60);
-				$end_mins = ceil(($end - $date_from)/60);
+				$start_mins = intval(ceil(($start - $date_from)/60));
+				$end_mins = intval(ceil(($end - $date_from)/60));
 				
 				if($start_mins < 0)
 					$start_mins = 0;

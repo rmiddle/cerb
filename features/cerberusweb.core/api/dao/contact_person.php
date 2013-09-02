@@ -906,14 +906,8 @@ class Context_ContactPerson extends Extension_DevblocksContext implements IDevbl
 		$contact = DAO_ContactPerson::get($context_id);
 
 		$address = $contact->getPrimaryAddress();
+		$name = $address->getNameWithEmail();
 
-		$name = $address->getName();
-		
-		if(!empty($name))
-			$name .= ' <' . $address->email . '>';
-		else
-			$name = $address->email;
-		
 		$url = $this->profileGetUrl($context_id);
 		$friendly = DevblocksPlatform::strToPermalink($address->email);
 		
@@ -929,7 +923,7 @@ class Context_ContactPerson extends Extension_DevblocksContext implements IDevbl
 	
 	function getContext($person, &$token_labels, &$token_values, $prefix=null) {
 		if(is_null($prefix))
-			$prefix = 'Person:';
+			$prefix = 'Contact:';
 		
 		$translate = DevblocksPlatform::getTranslationService();
 		$fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_CONTACT_PERSON);
@@ -945,9 +939,9 @@ class Context_ContactPerson extends Extension_DevblocksContext implements IDevbl
 			
 		// Token labels
 		$token_labels = array(
-			'created' => $prefix.$translate->_('common.created'),
+			'created|date' => $prefix.$translate->_('common.created'),
 			'id' => $prefix.$translate->_('common.id'),
-			'last_login' => $prefix.$translate->_('dao.contact_person.last_login'),
+			'last_login|date' => $prefix.$translate->_('dao.contact_person.last_login'),
 			'record_url' => $prefix.$translate->_('common.url.record'),
 		);
 		
@@ -962,8 +956,11 @@ class Context_ContactPerson extends Extension_DevblocksContext implements IDevbl
 		
 		// Address token values
 		if(null != $person) {
+			$address = $person->getPrimaryAddress();
+			$name = $address->getNameWithEmail();
+			
 			$token_values['_loaded'] = true;
-			$token_values['_label'] = '(contact person)';
+			$token_values['_label'] = $name;
 			$token_values['id'] = $person->id;
 			if(!empty($person->created))
 				$token_values['created'] = $person->created;
@@ -1153,16 +1150,9 @@ class Context_ContactPerson extends Extension_DevblocksContext implements IDevbl
 			),
 		);
 	
-		$cfields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_CONTACT_PERSON);
-	
-		foreach($cfields as $cfield_id => $cfield) {
-			$keys['cf_' . $cfield_id] = array(
-				'label' => $cfield->name,
-				'type' => $cfield->type,
-				'param' => 'cf_' . $cfield_id,
-			);
-		}
-	
+		$fields = SearchFields_ContactPerson::getFields();
+		self::_getImportCustomFields($fields, $keys);
+		
 		DevblocksPlatform::sortObjects($keys, '[label]', true);
 	
 		return $keys;

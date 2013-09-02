@@ -826,6 +826,16 @@
         <seg>importieren</seg>
       </tuv>
     </tu>
+    <tu tuid="common.import.upload_csv">
+      <tuv xml:lang="de_DE">
+        <seg>CSV-Datei hoch laden</seg>
+      </tuv>
+    </tu>
+    <tu tuid="common.import.upload_csv.tip">
+      <tuv xml:lang="de_DE">
+        <seg>(jede Spaltenreihenfolge; im nächsten Schritt wird das Ziel der Daten festgelegt)</seg>
+      </tuv>
+    </tu>
     <tu tuid="common.inbox">
       <tuv xml:lang="de_DE">
         <seg>Posteingang</seg>
@@ -1401,16 +1411,6 @@
         <seg>Absatzchance hinzufügen</seg>
       </tuv>
     </tu>
-    <tu tuid="crm.opp.import.upload_csv">
-      <tuv xml:lang="de_DE">
-        <seg>CSV-Datei hoch laden</seg>
-      </tuv>
-    </tu>
-    <tu tuid="crm.opp.import.upload_csv.tip">
-      <tuv xml:lang="de_DE">
-        <seg>(jede Spaltenreihenfolge; im nächsten Schritt wird das Ziel der Daten festgelegt)</seg>
-      </tuv>
-    </tu>
     <tu tuid="crm.opp.status.closed.lost">
       <tuv xml:lang="de_DE">
         <seg>Geschlossen/Verloren</seg>
@@ -1719,11 +1719,6 @@
     <tu tuid="display.convo.unknown_format">
       <tuv xml:lang="de_DE">
         <seg>unbekanntes Format</seg>
-      </tuv>
-    </tu>
-    <tu tuid="display.invalid_ticket">
-      <tuv xml:lang="de_DE">
-        <seg>Ungültiges Ticket!</seg>
       </tuv>
     </tu>
     <tu tuid="display.listnav.active_list">

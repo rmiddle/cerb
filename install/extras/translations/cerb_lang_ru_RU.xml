@@ -746,6 +746,16 @@
         <seg>импортировать</seg>
       </tuv>
     </tu>
+    <tu tuid="common.import.upload_csv">
+      <tuv xml:lang="ru_RU">
+        <seg></seg>
+      </tuv>
+    </tu>
+    <tu tuid="common.import.upload_csv.tip">
+      <tuv xml:lang="ru_RU">
+        <seg></seg>
+      </tuv>
+    </tu>
     <tu tuid="common.inbox">
       <tuv xml:lang="ru_RU">
         <seg>входящие</seg>
@@ -1349,11 +1359,6 @@
     <tu tuid="display.convo.unknown_format">
       <tuv xml:lang="ru_RU">
         <seg>Неизвестный формат</seg>
-      </tuv>
-    </tu>
-    <tu tuid="display.invalid_ticket">
-      <tuv xml:lang="ru_RU">
-        <seg>Некорректная заявка!</seg>
       </tuv>
     </tu>
     <tu tuid="display.listnav.active_list">
@@ -4265,166 +4270,6 @@ remote control of your helpdesk.</seg>
         <seg>[Показ заявок] Может удалять сообщения в заявках</seg>
       </tuv>
     </tu>
-    <tu tuid="acl.core.mail">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.core.snippets.actions.create">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.core.snippets.actions.update_all">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.core.tasks.actions.delete">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.core.watchers.assign">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.core.watchers.unassign">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.crm.opp.actions.create">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.crm.opp.actions.delete">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.crm.opp.actions.import">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.crm.opp.actions.update_all">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.crm.opp.view.actions.broadcast">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.crm.opp.view.actions.export">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.feedback.actions.create">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.feedback.actions.delete_all">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.feedback.actions.update_all">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="acl.feedback.view.actions.export">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.comment.create">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.connection.link">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.connection.unlink">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.opp.status">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.org.merge">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.task.status.completed">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.ticket.assigned">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.ticket.merge">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.ticket.message.inbound">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.ticket.message.outbound">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.ticket.status">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.ticket.unassigned">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.watcher.assigned">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.watcher.follow">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.watcher.unassigned">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="activities.watcher.unfollow">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
     <tu tuid="address.address">
       <tuv xml:lang="ru_RU">
         <seg>Адрес</seg>
@@ -4656,16 +4501,6 @@ remote control of your helpdesk.</seg>
       </tuv>
     </tu>
     <tu tuid="crm.opp.add">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="crm.opp.import.upload_csv">
-      <tuv xml:lang="ru_RU">
-        <seg></seg>
-      </tuv>
-    </tu>
-    <tu tuid="crm.opp.import.upload_csv.tip">
       <tuv xml:lang="ru_RU">
         <seg></seg>
       </tuv>

@@ -240,6 +240,28 @@ class DAO_Worker extends Cerb_ORMHelper {
 		return null;
 	}
 	
+	static function getByString($string) {
+		$workers = DAO_Worker::getAllActive();
+		$patterns = DevblocksPlatform::parseCsvString($string);
+		
+		$results = array();
+		
+		foreach($patterns as $pattern) {
+			foreach($workers as $worker_id => $worker) {
+				$worker_name = $worker->getName();
+			
+				if(isset($results[$worker_id]))
+					continue;
+				
+				if(false !== stristr($worker_name, $pattern)) {
+					$results[$worker_id] = $worker;
+				}
+			}
+		}
+
+		return $results;
+	}
+	
 	static function update($ids, $fields, $option_bits=0) {
 		if(!is_array($ids))
 			$ids = array($ids);
@@ -1314,6 +1336,29 @@ class DAO_WorkerPref extends DevblocksORMHelper {
 		// Invalidate cache
 		$cache = DevblocksPlatform::getCacheService();
 		$cache->remove(self::CACHE_PREFIX.$worker_id);
+	}
+	
+	static function deleteByKeyValues($key, $values) {
+		if(!is_array($values))
+			$values = array($values);
+		
+		$values = DevblocksPlatform::sanitizeArray($values, 'integer', array('nonzero','unique'));
+		
+		if(empty($values))
+			return;
+		
+		$db = DevblocksPlatform::getDatabaseService();
+
+		$results = $db->GetArray(sprintf("SELECT worker_id FROM worker_pref WHERE setting = %s AND value IN (%s)",
+			$db->qstr($key),
+			implode(',', $values)
+		));
+		
+		if(!empty($results))
+		foreach($results as $result)
+			self::delete($result['worker_id'], 'availability_calendar_id');
+		
+		return true;
 	}
 	
 	static function set($worker_id, $key, $value) {
