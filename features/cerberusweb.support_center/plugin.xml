@@ -4,14 +4,14 @@
 	<name>Support Center</name>
 	<description>Adds a Support Center community portal for public-facing support.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.3.1</version>
-	<link>http://wiki.cerb5.com/wiki/Support_Center</link>
+	<version>6.5.0</version>
+	<link>http://wiki.cerbweb.com/Support_Center</link>
 	<image>plugin.png</image>
  
 	<!-- Requirements -->
 
 	<requires>
-		<app_version min="6.3" max="6.3.99" />
+		<app_version min="6.5" max="6.5.99" />
 	</requires>
  
 	<!-- Plugin Dependencies -->
@@ -40,6 +40,9 @@
 			<class name="Extension_SupportCenterMessageBadge" />
 			<class name="Extension_UmScController" />
 			<class name="Extension_UmScRssController" />
+		</file>
+		<file path="api/events/contact_registered_in_sc.php">
+			<class name="Event_ContactRegisteredInSupportCenter" />
 		</file>
 		<file path="api/dao/supportcenter_address_share.php">
 			<class name="DAO_SupportCenterAddressShare" />
@@ -110,7 +113,7 @@
 			<params>
 				<param key="events">
 					<value>
-						<data key="cron.maint" />						
+						<data key="cron.maint" />
 					</value>
 				</param>
 			</params>
@@ -238,5 +241,23 @@
 			</params>
 		</extension>
 		
-    </extensions> 	
+		<!-- VA Events -->
+		
+		<extension point="devblocks.event">
+			<id>event.contact.registered.sc</id>
+			<name>New contact registered in Support Center</name>
+			<class>
+				<file>api/events/contact_registered_in_sc.php</file>
+				<name>Event_ContactRegisteredInSupportCenter</name>
+			</class>
+			<params>
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+	</extensions>
 </plugin>

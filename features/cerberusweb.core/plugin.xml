@@ -4,7 +4,7 @@
 	<name>Cerb6 Core</name>
 	<description>The core functionality of Cerb6.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.3.1</version>
+	<version>6.5.0</version>
 	<link>http://wiki.cerb4.com/wiki/New_Changes</link>
 	
 	<!-- Plugin Dependencies -->
@@ -49,6 +49,9 @@
 		<patch version="6.1.0" revision="1005" file="patches/6.x/6.1.0.php" />
 		<patch version="6.2.0" revision="1016" file="patches/6.x/6.2.0.php" />
 		<patch version="6.3.0" revision="1030" file="patches/6.x/6.3.0.php" />
+		<patch version="6.4.0" revision="1046" file="patches/6.x/6.4.0.php" />
+		
+		<patch version="6.4.0" revision="1059" file="patches/6.x/6.5.0.php" />
 	</patches>
 
 	<!-- Controller Routing -->
@@ -120,6 +123,14 @@
 			<class name="Model_Bucket" />
 		</file>
 		
+		<file path="api/dao/calendar.php">
+			<class name="Context_Calendar" />
+			<class name="DAO_Calendar" />
+			<class name="Model_Calendar" />
+			<class name="SearchFields_Calendar" />
+			<class name="View_Calendar" />
+		</file>
+		
 		<file path="api/dao/calendar_event.php">
 			<class name="Context_CalendarEvent" />
 			<class name="DAO_CalendarEvent" />
@@ -129,11 +140,13 @@
 		</file>
 		
 		<file path="api/dao/calendar_recurring_profile.php">
+			<class name="Context_CalendarRecurringProfile" />
 			<class name="DAO_CalendarRecurringProfile" />
 			<class name="Model_CalendarRecurringProfile" />
 			<class name="SearchFields_CalendarRecurringProfile" />
+			<class name="View_CalendarRecurringProfile" />
 		</file>
-		
+
 		<file path="api/dao/cerb_plugin.php">
 			<class name="DAO_CerbPlugin" />
 			<class name="Model_CerbPlugin" />
@@ -205,9 +218,18 @@
 		</file>
 		
 		<file path="api/dao/custom_field.php">
+			<class name="Context_CustomField" />
 			<class name="DAO_CustomField" />
 			<class name="DAO_CustomFieldValue" />
 			<class name="Model_CustomField" />
+		</file>
+
+		<file path="api/dao/custom_fieldset.php">
+			<class name="Context_CustomFieldset" />
+			<class name="DAO_CustomFieldset" />
+			<class name="Model_CustomFieldset" />
+			<class name="SearchFields_CustomFieldset" />
+			<class name="View_CustomFieldset" />
 		</file>
 
 		<file path="api/dao/decision_node.php">
@@ -321,6 +343,14 @@
 			<class name="Model_ViewRss" />
 		</file>
 		
+		<file path="api/dao/virtual_attendant.php">
+			<class name="Context_VirtualAttendant" />
+			<class name="DAO_VirtualAttendant" />
+			<class name="Model_VirtualAttendant" />
+			<class name="SearchFields_VirtualAttendant" />
+			<class name="View_VirtualAttendant" />
+		</file>
+		
 		<file path="api/dao/worker.php">
 			<class name="DAO_Worker" />
 			<class name="DAO_WorkerPref" />
@@ -344,6 +374,8 @@
 		</file>
 		
 		<file path="api/dao/workspace.php">
+			<class name="Context_WorkspacePage" />
+			<class name="Context_WorkspaceTab" />
 			<class name="DAO_WorkspaceList" />
 			<class name="DAO_WorkspacePage" />
 			<class name="DAO_WorkspaceTab" />
@@ -357,6 +389,7 @@
 		</file>
 		
 		<file path="api/dao/workspace_widget.php">
+			<class name="Context_WorkspaceWidget" />
 			<class name="DAO_WorkspaceWidget" />
 			<class name="Model_WorkspaceWidget" />
 			<class name="SearchFields_WorkspaceWidget" />
@@ -365,7 +398,19 @@
 		<file path="api/events/abstract/abstract_event_address.php">
 			<class name="AbstractEvent_Address" />
 		</file>
+		
+		<file path="api/events/abstract/abstract_event_api_request.php">
+			<class name="AbstractEvent_ApiRequest" />
+		</file>
+		
+		<file path="api/events/abstract/abstract_event_mail_before_sent.php">
+			<class name="AbstractEvent_MailBeforeSent" />
+		</file>
 
+		<file path="api/events/abstract/abstract_event_calendar.php">
+			<class name="AbstractEvent_Calendar" />
+		</file>
+		
 		<file path="api/events/abstract/abstract_event_calendar_event.php">
 			<class name="AbstractEvent_CalendarEvent" />
 		</file>
@@ -374,6 +419,10 @@
 			<class name="AbstractEvent_Comment" />
 		</file>
 		
+		<file path="api/events/abstract/abstract_event_contact.php">
+			<class name="AbstractEvent_ContactPerson" />
+		</file>
+
 		<file path="api/events/abstract/abstract_event_group.php">
 			<class name="AbstractEvent_Group" />
 		</file>
@@ -394,8 +443,16 @@
 			<class name="AbstractEvent_Ticket" />
 		</file>
 		
+		<file path="api/events/abstract/abstract_event_virtual_attendant.php">
+			<class name="AbstractEvent_VirtualAttendant" />
+		</file>
+		
 		<file path="api/events/abstract/abstract_event_worker.php">
 			<class name="AbstractEvent_Worker" />
+		</file>
+		
+		<file path="api/events/api/api_request.php">
+			<class name="Event_ApiRequest" />
 		</file>
 		
 		<file path="api/events/app/mail_received_by_app.php">
@@ -434,8 +491,16 @@
 			<class name="Event_MailReceivedByGroup" />
 		</file>
 		
+		<file path="api/events/app/mail_after_sent.php">
+			<class name="Event_MailAfterSent" />
+		</file>
+		
 		<file path="api/events/group/mail_after_sent_by_group.php">
 			<class name="Event_MailAfterSentByGroup" />
+		</file>
+		
+		<file path="api/events/app/mail_before_sent.php">
+			<class name="Event_MailBeforeSent" />
 		</file>
 		
 		<file path="api/events/group/mail_before_sent_by_group.php">
@@ -444,6 +509,10 @@
 		
 		<file path="api/events/macro/address_macro.php">
 			<class name="Event_AddressMacro" />
+		</file>
+		
+		<file path="api/events/macro/calendar_macro.php">
+			<class name="Event_CalendarMacro" />
 		</file>
 		
 		<file path="api/events/macro/calendar_event_macro.php">
@@ -470,6 +539,10 @@
 			<class name="Event_TicketMacro" />
 		</file>
 		
+		<file path="api/events/macro/virtual_attendant_macro.php">
+			<class name="Event_VirtualAttendantMacro" />
+		</file>
+		
 		<file path="api/events/macro/worker_macro.php">
 			<class name="Event_WorkerMacro" />
 		</file>
@@ -482,12 +555,21 @@
 			<class name="Event_MailDuringUiReplyByWorker" />
 		</file>
 		
+		<file path="api/events/ui/ui_worklist_render_by_worker.php">
+			<class name="Event_UiWorklistRenderByWorker" />
+		</file>
+		
 		<file path="api/events/worker/mail_received_by_watcher.php">
 			<class name="Event_MailReceivedByWatcher" />
 		</file>
 		
 		<file path="api/events/worker/notification_received_by_worker.php">
 			<class name="Event_NotificationReceivedByWorker" />
+		</file>
+		
+		<file path="api/uri/config/mail_failed.php">
+			<class name="SearchFields_MailParseFail" />
+			<class name="View_MailParseFail" />
 		</file>
 		
 		<file path="api/uri/internal/virtual_attendants.php">
@@ -503,6 +585,12 @@
 	<!-- Activity Points -->
 	
 	<activity_points>
+		<activity point="calendar_event.created">
+			<param key="label_key" value="Calendar Event Created" />
+		</activity>
+		<activity point="calendar_event_recurring.created">
+			<param key="label_key" value="Calendar Recurring Event Created" />
+		</activity>
 		<activity point="comment.create">
 			<param key="label_key" value="Comment Created" />
 		</activity>
@@ -636,9 +724,6 @@
 	<!-- Permissions -->
 
 	<acl>
-		<!-- Activity -->
-		<priv id="core.activity" label="acl.core.activity" />
-	
 		<!-- Addy Book -->
 		<priv id="core.addybook" label="acl.core.addybook" />
 		<priv id="core.addybook.addy.actions.update" label="acl.core.addybook.addy.actions.update" />
@@ -662,7 +747,6 @@
 		<priv id="core.display.message.actions.delete" label="acl.core.display.message.actions.delete" />
 
 		<!-- Mail page -->
-		<priv id="core.mail" label="acl.core.mail" />
 		<priv id="core.mail.send" label="acl.core.mail.send" />
 		<priv id="core.mail.draft.delete_all" label="acl.core.mail.draft.delete_all" />
 
@@ -738,11 +822,37 @@
 				<param key="view_class" value="View_ContactPerson" />
 				<param key="options">
 					<value>
+						<data key="custom_fields" />
 						<!--<data key="create" />-->
 						<!--<data key="find" />-->
 						<!--<data key="snippets" />-->
 						<data key="workspace" />
 					</value>
+				</param>
+				<param key="context_expand_export" value="email_" />
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.custom_field</id>
+			<name>Custom Field</name>
+			<class>
+				<file>api/dao/custom_field.php</file>
+				<name>Context_CustomField</name>
+			</class>
+			<params>
+				<param key="alias" value="custom_field" />
+				<param key="dao_class" value="DAO_CustomField" />
+				<param key="view_class" value="" />
+				<param key="options">
+					<!--
+					<value>
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="workspace" />
+					</value>
+					-->
 				</param>
 			</params>
 		</extension>
@@ -761,12 +871,14 @@
 				<param key="options">
 					<value>
 						<data key="create" />
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
+				<param key="context_expand_export" value="org_" />
 			</params>
 		</extension>
 		
@@ -795,6 +907,31 @@
 		</extension>
 		
 		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.calendar</id>
+			<name>Calendar</name>
+			<class>
+				<file>api/dao/calendar.php</file>
+				<name>Context_Calendar</name>
+			</class>
+			<params>
+				<param key="alias" value="calendar" />
+				<param key="dao_class" value="DAO_Calendar" />
+				<param key="view_class" value="View_Calendar" />
+				<param key="options">
+					<value>
+						<data key="create" />
+						<data key="custom_fields" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="va_variable" />
+						<data key="workspace" />
+					</value>
+				</param>
+				<param key="context_expand_export" value="owner_" />
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.calendar_event</id>
 			<name>Calendar Event</name>
 			<class>
@@ -808,12 +945,41 @@
 				<param key="options">
 					<value>
 						<data key="create" />
+						<data key="custom_fields" />
 						<data key="find" />
 						<!--<data key="snippets" />-->
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
+				<param key="context_expand_export" value="calendar_" />
+			</params>
+		</extension>
+		
+		<!-- Contexts -->
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.calendar_event.recurring</id>
+			<name>Calendar Recurring Event</name>
+			<class>
+				<file>api/dao/calendar_recurring_profile.php</file>
+				<name>Context_CalendarRecurringProfile</name>
+			</class>
+			<params>
+				<param key="alias" value="calendar_recurring_event" />
+				<param key="dao_class" value="DAO_CalendarRecurringProfile" />
+				<param key="view_class" value="View_CalendarRecurringProfile" />
+				<param key="options">
+					<value>
+						<data key="create" />
+						<data key="custom_fields" />
+						<data key="find" />
+						<!-- <data key="snippets" /> -->
+						<data key="va_variable" />
+						<data key="workspace" />
+					</value>
+				</param>
+				<param key="context_expand_export" value="calendar_" />
 			</params>
 		</extension>
 		
@@ -834,6 +1000,28 @@
 					</value>
 				</param>
 				-->
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.custom_fieldset</id>
+			<name>Custom Fieldset</name>
+			<class>
+				<file>api/dao/custom_fieldset.php</file>
+				<name>Context_CustomFieldset</name>
+			</class>
+			<params>
+				<param key="alias" value="custom_fieldset" />
+				<param key="dao_class" value="DAO_CustomFieldset" />
+				<param key="view_class" value="View_CustomFieldset" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<data key="find" />
+						<!--<data key="snippets" />-->
+						<data key="workspace" />
+					</value>
+				</param>
 			</params>
 		</extension>
 		
@@ -894,6 +1082,7 @@
 				<param key="view_class" value="View_Group" />
 				<param key="options">
 					<value>
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
 						<data key="va_variable" />
@@ -920,6 +1109,7 @@
 						<data key="workspace" />
 					</value>
 				</param>
+				<param key="context_expand_export" value="ticket_,ticket_bucket,ticket_group,sender_,sender_org_" />
 			</params>
 		</extension>
 		
@@ -942,7 +1132,7 @@
 					</value>
 				</param>
 			</params>
-		</extension>		
+		</extension>
 		
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.org</id>
@@ -958,6 +1148,7 @@
 				<param key="options">
 					<value>
 						<data key="create" />
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
 						<data key="va_variable" />
@@ -981,11 +1172,13 @@
 				<param key="options">
 					<value>
 						<!--<data key="create" />-->
+						<data key="custom_fields" />
 						<data key="find" />
 						<!--<data key="snippets" />-->
 						<data key="workspace" />
 					</value>
 				</param>
+				<param key="context_expand_export" value="owner_" />
 			</params>
 		</extension>
 		
@@ -1003,6 +1196,7 @@
 				<param key="options">
 					<value>
 						<data key="create" />
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
 						<data key="va_variable" />
@@ -1026,8 +1220,34 @@
 				<param key="options">
 					<value>
 						<data key="create" />
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
+						<data key="va_variable" />
+						<data key="workspace" />
+					</value>
+				</param>
+				<param key="context_expand_export" value="group_,bucket_,owner_,latest_message_sender_" />
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.virtual.attendant</id>
+			<name>Virtual Attendant</name>
+			<class>
+				<file>api/dao/virtual_attendant.php</file>
+				<name>Context_VirtualAttendant</name>
+			</class>
+			<params>
+				<param key="alias" value="virtual_attendant" />
+				<param key="dao_class" value="DAO_VirtualAttendant" />
+				<param key="view_class" value="View_VirtualAttendant" />
+				<param key="options">
+					<value>
+						<data key="create" />
+						<data key="custom_fields" />
+						<data key="find" />
+						<!--<data key="snippets" />-->
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
@@ -1049,12 +1269,14 @@
 				<param key="options">
 					<value>
 						<!--<data key="create" />-->
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
+				<param key="context_expand_export" value="address_" />
 			</params>
 		</extension>
 
@@ -1078,6 +1300,75 @@
 						<data key="workspace" />
 					</value>
 					-->
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.workspace.page</id>
+			<name>Workspace Page</name>
+			<class>
+				<file>api/dao/workspace.php</file>
+				<name>Context_WorkspacePage</name>
+			</class>
+			<params>
+				<param key="alias" value="workspace_page" />
+				<param key="dao_class" value="DAO_WorkspacePage" />
+				<param key="view_class" value="View_WorkspacePage" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<!--<data key="find" />-->
+						<!--<data key="snippets" />-->
+						<!--<data key="va_variable" />-->
+						<!--<data key="workspace" />-->
+					</value>
+				</param>
+			</params>
+		</extension>
+
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.workspace.tab</id>
+			<name>Workspace Tab</name>
+			<class>
+				<file>api/dao/workspace.php</file>
+				<name>Context_WorkspaceTab</name>
+			</class>
+			<params>
+				<param key="alias" value="workspace_tab" />
+				<param key="dao_class" value="DAO_WorkspaceTab" />
+				<param key="view_class" value="View_WorkspaceTab" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<!--<data key="find" />-->
+						<!--<data key="snippets" />-->
+						<!--<data key="va_variable" />-->
+						<!--<data key="workspace" />-->
+					</value>
+				</param>
+			</params>
+		</extension>
+
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.workspace.widget</id>
+			<name>Workspace Widget</name>
+			<class>
+				<file>api/dao/workspace_widget.php</file>
+				<name>Context_WorkspaceWidget</name>
+			</class>
+			<params>
+				<param key="alias" value="workspace_widget" />
+				<param key="dao_class" value="DAO_WorkspaceWidget" />
+				<param key="view_class" value="View_WorkspaceWidget" />
+				<param key="options">
+					<value>
+						<!--<data key="create" />-->
+						<!--<data key="find" />-->
+						<!--<data key="snippets" />-->
+						<!--<data key="va_variable" />-->
+						<!--<data key="workspace" />-->
+					</value>
 				</param>
 			</params>
 		</extension>
@@ -1181,6 +1472,22 @@
 		</extension>
 		
 		<extension point="devblocks.event">
+			<id>event.mail.after.sent</id>
+			<name>After sending worker message</name>
+			<class>
+				<file>api/events/app/mail_after_sent.php</file>
+				<name>Event_MailAfterSent</name>
+			</class>
+			<params>
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
 			<id>event.mail.after.sent.group</id>
 			<name>After sending worker message</name>
 			<class>
@@ -1191,6 +1498,22 @@
 				<param key="contexts">
 					<value>
 						<data key="cerberusweb.contexts.group" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
+			<id>event.mail.before.sent</id>
+			<name>Before sending worker message</name>
+			<class>
+				<file>api/events/app/mail_before_sent.php</file>
+				<name>Event_MailBeforeSent</name>
+			</class>
+			<params>
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
 					</value>
 				</param>
 			</params>
@@ -1255,6 +1578,44 @@
 				<param key="macro_context" value="cerberusweb.contexts.address" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
+						<data key="cerberusweb.contexts.group" />
+						<data key="cerberusweb.contexts.role" />
+						<data key="cerberusweb.contexts.worker" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
+			<id>event.api.custom_request</id>
+			<name>Custom API request</name>
+			<class>
+				<file>api/events/api/api_request.php</file>
+				<name>Event_ApiRequest</name>
+			</class>
+			<params>
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
+						<data key="cerberusweb.contexts.worker" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
+			<id>event.macro.calendar</id>
+			<name>Custom calendar behavior</name>
+			<class>
+				<file>api/events/macro/calendar_macro.php</file>
+				<name>Event_CalendarMacro</name>
+			</class>
+			<params>
+				<param key="macro_context" value="cerberusweb.contexts.calendar" />
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1274,6 +1635,7 @@
 				<param key="macro_context" value="cerberusweb.contexts.calendar_event" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1293,6 +1655,7 @@
 				<param key="macro_context" value="cerberusweb.contexts.group" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1312,6 +1675,7 @@
 				<param key="macro_context" value="cerberusweb.contexts.org" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1331,6 +1695,7 @@
 				<param key="macro_context" value="cerberusweb.contexts.task" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1350,6 +1715,27 @@
 				<param key="macro_context" value="cerberusweb.contexts.ticket" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
+						<data key="cerberusweb.contexts.group" />
+						<data key="cerberusweb.contexts.role" />
+						<data key="cerberusweb.contexts.worker" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
+			<id>event.macro.virtual_attendant</id>
+			<name>Custom virtual attendant behavior</name>
+			<class>
+				<file>api/events/macro/virtual_attendant_macro.php</file>
+				<name>Event_VirtualAttendantMacro</name>
+			</class>
+			<params>
+				<param key="macro_context" value="cerberusweb.contexts.virtual.attendant" />
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1369,6 +1755,7 @@
 				<param key="macro_context" value="cerberusweb.contexts.worker" />
 				<param key="contexts">
 					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
 						<data key="cerberusweb.contexts.worker" />
@@ -1441,6 +1828,23 @@
 						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.group" />
 						<data key="cerberusweb.contexts.role" />
+						<data key="cerberusweb.contexts.worker" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
+			<id>event.ui.worklist.render.worker</id>
+			<name>[UI] While displaying a worklist</name>
+			<class>
+				<file>api/events/ui/ui_worklist_render_by_worker.php</file>
+				<name>Event_UiWorklistRenderByWorker</name>
+			</class>
+			<params>
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
 						<data key="cerberusweb.contexts.worker" />
 					</value>
 				</param>
@@ -1533,8 +1937,34 @@
 			<!-- Internal Page Sections -->
 			
 			<extension point="cerberusweb.ui.page.section">
+				<id>core.internal.section.calendars</id>
+				<name>Internal Section Calendars</name>
+				<class>
+					<file>api/uri/internal/calendars.php</file>
+					<name>PageSection_InternalCalendars</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.controller.internal" />
+					<param key="uri" value="calendars" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.internal.section.custom_fieldsets</id>
+				<name>Internal Section Custom Fieldsets</name>
+				<class>
+					<file>api/uri/internal/custom_fieldsets.php</file>
+					<name>PageSection_InternalCustomFieldsets</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.controller.internal" />
+					<param key="uri" value="custom_fieldsets" />
+				</params>
+			</extension>
+
+			<extension point="cerberusweb.ui.page.section">
 				<id>core.internal.section.dashboards</id>
-				<name>Internal Section</name>
+				<name>Internal Section Dashboards</name>
 				<class>
 					<file>api/uri/internal/dashboards.php</file>
 					<name>PageSection_InternalDashboards</name>
@@ -1544,7 +1974,20 @@
 					<param key="uri" value="dashboards" />
 				</params>
 			</extension>
-
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.internal.section.workspaces</id>
+				<name>Internal Section Workspaces</name>
+				<class>
+					<file>api/uri/internal/workspaces.php</file>
+					<name>PageSection_InternalWorkspaces</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.controller.internal" />
+					<param key="uri" value="workspaces" />
+				</params>
+			</extension>
+			
 		<extension point="devblocks.controller">
 			<id>core.controller.print</id>
 			<name>Print Controller</name>
@@ -1746,7 +2189,6 @@
 			<params>
 				<param key="uri" value="mail" />
 				<param key="menutitle" value="common.mail" />
-				<param key="acl" value="core.mail" />
 			</params>
 		</extension>
 		
@@ -1775,7 +2217,6 @@
 			<params>
 				<param key="uri" value="tickets" />
 				<param key="menutitle" value="" />
-				<param key="acl" value="core.mail" />
 			</params>
 		</extension>
 		
@@ -1829,7 +2270,6 @@
 			<params>
 				<param key="uri" value="display" />
 				<param key="menutitle" value="" />
-				<param key="acl" value="core.mail" />
 			</params>
 		</extension>
 
@@ -1897,6 +2337,19 @@
 				<params>
 					<param key="page_id" value="core.page.configuration" />
 					<param key="uri" value="branding" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.setup.localization</id>
+				<name>Localizaiton Section</name>
+				<class>
+					<file>api/uri/config/localization.php</file>
+					<name>PageSection_SetupLocalization</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.configuration" />
+					<param key="uri" value="localization" />
 				</params>
 			</extension>
 			
@@ -1979,6 +2432,19 @@
 			</extension>
 			
 			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.setup.mail_failed</id>
+				<name>Failed Messages Section</name>
+				<class>
+					<file>api/uri/config/mail_failed.php</file>
+					<name>PageSection_SetupMailFailed</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.configuration" />
+					<param key="uri" value="mail_failed" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
 				<id>core.page.setup.mail_from</id>
 				<name>Mail From Section</name>
 				<class>
@@ -1988,6 +2454,19 @@
 				<params>
 					<param key="page_id" value="core.page.configuration" />
 					<param key="uri" value="mail_from" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.setup.mail_import</id>
+				<name>Import Messages Section</name>
+				<class>
+					<file>api/uri/config/mail_import.php</file>
+					<name>PageSection_SetupMailImport</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.configuration" />
+					<param key="uri" value="mail_import" />
 				</params>
 			</extension>
 			
@@ -2265,6 +2744,19 @@
 					<param key="uri" value="address" />
 				</params>
 			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.calendars.page.profiles.calendar</id>
+				<name>Calendar Section</name>
+				<class>
+					<file>api/uri/profiles/calendar.php</file>
+					<name>PageSection_ProfilesCalendar</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="calendar" />
+				</params>
+			</extension>
 		
 			<extension point="cerberusweb.ui.page.section">
 				<id>core.page.profiles.calendar_event</id>
@@ -2276,6 +2768,19 @@
 				<params>
 					<param key="page_id" value="core.page.profiles" />
 					<param key="uri" value="calendar_event" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.calendar_recurring_profile</id>
+				<name>Calendar Recurring Profile Section</name>
+				<class>
+					<file>api/uri/profiles/calendar_recurring_profile.php</file>
+					<name>PageSection_ProfilesCalendarRecurringProfile</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="calendar_recurring_profile" />
 				</params>
 			</extension>
 
@@ -2345,6 +2850,19 @@
 			</extension>
 			
 			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.virtual_attendant</id>
+				<name>Virtual Attendant Section</name>
+				<class>
+					<file>api/uri/profiles/virtual_attendant.php</file>
+					<name>PageSection_ProfilesVirtualAttendant</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="virtual_attendant" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
 				<id>core.page.profiles.worker</id>
 				<name>Worker Section</name>
 				<class>
@@ -2356,6 +2874,20 @@
 					<param key="uri" value="worker" />
 				</params>
 			</extension>
+			
+		<!-- Workspace Pages -->
+		
+		<extension point="cerberusweb.ui.workspace.page">
+			<id>core.workspace.page.workspace</id>
+			<name>Workspace Page</name>
+			<class>
+				<file>api/uri/internal/workspaces.php</file>
+				<name>WorkspacePage_Workspace</name>
+			</class>
+			<params>
+				<param key="label" value="common.workspace" />
+			</params>
+		</extension>
 		
 		<!-- Workspace Tabs -->
 		
@@ -2383,6 +2915,18 @@
 			</params>
 		</extension>
 		
+		<extension point="cerberusweb.ui.workspace.tab">
+			<id>core.workspace.tab.worklists</id>
+			<name>Workspace Worklists Tab</name>
+			<class>
+				<file>api/uri/internal/workspaces.php</file>
+				<name>WorkspaceTab_Worklists</name>
+			</class>
+			<params>
+				<param key="label" value="Worklists" />
+			</params>
+		</extension>
+		
 		<!-- Workspace Widgets -->
 		
 		<extension point="cerberusweb.ui.workspace.widget">
@@ -2397,11 +2941,44 @@
 		</extension>
 	
 		<extension point="cerberusweb.ui.workspace.widget">
+			<id>core.workspace.widget.calendar</id>
+			<name>Calendar</name>
+			<class>
+				<file>api/uri/internal/dashboards.php</file>
+				<name>WorkspaceWidget_Calendar</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="cerberusweb.ui.workspace.widget">
 			<id>core.workspace.widget.chart</id>
 			<name>Line/Bar Chart</name>
 			<class>
 				<file>api/uri/internal/dashboards.php</file>
 				<name>WorkspaceWidget_Chart</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="cerberusweb.ui.workspace.widget">
+			<id>core.workspace.widget.clock</id>
+			<name>Clock</name>
+			<class>
+				<file>api/uri/internal/dashboards.php</file>
+				<name>WorkspaceWidget_Clock</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="cerberusweb.ui.workspace.widget">
+			<id>core.workspace.widget.countdown</id>
+			<name>Countdown</name>
+			<class>
+				<file>api/uri/internal/dashboards.php</file>
+				<name>WorkspaceWidget_Countdown</name>
 			</class>
 			<params>
 			</params>
@@ -2529,6 +3106,19 @@
 			</params>
 		</extension>
 		
+		<!-- Calendar Datasources -->
+		
+		<extension point="cerberusweb.calendar.datasource">
+			<id>calendar.datasource.worklist</id>
+			<name>Worklist</name>
+			<class>
+				<file>api/uri/internal/calendars/calendar_datasources.php</file>
+				<name>CalendarDatasource_Worklist</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
 		<!--  Login Extensions -->
 
 		<extension point="cerberusweb.login">
@@ -2547,23 +3137,23 @@
 		
 		<extension point="cerberusweb.cron">
 			<id>cron.pop3</id>
-			<name>POP3 / IMAP E-Mail Importing</name>
+			<name>Mailbox (POP3/IMAP) Checker and Email Downloader</name>
 			<class>
 				<file>api/cron.classes.php</file>
 				<name>Pop3Cron</name>
 			</class>
 			<params />
-		</extension>		
+		</extension>
 		
 		<extension point="cerberusweb.cron">
 			<id>cron.parser</id>
-			<name>Inbound E-Mail Processing</name>
+			<name>Inbound Email Message Processor</name>
 			<class>
 				<file>api/cron.classes.php</file>
 				<name>ParseCron</name>
 			</class>
 			<params />
-		</extension>		
+		</extension>
 		
 		<extension point="cerberusweb.cron">
 			<id>cron.maint</id>
@@ -2573,7 +3163,7 @@
 				<name>MaintCron</name>
 			</class>
 			<params />
-		</extension>		
+		</extension>
 		
 		<extension point="cerberusweb.cron">
 			<id>cron.heartbeat</id>
@@ -2617,7 +3207,7 @@
 		
 		<extension point="cerberusweb.cron">
 			<id>cron.mail_queue</id>
-			<name>Mail Queue</name>
+			<name>Mail Queue Processor</name>
 			<class>
 				<file>api/cron.classes.php</file>
 				<name>MailQueueCron</name>
@@ -2631,16 +3221,6 @@
 			<class>
 				<file>api/cron.classes.php</file>
 				<name>Cron_VirtualAttendantScheduledBehavior</name>
-			</class>
-			<params />
-		</extension>
-		
-		<extension point="cerberusweb.cron">
-			<id>cron.calendar_recurring</id>
-			<name>Calendar Recurring Event Schedule</name>
-			<class>
-				<file>api/cron.classes.php</file>
-				<name>Cron_CalendarRecurringEventScheduler</name>
 			</class>
 			<params />
 		</extension>

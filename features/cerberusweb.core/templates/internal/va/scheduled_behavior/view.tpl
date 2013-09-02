@@ -24,6 +24,7 @@
 <table cellpadding="5" cellspacing="0" border="0" width="100%" class="worklistBody">
 
 	{* Column Headers *}
+	<thead>
 	<tr>
 		{foreach from=$view->view_columns item=header name=headers}
 			{* start table header, insert column title and link *}
@@ -41,6 +42,7 @@
 			</th>
 		{/foreach}
 	</tr>
+	</thead>
 
 	{* Column Data *}
 	{*$object_watchers = DAO_ContextLink::getContextLinks(CerberusContexts::CONTEXT_GROUP, array_keys($data), CerberusContexts::CONTEXT_WORKER)*}
@@ -59,7 +61,7 @@
 			{elseif $column=="b_behavior_name"}
 			<td>
 				<input type="checkbox" name="row_id[]" value="{$result.c_id}" style="display:none;">
-				<a href="javascript:;" onclick="$popup=genericAjaxPopup('peek','c=internal&a=showMacroSchedulerPopup&job_id={$result.c_id}&view_id={$view->id}',this,false,'400');$popup.one('behavior_save',function(e) { genericAjaxGet('view{$view->id}','c=internal&a=viewRefresh&id={$view->id}'); });" class="subject">{$result.$column}</a>
+				<a href="javascript:;" onclick="$popup=genericAjaxPopup('peek','c=internal&a=showMacroSchedulerPopup&job_id={$result.c_id}&view_id={$view->id}',this,false,'550');$popup.one('behavior_save',function(e) { genericAjaxGet('view{$view->id}','c=internal&a=viewRefresh&id={$view->id}'); });" class="subject">{$result.$column}</a>
 			</td>
 			{elseif $column=="c_run_date"}
 			<td style="width:100px;">
@@ -69,18 +71,18 @@
 				<abbr title="{$result.$column|devblocks_date}">{$result.$column|devblocks_prettytime}</abbr>
 				{/if}
 			</td>
-			{elseif $column=="*_owner"}
+			{elseif $column=="b_behavior_virtual_attendant_id"}
 			<td>
-				{$ctx = Extension_DevblocksContext::get($result.b_behavior_owner_context)}
+				{$ctx = Extension_DevblocksContext::get(CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT)}
 				{if is_object($ctx)}
-				{$meta = $ctx->getMeta($result.b_behavior_owner_context_id)}
+				{$meta = $ctx->getMeta($result.$column)}
 				<span title="{$ctx->manifest->name}">
 				{if !empty($meta.permalink)}
 				<a href="{$meta.permalink}">{$meta.name|truncate:64}</a>
 				{else}
 				{$meta.name|truncate:64}
-				{/if}
-				</span> 
+				{/if} 
+				</span>
 				{/if}
 			</td>
 			{elseif $column=="*_target"}

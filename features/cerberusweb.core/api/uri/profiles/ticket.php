@@ -41,7 +41,7 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		}
 		
 		if(null == ($ticket = DAO_Ticket::get($id))) {
-			echo "<H1>".$translate->_('display.invalid_ticket')."</H1>";
+			DevblocksPlatform::redirect(new DevblocksHttpRequest());
 			return;
 		}
 		
@@ -108,28 +108,24 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		// Trigger ticket view event
 		Event_TicketViewedByWorker::trigger($ticket->id, $active_worker->id);
 		
-		// Custom fields
-		$custom_fields = DAO_CustomField::getAll();
-		$tpl->assign('custom_fields', $custom_fields);
-		
 		// Properties
 		
 		$properties = array(
-				'status' => null,
-				'owner' => null,
-				'mask' => null,
-				'bucket' => null,
-				'org' => null,
-				'created' => array(
-					'label' => ucfirst($translate->_('common.created')),
-					'type' => Model_CustomField::TYPE_DATE,
-					'value' => $ticket->created_date,
-				),
-				'updated' => array(
-					'label' => ucfirst($translate->_('common.updated')),
-					'type' => Model_CustomField::TYPE_DATE,
-					'value' => $ticket->updated_date,
-				),
+			'status' => null,
+			'owner' => null,
+			'mask' => null,
+			'bucket' => null,
+			'org' => null,
+			'created' => array(
+				'label' => ucfirst($translate->_('common.created')),
+				'type' => Model_CustomField::TYPE_DATE,
+				'value' => $ticket->created_date,
+			),
+			'updated' => array(
+				'label' => ucfirst($translate->_('common.updated')),
+				'type' => Model_CustomField::TYPE_DATE,
+				'value' => $ticket->updated_date,
+			),
 		);
 		
 		if(!empty($ticket->closed_at)) {
@@ -162,21 +158,23 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 			'value' => (100*$ticket->spam_score) . '%',
 		);
 		
+		// Custom Fields
+
 		@$values = array_shift(DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_TICKET, $ticket->id)) or array();
+		$tpl->assign('custom_field_values', $values);
 		
-		foreach($custom_fields as $cf_id => $cfield) {
-			if(!isset($values[$cf_id]))
-				continue;
+		$properties_cfields = Page_Profiles::getProfilePropertiesCustomFields(CerberusContexts::CONTEXT_TICKET, $values);
 		
-			if(!empty($cfield->group_id) && $cfield->group_id != $ticket->group_id)
-				continue;
+		if(!empty($properties_cfields))
+			$properties = array_merge($properties, $properties_cfields);
 		
-			$properties['cf_' . $cf_id] = array(
-				'label' => $cfield->name,
-				'type' => $cfield->type,
-				'value' => $values[$cf_id],
-			);
-		}
+
+		// Custom Fieldsets
+
+		$properties_custom_fieldsets = Page_Profiles::getProfilePropertiesCustomFieldsets(CerberusContexts::CONTEXT_TICKET, $ticket->id, $values);
+		$tpl->assign('properties_custom_fieldsets', $properties_custom_fieldsets);
+		
+		// Properties
 		
 		$tpl->assign('properties', $properties);
                 
@@ -214,8 +212,8 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		
 		// Check group membership ACL
 		if(!isset($active_worker_memberships[$ticket->group_id])) {
-			echo "<H1>".$translate->_('common.access_denied')."</H1>";
-			return;
+			DevblocksPlatform::redirect(new DevblocksHttpRequest());
+			exit;
 		}
 		
 		// Groups
@@ -223,13 +221,23 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		$tpl->assign('groups', $groups);
 		
 		// Macros
-		$macros = DAO_TriggerEvent::getByOwners(
-			array(
-				array(CerberusContexts::CONTEXT_WORKER, $active_worker->id, null),
-				array(CerberusContexts::CONTEXT_GROUP, $ticket->group_id, $groups[$ticket->group_id]->name),
-			),
+		
+		$macros = DAO_TriggerEvent::getReadableByActor(
+			$active_worker,
 			'event.macro.ticket'
 		);
+
+		// Filter macros to only those owned by the ticket's group
+		
+		$macros = array_filter($macros, function($macro) use ($ticket) { /* @var $macro Model_TriggerEvent */
+			$va = $macro->getVirtualAttendant(); /* @var $va Model_VirtualAttendant */
+			
+			if($va->owner_context == CerberusContexts::CONTEXT_GROUP && $va->owner_context_id != $ticket->group_id)
+				return false;
+			
+			return true;
+		});
+		
 		$tpl->assign('macros', $macros);
 		
 		// Requesters

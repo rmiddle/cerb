@@ -58,30 +58,132 @@ var markitupHTMLSettings = {
 	]
 } 
 
-function appendFileInput(divName,fieldName) {
-	var frm = document.getElementById(divName);
-	if(null == frm) return;
-
-	// Why is IE such a PITA?  it doesn't allow post-creation specification of the "name" attribute.  Who thought that one up?
-	try {
-		var fileInput = document.createElement('<input type="file" name="'+fieldName+'" size="45">');
-	} catch (err) {
-		var fileInput = document.createElement('input');
-		fileInput.setAttribute('type','file');
-		fileInput.setAttribute('name',fieldName);
-		fileInput.setAttribute('size','45');
-	}
+$.fn.cerbDateInputHelper = function(options) {
+	var options = (typeof options == 'object') ? options : {};
 	
-	// Gotta add the <br> as a child, see below
-	var brTag = document.createElement('br');
-	
-	frm.appendChild(fileInput);
-	frm.appendChild(brTag);
+	return this.each(function() {
+		var $this = $(this);
+		
+		$this.datepicker({
+			showOn: 'button',
+			dateFormat: 'D, d M yy',
+			defaultDate: 'D, d M yy',
+			onSelect: function(dateText, inst) {
+				inst.input.addClass('changed').focus();
+			}
+		});
+		
+		$this
+			.attr('placeholder', '+2 hours; +4 hours @Calendar; Jan 15 2018 2pm; 5pm America/New York')
+			.autocomplete({
+				minLength: 1,
+				autoFocus: false,
+				source: function(request, response) {
+					var last = request.term.split(' ').pop();
 
-	// This is effectively the same as frm.innerHTML = frm.innerHTML + "<br>".
-	// The innerHTML element doesn't know jack about the selected files of the child elements, so it throws that away.	
-	//frm.innerHTML += "<BR>";
-}
+					request.term = last;
+					
+					if(request.term == null)
+						return;
+					
+					var url = DevblocksAppPath+'ajax.php?c=internal&a=handleSectionAction&section=calendars&action=getDateInputAutoCompleteOptionsJson';
+					
+					$.ajax({
+						url: url,
+						dataType: "json",
+						data: request,
+						success: function(data) {
+							response(data);
+						}
+					});
+					
+				},
+				focus: function() {
+					return false;
+				},
+				select: function(event, ui) {
+					$(this).addClass('autocomplete_select');
+					
+					var terms = this.value.split(' ');
+					terms.pop();
+					terms.push(ui.item.value);
+					terms.push('');
+					this.value = terms.join(' ');
+					$(this).addClass('changed', true);
+					return false;
+				}
+			})
+			.data('autocomplete')
+				._renderItem = function(ul, item) {
+					var $li = $('<li></li>')
+						.data('item.autocomplete', item)
+						.append($('<a></a>').html(item.label))
+						.appendTo(ul);
+					
+					item.value = $li.text();
+					
+					return $li;
+				}
+			;
+		
+		$this
+			.on('send', function(e) {
+				var $input_date = $(this);
+				
+				if(!$input_date.is('.changed')) {
+					if(e.keydown_event_caller && e.keydown_event_caller.shiftKey && e.keydown_event_caller.ctrlKey && e.keydown_event_caller.which == 13)
+						if(options.submit && typeof options.submit == 'function')
+							options.submit();
+						
+					return;
+				}
+				
+				$input_date.autocomplete('close');
+				
+				genericAjaxGet('', 'c=internal&a=handleSectionAction&section=calendars&action=parseDateJson&date=' + encodeURIComponent($input_date.val()), function(json) {
+					if(json == false) {
+						// [TODO] Color it red for failed, and display an error somewhere
+						$input_date.val('');
+					} else {
+						$input_date.val(json.to_string);
+					}
+					
+					if(e.keydown_event_caller && e.keydown_event_caller.shiftKey && e.keydown_event_caller.ctrlKey && e.keydown_event_caller.which == 13)
+						if(options.submit && typeof options.submit == 'function')
+							options.submit();
+					
+					$input_date.removeClass('changed');
+				});
+			})
+			.blur(function(e) {
+				$(this).trigger('send');
+			})
+			.keydown(function(e) {
+				$(this).addClass('changed', true);
+				
+				// If the worker hit enter and we're not showing an autocomplete menu
+				if(e.which == 13) {
+					e.preventDefault();
+
+					if($(this).is('.autocomplete_select')) {
+						$(this).removeClass('autocomplete_select');
+						return false;
+					}
+					
+					$(this).trigger({ type: 'send', 'keydown_event_caller': e });
+				}
+			})
+			;
+		
+		var $parent = $this.parent();
+		
+		if($parent.is(':visible')) {
+			var width_minus_icons = ($parent.width() - 64);
+			var width_relative = Math.floor(100 * (width_minus_icons / $parent.width()));
+			$this.css('width', width_relative + '%');
+		}
+	});
+};
 
 var cAjaxCalls = function() {
 	// [TODO] We don't really need all this
@@ -571,6 +673,9 @@ var cAjaxCalls = function() {
 		// The <ul> buffer
 		$ul = $button.next('ul.chooser-container');
 		
+		if(null == options.single)
+			options.single = false;
+		
 		// Add the container if it doesn't exist
 		if(0==$ul.length) {
 			$ul = $('<ul class="bubbles chooser-container"></ul>');
@@ -581,19 +686,23 @@ var cAjaxCalls = function() {
 		$button.click(function(event) {
 			$button = $(this);
 			$ul = $(this).nextAll('ul.chooser-container:first');
-			$chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile',null,true,'750');
+			$chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=' + (options.single ? '1' : '0'),null,true,'750');
 			$chooser.one('chooser_save', function(event) {
+				// If in single-selection mode
+				if(options.single)
+					$ul.find('li').remove();
+				
 				// Add the labels
 				for(var idx in event.labels)
 					if(0==$ul.find('input:hidden[value="'+event.values[idx]+'"]').length) {
-						$li = $('<li>'+event.labels[idx]+'<input type="hidden" name="' + field_name + '[]" value="'+event.values[idx]+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
+						$li = $('<li>'+event.labels[idx]+'<input type="hidden" name="' + field_name + (options.single ? '' : '[]') + '" value="'+event.values[idx]+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
 						if(null != options.style)
 							$li.addClass(options.style);
 						$ul.append($li);
 					}
 			});
 		});
-	}	
+	}
 }
 
 var ajax = new cAjaxCalls();

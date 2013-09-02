@@ -170,7 +170,7 @@ class CrmPage extends CerberusPageExtension {
 		$tpl->assign('workers', $workers);
 		
 		// Custom Fields
-		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_OPPORTUNITY);
+		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_OPPORTUNITY, false);
 		$tpl->assign('custom_fields', $custom_fields);
 		
 		// Groups
@@ -178,7 +178,11 @@ class CrmPage extends CerberusPageExtension {
 		$tpl->assign('groups', $groups);
 		
 		// Macros
-		$macros = DAO_TriggerEvent::getByOwner(CerberusContexts::CONTEXT_WORKER, $active_worker->id, 'event.macro.crm.opportunity');
+		
+		$macros = DAO_TriggerEvent::getReadableByActor(
+			$active_worker,
+			'event.macro.crm.opportunity'
+		);
 		$tpl->assign('macros', $macros);
 		
 		// Broadcast

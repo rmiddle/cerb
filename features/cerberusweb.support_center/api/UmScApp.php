@@ -68,39 +68,44 @@ class UmScApp extends Extension_UsermeetTool {
 	
 	const SESSION_CAPTCHA = 'write_captcha';
 	
-	private function _getModules() {
-		static $modules = null;
+	private function _getModules($visible_only=false) {
+		static $_all_modules = null;
+		static $_visible_modules = null;
 		
 		// Lazy load
-		if(null == $modules) {
+		if(null == $_all_modules) {
 			$umsession = ChPortalHelper::getSession();
 			@$active_contact = $umsession->getProperty('sc_login',null);
 			
+			$modules = DevblocksPlatform::getExtensions('usermeet.sc.controller', true);
 			@$visible_modules = unserialize(DAO_CommunityToolProperty::get(ChPortalHelper::getCode(), self::PARAM_VISIBLE_MODULES, ''));
 			
-			if(is_array($visible_modules))
-			foreach($visible_modules as $module_id => $visibility) {
-				// Disabled
-				if(0==strcmp($visibility, '2'))
-					continue;
-
-				// Must be logged in
-				if(0==strcmp($visibility, '1') && empty($active_contact))
-					continue;
-				
-				$module = DevblocksPlatform::getExtension($module_id,true,true); /* @var $module Extension_UmScController */
-				
+			foreach($modules as $module_id => $module) {  /* @var $module Extension_UmScController */
 				if(empty($module) || !$module instanceof Extension_UmScController)
 					continue;
 				
 				@$module_uri = $module->manifest->params['uri'];
+
+				$_all_modules[$module_uri] = $module;
+				
+				if(isset($visible_modules[$module_id])) {
+					$visibility = $visible_modules[$module_id];
+					
+					// Disabled
+					if(0==strcmp($visibility, '2'))
+						continue;
 	
-				if($module->isVisible())
-					$modules[$module_uri] = $module;
+					// Must be logged in
+					if(0==strcmp($visibility, '1') && empty($active_contact))
+						continue;
+					
+					if($module->isVisible())
+						$_visible_modules[$module_uri] = $module;
+				}
 			}
 		}
 		
-		return $modules;
+		return $visible_only ? $_visible_modules : $_all_modules;
 	}
 	
 	public static function getLoginExtensions() {
@@ -263,10 +268,12 @@ class UmScApp extends Extension_UsermeetTool {
 			
 			default:
 				// Build the menu
-				$modules = $this->_getModules();
+				$all_modules = $this->_getModules(false);
+				$visible_modules = $this->_getModules(true);
+				
 				$menu_modules = array();
-				if(is_array($modules))
-				foreach($modules as $uri => $module) {
+				if(is_array($visible_modules))
+				foreach($visible_modules as $uri => $module) {
 					// Must be menu renderable
 					if(!empty($module->manifest->params['menu_title']) && !empty($uri)) {
 						$menu_modules[$uri] = $module;
@@ -274,9 +281,15 @@ class UmScApp extends Extension_UsermeetTool {
 				}
 				$tpl->assign('menu', $menu_modules);
 
-				// Modules
-				if(isset($modules[$module_uri])) {
-					$controller = $modules[$module_uri];
+				// If asking for a module that requires auth, redirect to login (if enabled)
+				if(!isset($visible_modules[$module_uri]) && isset($all_modules[$module_uri]) && isset($visible_modules['login'])) {
+					$umsession->setProperty('login.original_path', implode('/',$response->path));
+					DevblocksPlatform::redirect(new DevblocksHttpResponse(array('login')));
+					
+				// Display the visible module
+				} elseif(isset($visible_modules[$module_uri])) {
+					$controller = $visible_modules[$module_uri];
+					
 				} else {
 					// First menu item
 					$controller = reset($menu_modules);
@@ -454,6 +467,8 @@ class UmScLoginAuthenticator extends Extension_ScLoginAuthenticator {
 	
 	function doRegisterConfirmAction() {
 		@$confirm = DevblocksPlatform::importGPC($_REQUEST['confirm'],'string','');
+		@$first_name = DevblocksPlatform::importGPC($_REQUEST['first_name'],'string','');
+		@$last_name = DevblocksPlatform::importGPC($_REQUEST['last_name'],'string','');
 		@$password = DevblocksPlatform::importGPC($_REQUEST['password'],'string','');
 		@$password2 = DevblocksPlatform::importGPC($_REQUEST['password2'],'string','');
 		
@@ -489,11 +504,19 @@ class UmScLoginAuthenticator extends Extension_ScLoginAuthenticator {
 			// Load the address
 			if(null == ($address = DAO_Address::lookupAddress($email, true)))
 				throw new Exception("You have provided an invalid email address.");
-				
+			
 			// Verify address is unlinked
 			if(!empty($address->contact_person_id))
 				throw new Exception("The email address you provided is already associated with an account.");
 
+			// Set a new first or last name if given
+			if($address && (!empty($first_name) || !empty($last_name))) {
+				DAO_Address::update($address->id, array(
+					DAO_Address::FIRST_NAME => $first_name ?: $address->first_name,
+					DAO_Address::LAST_NAME => $last_name ?: $address->last_name,
+				));
+			}
+			
 			// Create the contact
 			$salt = CerberusApplication::generatePassword(8);
 			$fields = array(
@@ -517,7 +540,14 @@ class UmScLoginAuthenticator extends Extension_ScLoginAuthenticator {
 			DAO_ConfirmationCode::delete($code->id);
 			
 			// Log in the session
+			
 			$umsession->login($contact);
+			
+			// Virtual Attendant events
+			
+			Event_ContactRegisteredInSupportCenter::trigger($contact_person_id, null);
+			
+			// Redirect
 			
 			$address_uri = urlencode(str_replace(array('@','.'),array('_at_','_dot_'),$address->email));
 			header("Location: " . $url_writer->write('c=account&a=email&address='.$address_uri, true));
@@ -652,7 +682,11 @@ class UmScLoginAuthenticator extends Extension_ScLoginAuthenticator {
 				throw new Exception("Login failed.");
 			
 			$umsession->login($contact);
-			header("Location: " . $url_writer->write('', true));
+			
+			$original_path = $umsession->getProperty('login.original_path', '');
+			$path = !empty($original_path) ? explode('/', $original_path) : array();
+			
+			DevblocksPlatform::redirect(new DevblocksHttpResponse($path));
 			exit;
 			
 		} catch (Exception $e) {
@@ -963,7 +997,11 @@ class ScOpenIDLoginAuthenticator extends Extension_ScLoginAuthenticator {
 					
 					if(null != ($contact = DAO_ContactPerson::get($contact_id))) {
 						$umsession->login($contact);
-						header("Location: " . $url_writer->write('', true));
+						
+						$original_path = $umsession->getProperty('login.original_path', '');
+						$path = !empty($original_path) ? explode('/', $original_path) : array();
+						
+						DevblocksPlatform::redirect(new DevblocksHttpResponse($path));
 						exit;
 						
 					} else {

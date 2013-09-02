@@ -25,6 +25,7 @@
 <table cellpadding="1" cellspacing="0" border="0" width="100%" class="worklistBody">
 
 	{* Column Headers *}
+	<thead>
 	<tr>
 		<th style="width:25px;min-width:25px;max-width:25px;"></th>
 		{foreach from=$view->view_columns item=header name=headers}
@@ -45,6 +46,7 @@
 			</th>
 		{/foreach}
 	</tr>
+	</thead>
 
 	{* Column Data *}
 	{foreach from=$data item=result key=idx name=results}
@@ -58,7 +60,7 @@
 		<tr class="{$tableRowClass}">
 			<td align="center" rowspan="2" nowrap="nowrap" style="padding:5px;"><input type="checkbox" name="row_id[]" value="{$result.al_guid}" style="display:none;"></td>
 			<td colspan="{$smarty.foreach.headers.total}">
-				<a href="{devblocks_url}c=files&p={$result.al_guid}&name={$result.a_display_name|escape:'url'}{/devblocks_url}" class="subject" target="_blank">{$result.a_display_name}</a>
+				<a href="{devblocks_url}c=files&p={$result.al_guid}&name={$result.a_display_name|escape:'url'}{/devblocks_url}" class="subject" target="_blank">{$result.a_display_name|default:'(no name)'}</a>
 			</td>
 		</tr>
 		<tr class="{$tableRowClass}">

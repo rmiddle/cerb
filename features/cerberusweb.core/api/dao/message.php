@@ -109,7 +109,7 @@ class DAO_Message extends Cerb_ORMHelper {
 			$object->storage_profile_id = $row['storage_profile_id'];
 			$object->storage_size = $row['storage_size'];
 			$object->response_time = $row['response_time'];
-			$object->is_broadcast = intval($row['response_time']);
+			$object->is_broadcast = intval($row['is_broadcast']);
 			$objects[$object->id] = $object;
 		}
 		
@@ -403,11 +403,11 @@ class DAO_Message extends Cerb_ORMHelper {
 	 * @param boolean $withCounts
 	 * @return array
 	 */
-	static function search($params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
+	static function search($columns, $params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
 		$db = DevblocksPlatform::getDatabaseService();
 
 		// Build search queries
-		$query_parts = self::getSearchQueryComponents(array(),$params,$sortBy,$sortAsc);
+		$query_parts = self::getSearchQueryComponents($columns,$params,$sortBy,$sortAsc);
 
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
@@ -1114,7 +1114,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals, I
 
 	function getData() {
 		return DAO_Message::search(
-			//$this->view_columns,
+			$this->view_columns,
 			$this->getParams(),
 			$this->renderLimit,
 			$this->renderPage,
@@ -1129,7 +1129,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals, I
 	}
 	
 	function getSubtotalFields() {
-		$all_fields = $this->getParamsAvailable();
+		$all_fields = $this->getParamsAvailable(true);
 		
 		$fields = array();
 
@@ -1677,7 +1677,7 @@ class View_Message extends C4_AbstractView implements IAbstractView_Subtotals, I
 		if(empty($ids))
 		do {
 			list($objects,$null) = DAO_Message::search(
-//			array(),
+			array(),
 			$this->getParams(),
 			100,
 			$pg++,
@@ -1750,7 +1750,22 @@ class Context_Message extends Extension_DevblocksContext {
 		);
 	}
 	
+	// [TODO] Interface
+	function getDefaultProperties() {
+		return array(
+			'ticket__label',
+			'sender__label',
+			'ticket_org__label',
+			'created',
+			'response_time',
+			'is_outgoing',
+			'storage_size',
+		);
+	}
+	
 	function getContext($message, &$token_labels, &$token_values, $prefix=null) {
+		$is_nested = $prefix ? true : false;
+		
 		if(is_null($prefix))
 			$prefix = 'Message:';
 		
@@ -1768,24 +1783,42 @@ class Context_Message extends Extension_DevblocksContext {
 		
 		// Token labels
 		$token_labels = array(
+			'_label' => $prefix,
 			'content' => $prefix.$translate->_('common.content'),
-			'created|date' => $prefix.$translate->_('common.created'),
+			'created' => $prefix.$translate->_('common.created'),
 			'is_broadcast' => $prefix.$translate->_('message.is_broadcast'),
 			'is_outgoing' => $prefix.$translate->_('message.is_outgoing'),
 			'response_time' => $prefix.$translate->_('message.response_time'),
-			'storage_size' => $prefix.$translate->_('message.storage_size').' (bytes)',
+			'storage_size' => $prefix.$translate->_('message.storage_size'),
+			'record_url' => $prefix.$translate->_('common.url.record'),
+		);
+		
+		// Token types
+		$token_types = array(
+			'_label' => 'context_url',
+			'content' => Model_CustomField::TYPE_MULTI_LINE,
+			'created' => Model_CustomField::TYPE_DATE,
+			'is_broadcast' => Model_CustomField::TYPE_CHECKBOX,
+			'is_outgoing' => Model_CustomField::TYPE_CHECKBOX,
+			'response_time' => 'time_secs',
+			'storage_size' => 'size_bytes',
+			'record_url' => Model_CustomField::TYPE_URL,
 		);
 		
 		// Token values
 		$token_values = array();
 		
 		$token_values['_context'] = CerberusContexts::CONTEXT_MESSAGE;
+		$token_values['_types'] = $token_types;
 		
 		// Message token values
 		if($message) {
+			// [TODO] Cache these in a request registry
+			$sender = DAO_Address::get($message->address_id);
+			$ticket = DAO_Ticket::get($message->ticket_id);
+			
 			$token_values['_loaded'] = true;
-			$token_values['_label'] = '(message)';
-			$token_values['content'] = $message->getContent();
+			$token_values['_label'] = sprintf("%s wrote on [%s] %s", $sender->email, $ticket->mask, $ticket->subject);
 			$token_values['created'] = $message->created_date;
 			$token_values['id'] = $message->id;
 			$token_values['is_broadcast'] = $message->is_broadcast;
@@ -1798,8 +1831,28 @@ class Context_Message extends Extension_DevblocksContext {
 			// Sender
 			@$address_id = $message->address_id;
 			$token_values['sender_id'] = $address_id;
+			
+			// URL
+			$url_writer = DevblocksPlatform::getUrlService();
+			$token_values['record_url'] = $url_writer->writeNoProxy(sprintf("c=profiles&type=ticket&id=%d/message/%d", $message->ticket_id, $message->id), true);
 		}
 
+		// Ticket (only if message is the top of the context chain)
+		if(!$is_nested) {
+			$merge_token_labels = array();
+			$merge_token_values = array();
+			CerberusContexts::getContext(CerberusContexts::CONTEXT_TICKET, null, $merge_token_labels, $merge_token_values, '', true);
+	
+			CerberusContexts::merge(
+				'ticket_',
+				'Ticket:',
+				$merge_token_labels,
+				$merge_token_values,
+				$token_labels,
+				$token_values
+			);
+		}
+		
 		// Sender
 		$merge_token_labels = array();
 		$merge_token_values = array();
@@ -1829,10 +1882,14 @@ class Context_Message extends Extension_DevblocksContext {
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
 		}
 		
 		switch($token) {
+			case 'content':
+				$values['content'] = Storage_MessageContent::get($context_id);
+				break;
+				
 			default:
 				if(substr($token,0,7) == 'custom_') {
 					$fields = $this->_lazyLoadCustomFields($context, $context_id);

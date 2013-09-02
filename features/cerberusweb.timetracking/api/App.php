@@ -481,11 +481,15 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 		$tpl->assign('activities', $activities);
 		
 		// Custom Fields
-		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TIMETRACKING);
+		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TIMETRACKING, false);
 		$tpl->assign('custom_fields', $custom_fields);
 		
 		// Macros
-		$macros = DAO_TriggerEvent::getByOwner(CerberusContexts::CONTEXT_WORKER, $active_worker->id, 'event.macro.timetracking');
+		
+		$macros = DAO_TriggerEvent::getReadableByActor(
+			$active_worker,
+			'event.macro.timetracking'
+		);
 		$tpl->assign('macros', $macros);
 		
 		$tpl->display('devblocks:cerberusweb.timetracking::timetracking/bulk.tpl');

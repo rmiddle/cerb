@@ -366,6 +366,10 @@ class DAO_CrmOpportunity extends Cerb_ORMHelper {
 				self::_searchComponentsVirtualContextLinks($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
 				break;
 			
+			case SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET:
+				self::_searchComponentsVirtualHasFieldset($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
+				break;
+				
 			case SearchFields_CrmOpportunity::VIRTUAL_WATCHERS:
 				$args['has_multiple_values'] = true;
 				self::_searchComponentsVirtualWatchers($param, $from_context, $from_index, $args['join_sql'], $args['where_sql'], $args['tables']);
@@ -463,6 +467,7 @@ class SearchFields_CrmOpportunity implements IDevblocksSearchFields {
 
 	// Virtuals
 	const VIRTUAL_CONTEXT_LINK = '*_context_link';
+	const VIRTUAL_HAS_FIELDSET = '*_has_fieldset';
 	const VIRTUAL_WATCHERS = '*_workers';
 	
 	/**
@@ -497,6 +502,7 @@ class SearchFields_CrmOpportunity implements IDevblocksSearchFields {
 			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null),
 			
 			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null),
+			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null),
 			self::VIRTUAL_WATCHERS => new DevblocksSearchField(self::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS'),
 		);
 		
@@ -505,18 +511,16 @@ class SearchFields_CrmOpportunity implements IDevblocksSearchFields {
 			$columns[self::FULLTEXT_COMMENT_CONTENT] = new DevblocksSearchField(self::FULLTEXT_COMMENT_CONTENT, 'ftcc', 'content', $translate->_('comment.filters.content'), 'FT');
 		}
 		
-		// Custom Fields: opp + addy + org
-		$fields =
-			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_OPPORTUNITY) +
-			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ADDRESS) +
-			DAO_CustomField::getByContext(CerberusContexts::CONTEXT_ORG)
-		;
+		// Custom fields with fieldsets
 		
-		if(is_array($fields))
-		foreach($fields as $field_id => $field) {
-			$key = 'cf_'.$field_id;
-			$columns[$key] = new DevblocksSearchField($key,$key,'field_value',$field->name,$field->type);
-		}
+		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array(
+			CerberusContexts::CONTEXT_OPPORTUNITY,
+			CerberusContexts::CONTEXT_ADDRESS,
+			CerberusContexts::CONTEXT_ORG,
+		));
+		
+		if(is_array($custom_columns))
+			$columns = array_merge($columns, $custom_columns);
 		
 		// Sort by label (translation-conscious)
 		DevblocksPlatform::sortObjects($columns, 'db_label');
@@ -562,6 +566,7 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 			SearchFields_CrmOpportunity::CONTEXT_LINK_ID,
 			SearchFields_CrmOpportunity::FULLTEXT_COMMENT_CONTENT,
 			SearchFields_CrmOpportunity::VIRTUAL_CONTEXT_LINK,
+			SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET,
 			SearchFields_CrmOpportunity::VIRTUAL_WATCHERS,
 		));
 		
@@ -601,7 +606,7 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 	}
 	
 	function getSubtotalFields() {
-		$all_fields = $this->getParamsAvailable();
+		$all_fields = $this->getParamsAvailable(true);
 		
 		$fields = array();
 
@@ -622,6 +627,7 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 					break;
 					
 				case SearchFields_CrmOpportunity::VIRTUAL_CONTEXT_LINK:
+				case SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET:
 				case SearchFields_CrmOpportunity::VIRTUAL_WATCHERS:
 					$pass = true;
 					break;
@@ -663,6 +669,10 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 			
 			case SearchFields_CrmOpportunity::VIRTUAL_CONTEXT_LINK:
 				$counts = $this->_getSubtotalCountForContextLinkColumn('DAO_CrmOpportunity', CerberusContexts::CONTEXT_OPPORTUNITY, $column);
+				break;
+				
+			case SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET:
+				$counts = $this->_getSubtotalCountForHasFieldsetColumn('DAO_CrmOpportunity', CerberusContexts::CONTEXT_OPPORTUNITY, $column);
 				break;
 				
 			case SearchFields_CrmOpportunity::VIRTUAL_WATCHERS:
@@ -714,6 +724,10 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 			case SearchFields_CrmOpportunity::VIRTUAL_CONTEXT_LINK:
 				$this->_renderVirtualContextLinks($param);
 				break;
+				
+			case SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET:
+				$this->_renderVirtualHasFieldset($param);
+				break;
 
 			case SearchFields_CrmOpportunity::VIRTUAL_WATCHERS:
 				$this->_renderVirtualWatchers($param);
@@ -761,6 +775,10 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 				$contexts = Extension_DevblocksContext::getAll(false);
 				$tpl->assign('contexts', $contexts);
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__context_link.tpl');
+				break;
+				
+			case SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET:
+				$this->_renderCriteriaHasFieldset($tpl, CerberusContexts::CONTEXT_OPPORTUNITY);
 				break;
 				
 			case SearchFields_CrmOpportunity::VIRTUAL_WATCHERS:
@@ -833,6 +851,11 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 			case SearchFields_CrmOpportunity::VIRTUAL_CONTEXT_LINK:
 				@$context_links = DevblocksPlatform::importGPC($_REQUEST['context_link'],'array',array());
 				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_IN,$context_links);
+				break;
+				
+			case SearchFields_CrmOpportunity::VIRTUAL_HAS_FIELDSET:
+				@$options = DevblocksPlatform::importGPC($_REQUEST['options'],'array',array());
+				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_IN,$options);
 				break;
 				
 			case SearchFields_CrmOpportunity::VIRTUAL_WATCHERS:
@@ -1082,6 +1105,16 @@ class Context_Opportunity extends Extension_DevblocksContext implements IDevbloc
 		);
 	}
 	
+	// [TODO] Interface
+	function getDefaultProperties() {
+		return array(
+			'status',
+			'email__label',
+			'created',
+			'updated',
+		);
+	}
+	
 	function getContext($opp, &$token_labels, &$token_values, $prefix=null) {
 		if(is_null($prefix))
 			$prefix = 'Opportunity:';
@@ -1100,25 +1133,39 @@ class Context_Opportunity extends Extension_DevblocksContext implements IDevbloc
 		
 		// Token labels
 		$token_labels = array(
+			'_label' => $prefix,
 			'amount' => $prefix.$translate->_('crm.opportunity.amount'),
-			'created|date' => $prefix.$translate->_('crm.opportunity.created_date'),
+			'created' => $prefix.$translate->_('crm.opportunity.created_date'),
 			'is_closed' => $prefix.$translate->_('crm.opportunity.is_closed'),
 			'is_won' => $prefix.$translate->_('crm.opportunity.is_won'),
 			'status' => $prefix.$translate->_('common.status'),
 			'title' => $prefix.$translate->_('crm.opportunity.name'),
-			'updated|date' => $prefix.$translate->_('crm.opportunity.updated_date'),
+			'updated' => $prefix.$translate->_('crm.opportunity.updated_date'),
 			'record_url' => $prefix.$translate->_('common.url.record'),
 		);
 		
-		if(is_array($fields))
-		foreach($fields as $cf_id => $field) {
-			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-		}
-
+		// Token types
+		$token_types = array(
+			'_label' => 'context_url',
+			'amount' => Model_CustomField::TYPE_NUMBER,
+			'created' => Model_CustomField::TYPE_DATE,
+			'is_closed' => Model_CustomField::TYPE_CHECKBOX,
+			'is_won' => Model_CustomField::TYPE_CHECKBOX,
+			'status' => Model_CustomField::TYPE_SINGLE_LINE,
+			'title' => Model_CustomField::TYPE_SINGLE_LINE,
+			'updated' => Model_CustomField::TYPE_DATE,
+			'record_url' => Model_CustomField::TYPE_URL,
+		);
+		
+		// Custom field/fieldset token labels
+		if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
+			$token_labels = array_merge($token_labels, $custom_field_labels);
+		
 		// Token values
 		$token_values = array();
 		
 		$token_values['_context'] = CerberusContexts::CONTEXT_OPPORTUNITY;
+		$token_values['_types'] = $token_types;
 		
 		// Opp token values
 		if($opp) {
@@ -1177,7 +1224,7 @@ class Context_Opportunity extends Extension_DevblocksContext implements IDevbloc
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
 		}
 		
 		switch($token) {
@@ -1271,7 +1318,7 @@ class Context_Opportunity extends Extension_DevblocksContext implements IDevbloc
 			}
 		}
 		
-		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_OPPORTUNITY);
+		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_OPPORTUNITY, false);
 		$tpl->assign('custom_fields', $custom_fields);
 		
 		if(!empty($context_id)) {
@@ -1336,15 +1383,8 @@ class Context_Opportunity extends Extension_DevblocksContext implements IDevbloc
 			),
 		);
 		
-		$cfields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_OPPORTUNITY);
-		
-		foreach($cfields as $cfield_id => $cfield) {
-			$keys['cf_' . $cfield_id] = array(
-				'label' => $cfield->name,
-				'type' => $cfield->type,
-				'param' => 'cf_' . $cfield_id,
-			);
-		}
+		$fields = SearchFields_CrmOpportunity::getFields();
+		self::_getImportCustomFields($fields, $keys);
 		
 		DevblocksPlatform::sortObjects($keys, '[label]', true);
 		

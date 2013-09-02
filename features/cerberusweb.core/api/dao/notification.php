@@ -332,11 +332,11 @@ class DAO_Notification extends DevblocksORMHelper {
 	 * @param boolean $withCounts
 	 * @return array
 	 */
-	static function search($params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
+	static function search($columns, $params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
 		$db = DevblocksPlatform::getDatabaseService();
 
 		// Build search queries
-		$query_parts = self::getSearchQueryComponents(array(),$params,$sortBy,$sortAsc);
+		$query_parts = self::getSearchQueryComponents($columns,$params,$sortBy,$sortAsc);
 
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
@@ -494,6 +494,7 @@ class View_Notification extends C4_AbstractView implements IAbstractView_Subtota
 
 	function getData() {
 		$objects = DAO_Notification::search(
+			$this->view_columns,
 			$this->getParams(),
 			$this->renderLimit,
 			$this->renderPage,
@@ -513,7 +514,7 @@ class View_Notification extends C4_AbstractView implements IAbstractView_Subtota
 	}
 	
 	function getSubtotalFields() {
-		$all_fields = $this->getParamsAvailable();
+		$all_fields = $this->getParamsAvailable(true);
 		
 		$fields = array();
 
@@ -712,7 +713,7 @@ class View_Notification extends C4_AbstractView implements IAbstractView_Subtota
 		if(empty($ids))
 		do {
 			list($objects,$null) = DAO_Notification::search(
-				//array(),
+				array(),
 				$this->getParams(),
 				100,
 				$pg++,
@@ -792,6 +793,17 @@ class Context_Notification extends Extension_DevblocksContext {
 		);
 	}
 	
+	// [TODO] Interface
+	function getDefaultProperties() {
+		return array(
+			'assignee__label',
+			'target__label',
+			'created',
+			'is_read',
+			'url',
+		);
+	}
+	
 	function getContext($notification, &$token_labels, &$token_values, $prefix=null) {
 		if(is_null($prefix))
 			$prefix = 'Notification:';
@@ -811,24 +823,35 @@ class Context_Notification extends Extension_DevblocksContext {
 		
 		// Token labels
 		$token_labels = array(
+			'_label' => $prefix,
 			'id' => $prefix.$translate->_('common.id'),
-			'context' => $prefix.$translate->_('common.context'),
-			'context_id' => $prefix.$translate->_('common.context_id'),
-			'created|date' => $prefix.$translate->_('common.created'),
+			'created' => $prefix.$translate->_('common.created'),
 			'message' => $prefix.'message',
 			'is_read' => $prefix.'is read',
+			'target__label' => $prefix.$translate->_('common.target'),
 			'url' => $prefix.$translate->_('common.url'),
 		);
 		
-		if(is_array($fields))
-		foreach($fields as $cf_id => $field) {
-			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-		}
-
+		// Token types
+		$token_types = array(
+			'_label' => 'context_url',
+			'id' => Model_CustomField::TYPE_NUMBER,
+			'created' => Model_CustomField::TYPE_DATE,
+			'message' => Model_CustomField::TYPE_MULTI_LINE,
+			'is_read' => Model_CustomField::TYPE_CHECKBOX,
+			'target__label' => 'context_url',
+			'url' => Model_CustomField::TYPE_URL,
+		);
+		
+		// Custom field/fieldset token labels
+		if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
+			$token_labels = array_merge($token_labels, $custom_field_labels);
+		
 		// Token values
 		$token_values = array();
 		
 		$token_values['_context'] = CerberusContexts::CONTEXT_NOTIFICATION;
+		$token_values['_types'] = $token_types;
 		
 		if($notification) {
 			$token_values['_loaded'] = true;
@@ -840,6 +863,9 @@ class Context_Notification extends Extension_DevblocksContext {
 			$token_values['message'] = $notification->message;
 			$token_values['is_read'] = $notification->is_read;
 			$token_values['url'] = $notification->url; //$notification->getURL();
+			
+			$token_values['target__context'] = $notification->context;
+			$token_values['target_id'] = $notification->context_id;
 			
 			$redirect_url = $url_writer->writeNoProxy(sprintf("c=preferences&a=redirectRead&id=%d", $notification->id), true);
 			$token_values['url_markread'] = $redirect_url;
@@ -878,7 +904,7 @@ class Context_Notification extends Extension_DevblocksContext {
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
 		}
 		
 		switch($token) {

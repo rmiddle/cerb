@@ -91,7 +91,7 @@ class DAO_Worker extends Cerb_ORMHelper {
 			if(!isset($workers_to_sessions[$worker->id]))
 				$workers_to_sessions[$worker->id] = array();
 			
-			$workers_to_sessions[$worker->id][$key] = $data;
+			$workers_to_sessions[$worker->id][$key] = $session_data;
 		}
 		
 		// Sort workers by idle time (newest first)
@@ -238,6 +238,28 @@ class DAO_Worker extends Cerb_ORMHelper {
 			return $id;
 		
 		return null;
+	}
+	
+	static function getByString($string) {
+		$workers = DAO_Worker::getAllActive();
+		$patterns = DevblocksPlatform::parseCsvString($string);
+		
+		$results = array();
+		
+		foreach($patterns as $pattern) {
+			foreach($workers as $worker_id => $worker) {
+				$worker_name = $worker->getName();
+			
+				if(isset($results[$worker_id]))
+					continue;
+				
+				if(false !== stristr($worker_name, $pattern)) {
+					$results[$worker_id] = $worker;
+				}
+			}
+		}
+
+		return $results;
 	}
 	
 	static function update($ids, $fields, $option_bits=0) {
@@ -558,6 +580,10 @@ class DAO_Worker extends Cerb_ORMHelper {
 				$args['has_multiple_values'] = true;
 				self::_searchComponentsVirtualContextLinks($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
 				break;
+				
+			case SearchFields_Worker::VIRTUAL_HAS_FIELDSET:
+				self::_searchComponentsVirtualHasFieldset($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
+				break;
 			
 			case SearchFields_Worker::VIRTUAL_GROUPS:
 				$args['has_multiple_values'] = true;
@@ -574,16 +600,51 @@ class DAO_Worker extends Cerb_ORMHelper {
 			case SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY:
 				if(!is_array($param->value) || count($param->value) != 3)
 					break;
+
+				$from = $param->value[0];
+				$to = $param->value[1];
+				$is_available = !empty($param->value[2]);
+				
+				// [TODO] Load all worker availability calendars
+				
+				$workers = DAO_Worker::getAllActive();
+				$results = array();
+				
+				foreach($workers as $worker_id => $worker) {
+					@$availability_calendar_id = DAO_WorkerPref::get($worker->id, 'availability_calendar_id', 0);
 					
-				$args['where_sql'] .= sprintf("AND (SELECT IF(COUNT(id) = SUM(is_available) && COUNT(id) > 0,1,0) AS num_available ".
-					"FROM calendar_event ".
-					"WHERE date_start <= %d AND date_end >= %d ".
-					"AND owner_context = %s AND owner_context_id = w.id) %s 0 ",
-					strtotime($param->value[1]),
-					strtotime($param->value[0]),
-					Cerb_ORMHelper::qstr('cerberusweb.contexts.worker'),
-					(!empty($param->value[2]) ? '!=' : '=')
-				);
+					if(empty($availability_calendar_id)) {
+						if(!$is_available)
+							$results[] = $worker_id;
+						continue;
+					}
+					
+					if(false == ($calendar = DAO_Calendar::get($availability_calendar_id))) {
+						if(!$is_available)
+							$results[] = $worker_id;
+						continue;
+					}
+					
+					@$cal_from = strtotime("today", strtotime($from));
+					@$cal_to = strtotime("tomorrow", strtotime($to));
+					
+					// [TODO] Cache!!
+					$calendar_events = $calendar->getEvents($cal_from, $cal_to);
+					$availability = $calendar->computeAvailability($cal_from, $cal_to, $calendar_events);
+					
+					$pass = $availability->isAvailableBetween(strtotime($from), strtotime($to));
+					
+					if($pass == $is_available) {
+						$results[] = $worker_id;
+						continue;
+					}
+				}
+				
+				if(empty($results))
+					$results[] = '-1';
+				
+				$args['where_sql'] .= sprintf("AND w.id IN (%s) ", implode($results));
+				
 				break;
 		}
 	}
@@ -705,6 +766,7 @@ class SearchFields_Worker implements IDevblocksSearchFields {
 	
 	const VIRTUAL_CONTEXT_LINK = '*_context_link';
 	const VIRTUAL_GROUPS = '*_groups';
+	const VIRTUAL_HAS_FIELDSET = '*_has_fieldset';
 	const VIRTUAL_CALENDAR_AVAILABILITY = '*_calendar_availability';
 	
 	const CONTEXT_LINK = 'cl_context_from';
@@ -733,17 +795,18 @@ class SearchFields_Worker implements IDevblocksSearchFields {
 
 			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null),
 			self::VIRTUAL_GROUPS => new DevblocksSearchField(self::VIRTUAL_GROUPS, '*', 'groups', $translate->_('common.groups')),
+			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null),
 			self::VIRTUAL_CALENDAR_AVAILABILITY => new DevblocksSearchField(self::VIRTUAL_CALENDAR_AVAILABILITY, '*', 'calendar_availability', 'Calendar Availability'),
 		);
-		
-		// Custom Fields
-		$fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_WORKER);
 
-		if(is_array($fields))
-		foreach($fields as $field_id => $field) {
-			$key = 'cf_'.$field_id;
-			$columns[$key] = new DevblocksSearchField($key,$key,'field_value',$field->name,$field->type);
-		}
+		// Custom fields with fieldsets
+		
+		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(
+			CerberusContexts::CONTEXT_WORKER
+		);
+		
+		if(is_array($custom_columns))
+			$columns = array_merge($columns, $custom_columns);
 		
 		// Sort by label (translation-conscious)
 		DevblocksPlatform::sortObjects($columns, 'db_label');
@@ -829,6 +892,15 @@ class Model_Worker {
 		return true;
 	}
 	
+	function isRoleMember($role_id) {
+		$roles = $this->getRoles();
+		
+		if(isset($roles[$role_id]))
+			return true;
+		
+		return false;
+	}
+	
 	function getName($reverse=false) {
 		if(!$reverse) {
 			$name = sprintf("%s%s%s",
@@ -891,6 +963,7 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 			SearchFields_Worker::CONTEXT_LINK_ID,
 			SearchFields_Worker::VIRTUAL_CONTEXT_LINK,
 			SearchFields_Worker::VIRTUAL_GROUPS,
+			SearchFields_Worker::VIRTUAL_HAS_FIELDSET,
 		));
 		
 		$this->addParamsHidden(array(
@@ -924,7 +997,7 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 	}
 	
 	function getSubtotalFields() {
-		$all_fields = $this->getParamsAvailable();
+		$all_fields = $this->getParamsAvailable(true);
 		
 		$fields = array();
 
@@ -943,6 +1016,7 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 					break;
 					
 				case SearchFields_Worker::VIRTUAL_CONTEXT_LINK:
+				case SearchFields_Worker::VIRTUAL_HAS_FIELDSET:
 					$pass = true;
 					break;
 					
@@ -981,6 +1055,10 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 			
 			case SearchFields_Worker::VIRTUAL_CONTEXT_LINK:
 				$counts = $this->_getSubtotalCountForContextLinkColumn('DAO_Worker', CerberusContexts::CONTEXT_WORKER, $column);
+				break;
+				
+			case SearchFields_Worker::VIRTUAL_HAS_FIELDSET:
+				$counts = $this->_getSubtotalCountForHasFieldsetColumn('DAO_Worker', CerberusContexts::CONTEXT_WORKER, $column);
 				break;
 				
 			default:
@@ -1046,6 +1124,10 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 				}
 				break;
 				
+			case SearchFields_Worker::VIRTUAL_HAS_FIELDSET:
+				$this->_renderVirtualHasFieldset($param);
+				break;
+				
 			case SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY:
 				if(!is_array($param->value) || count($param->value) != 3)
 					break;
@@ -1088,6 +1170,10 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 				
 			case SearchFields_Worker::VIRTUAL_GROUPS:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__context_group.tpl');
+				break;
+				
+			case SearchFields_Worker::VIRTUAL_HAS_FIELDSET:
+				$this->_renderCriteriaHasFieldset($tpl, CerberusContexts::CONTEXT_WORKER);
 				break;
 				
 			case SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY:
@@ -1145,6 +1231,13 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 				$criteria = new DevblocksSearchCriteria($field,$oper,$bool);
 				break;
 				
+			case SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY:
+				@$from = DevblocksPlatform::importGPC($_REQUEST['from'],'string','now');
+				@$to = DevblocksPlatform::importGPC($_REQUEST['to'],'string','now');
+				@$is_available = DevblocksPlatform::importGPC($_REQUEST['is_available'],'integer',0);
+				$criteria = new DevblocksSearchCriteria($field,null,array($from,$to,$is_available));
+				break;
+				
 			case SearchFields_Worker::VIRTUAL_CONTEXT_LINK:
 				@$context_links = DevblocksPlatform::importGPC($_REQUEST['context_link'],'array',array());
 				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_IN,$context_links);
@@ -1155,11 +1248,9 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals {
 				$criteria = new DevblocksSearchCriteria($field,'in', $group_ids);
 				break;
 				
-			case SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY:
-				@$from = DevblocksPlatform::importGPC($_REQUEST['from'],'string','now');
-				@$to = DevblocksPlatform::importGPC($_REQUEST['to'],'string','now');
-				@$is_available = DevblocksPlatform::importGPC($_REQUEST['is_available'],'integer',0);
-				$criteria = new DevblocksSearchCriteria($field,null,array($from,$to,$is_available));
+			case SearchFields_Worker::VIRTUAL_HAS_FIELDSET:
+				@$options = DevblocksPlatform::importGPC($_REQUEST['options'],'array',array());
+				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_IN,$options);
 				break;
 				
 			default:
@@ -1254,6 +1345,29 @@ class DAO_WorkerPref extends DevblocksORMHelper {
 		// Invalidate cache
 		$cache = DevblocksPlatform::getCacheService();
 		$cache->remove(self::CACHE_PREFIX.$worker_id);
+	}
+	
+	static function deleteByKeyValues($key, $values) {
+		if(!is_array($values))
+			$values = array($values);
+		
+		$values = DevblocksPlatform::sanitizeArray($values, 'integer', array('nonzero','unique'));
+		
+		if(empty($values))
+			return;
+		
+		$db = DevblocksPlatform::getDatabaseService();
+
+		$results = $db->GetArray(sprintf("SELECT worker_id FROM worker_pref WHERE setting = %s AND value IN (%s)",
+			$db->qstr($key),
+			implode(',', $values)
+		));
+		
+		if(!empty($results))
+		foreach($results as $result)
+			self::delete($result['worker_id'], 'availability_calendar_id');
+		
+		return true;
 	}
 	
 	static function set($worker_id, $key, $value) {
@@ -1355,6 +1469,19 @@ class Context_Worker extends Extension_DevblocksContext {
 		);
 	}
 	
+	// [TODO] Interface
+	function getDefaultProperties() {
+		return array(
+			'full_name',
+			'title',
+			'address__label',
+			'address_org__label',
+			'is_disabled',
+			'is_superuser',
+			'last_activity_date',
+		);
+	}
+	
 	function getContext($worker, &$token_labels, &$token_values, $prefix=null) {
 		if(is_null($prefix))
 			$prefix = 'Worker:';
@@ -1373,36 +1500,53 @@ class Context_Worker extends Extension_DevblocksContext {
 			
 		// Token labels
 		$token_labels = array(
+			'_label' => $prefix,
 			'first_name' => $prefix.$translate->_('worker.first_name'),
 			'full_name' => $prefix.$translate->_('worker.full_name'),
+			'is_disabled' => $prefix.$translate->_('common.disabled'),
+			'is_superuser' => $prefix.$translate->_('worker.is_superuser'),
 			'last_name' => $prefix.$translate->_('worker.last_name'),
+			'last_activity_date' => $prefix.$translate->_('worker.last_activity_date'),
 			'title' => $prefix.$translate->_('worker.title'),
 			'record_url' => $prefix.$translate->_('common.url.record'),
 		);
 		
-		if(is_array($fields))
-		foreach($fields as $cf_id => $field) {
-			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-		}
-
+		// Token types
+		$token_types = array(
+			'_label' => 'context_url',
+			'first_name' => Model_CustomField::TYPE_SINGLE_LINE,
+			'full_name' => Model_CustomField::TYPE_SINGLE_LINE,
+			'is_disabled' => Model_CustomField::TYPE_CHECKBOX,
+			'is_superuser' => Model_CustomField::TYPE_CHECKBOX,
+			'last_name' => Model_CustomField::TYPE_SINGLE_LINE,
+			'last_activity_date' => Model_CustomField::TYPE_DATE,
+			'title' => Model_CustomField::TYPE_SINGLE_LINE,
+			'record_url' => Model_CustomField::TYPE_URL,
+		);
+		
+		// Custom field/fieldset token labels
+		if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
+			$token_labels = array_merge($token_labels, $custom_field_labels);
+		
 		// Token values
 		$token_values = array();
 		
 		// Context for lazy-loading
 		$token_values['_context'] = CerberusContexts::CONTEXT_WORKER;
+		$token_values['_types'] = $token_types;
 		
 		// Worker token values
 		if(null != $worker) {
 			$token_values['_loaded'] = true;
 			$token_values['_label'] = $worker->getName();
 			$token_values['id'] = $worker->id;
+			$token_values['first_name'] = $worker->first_name;
 			$token_values['full_name'] = $worker->getName();
-			if(!empty($worker->first_name))
-				$token_values['first_name'] = $worker->first_name;
-			if(!empty($worker->last_name))
-				$token_values['last_name'] = $worker->last_name;
-			if(!empty($worker->title))
-				$token_values['title'] = $worker->title;
+			$token_values['is_disabled'] = $worker->is_disabled;
+			$token_values['is_superuser'] = $worker->is_superuser;
+			$token_values['last_name'] = $worker->last_name;
+			$token_values['last_activity_date'] = $worker->last_activity_date;
+			$token_values['title'] = $worker->title;
 
 			// URL
 			$url_writer = DevblocksPlatform::getUrlService();

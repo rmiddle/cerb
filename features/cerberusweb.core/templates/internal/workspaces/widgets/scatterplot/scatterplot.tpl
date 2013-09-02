@@ -20,10 +20,13 @@
 </div>
 
 <script type="text/javascript">
+$(function() {
 try {
 	$widget = $('#widget{$widget->id}');
 	width = $widget.width();
-	$widget.find('canvas').attr('width', width);
+	
+	if(width > 0)
+		$widget.find('canvas').attr('width', width);
 	
 	var options = {
 		axes_independent: {if !empty($widget->params.axes_independent)}true{else}false{/if},
@@ -40,7 +43,7 @@ try {
 		]
 	};
 	
-	drawScatterplot($('#widget{$widget->id}_canvas'), options);
+	$('#widget{$widget->id}_canvas').devblocksCharts('scatterplot', options);
 	
 	$('#widget{$widget->id}_axes_canvas')
 		.data('model', options)
@@ -140,8 +143,8 @@ try {
 				if(null == series || null == series.data)
 					continue;
 
-				xaxis_tick = chart_width / stat.x_range;
-				yaxis_tick = chart_height / stat.y_range;
+				xaxis_tick = (stat.x_range != 0) ? (chart_width / stat.x_range) : chart_width;
+				yaxis_tick = (stat.y_range != 0) ? (chart_height / stat.y_range) : chart_height;
 				
 				plots[series_idx] = [];
 				
@@ -236,4 +239,5 @@ try {
 		;
 } catch(e) {
 }
+});
 </script>

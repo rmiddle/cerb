@@ -1,6 +1,6 @@
 <div class="block reply_frame" style="width:98%;margin:10px;">
 
-<form id="reply{$message->id}_part1">
+<form id="reply{$message->id}_part1" onsubmit="return false;">
 <table cellpadding="2" cellspacing="0" border="0" width="100%">
 	<tr>
 		<td><h2 style="color:rgb(50,50,50);">{if $is_forward}{$translate->_('display.ui.forward')|capitalize}{else}{$translate->_('display.ui.reply')|capitalize}{/if}</h2></td>
@@ -70,35 +70,49 @@
 					
 					{* Virtual Attendants *}
 					{if !empty($macros)}
-					<button type="button" title="(Ctrl+Shift+B)" class="split-left" onclick="$(this).next('button').click();"><span class="cerb-sprite2 sprite-robot"></span> Virtual Attendant</button><!--  
+					<button type="button" title="(Ctrl+Shift+B)" class="split-left" onclick="$(this).next('button').click();"><span class="cerb-sprite2 sprite-robot"></span> Virtual Attendants</button><!--  
 					--><button type="button" title="(Ctrl+Shift+B)" class="split-right" id="btnReplyMacros{$message->id}"><span class="cerb-sprite sprite-arrow-down-white"></span></button>
 					<ul class="cerb-popupmenu cerb-float" id="menuReplyMacros{$message->id}">
 						<li style="background:none;">
 							<input type="text" size="32" class="input_search filter">
 						</li>
-						{foreach from=$macros item=macro key=macro_id}
-						{$owner_ctx = Extension_DevblocksContext::get($macro->owner_context)}
-						<li class="item">
-							<div>
-								{if $macro->has_public_vars}
-								<a href="javascript:;" onclick="genericAjaxPopup('peek','c=display&a=showMacroReplyPopup&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}',$(this).closest('ul').get(),false,'400');$(this).closest('ul.cerb-popupmenu').hide();">
-								{else}
-								<a href="javascript:;" onclick="genericAjaxGet('','c=display&a=getMacroReply&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}', function(js) { $script=$('<div></div>').html(js); $('BODY').append($script); });$(this).closest('ul.cerb-popupmenu').hide();">
-								{/if}
-									{if !empty($macro->title)}
-										{$macro->title}
+						
+						{$vas = DAO_VirtualAttendant::getAll()}
+						
+						{foreach from=$vas item=va}
+							{capture name=behaviors}
+							{foreach from=$macros item=macro key=macro_id}
+							{if $macro->virtual_attendant_id == $va->id}
+							<li class="item item-behavior">
+								<div style="margin-left:10px;">
+									{if $macro->has_public_vars}
+									<a href="javascript:;" onclick="genericAjaxPopup('peek','c=display&a=showMacroReplyPopup&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}',$(this).closest('ul').get(),false,'400');$(this).closest('ul.cerb-popupmenu').hide();">
 									{else}
-										{$event = DevblocksPlatform::getExtension($macro->event_point, false)}
-										{$event->name}
+									<a href="javascript:;" onclick="genericAjaxGet('','c=display&a=getMacroReply&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}', function(js) { $script=$('<div></div>').html(js); $('BODY').append($script); });$(this).closest('ul.cerb-popupmenu').hide();">
 									{/if}
-								</a>
-							</div>
-							<div style="margin-left:10px;">
-								{$meta = $owner_ctx->getMeta($macro->owner_context_id)}
-								{$meta.name} ({$owner_ctx->manifest->name})
-							</div>
-						</li>
+										{if !empty($macro->title)}
+											{$macro->title}
+										{else}
+											{$event = DevblocksPlatform::getExtension($macro->event_point, false)}
+											{$event->name}
+										{/if}
+									</a>
+								</div
+							</li>
+							{/if}
+							{/foreach}
+							{/capture}
+							
+							{if strlen(trim($smarty.capture.behaviors))}
+							<li class="item-va">
+								<div>
+									<a href="javascript:;" style="color:black;" tabindex="-1">{$va->name}</a>
+								</div>
+							</li>
+							{$smarty.capture.behaviors nofilter}
+							{/if}
 						{/foreach}
+						
 					</ul>
 					{/if}
 					
@@ -222,29 +236,33 @@
 			<fieldset class="peek">
 				<legend>{'common.properties'|devblocks_translate|capitalize}</legend>
 				
-				<table cellpadding="2" cellspacing="0" border="0">
+				<table cellpadding="2" cellspacing="0" border="0" id="replyStatus{$message->id}">
 					<tr>
-						<td nowrap="nowrap" valign="top" colspan="2">
+						<td nowrap="nowrap" valign="top">
 							<div style="margin-bottom:10px;">
 								{include file="devblocks:cerberusweb.core::internal/watchers/context_follow_button.tpl" object_watchers=$object_watchers context=CerberusContexts::CONTEXT_TICKET context_id=$ticket->id full=true}
 							</div>
 							
-							<label><input type="radio" name="closed" value="0" class="status_open" onclick="toggleDiv('replyOpen{$message->id}','block');toggleDiv('replyClosed{$message->id}','none');" {if (empty($draft) && 'open'==$mail_status_reply) || $draft->params.closed==0}checked="checked"{/if}>{$translate->_('status.open')|capitalize}</label>
-							<label><input type="radio" name="closed" value="2" class="status_waiting" onclick="toggleDiv('replyOpen{$message->id}','block');toggleDiv('replyClosed{$message->id}','block');" {if (empty($draft) && 'waiting'==$mail_status_reply) || $draft->params.closed==2}checked="checked"{/if}>{$translate->_('status.waiting')|capitalize}</label>
-							{if $active_worker->hasPriv('core.ticket.actions.close') || ($ticket->is_closed && !$ticket->is_deleted)}<label><input type="radio" name="closed" value="1" class="status_closed" onclick="toggleDiv('replyOpen{$message->id}','none');toggleDiv('replyClosed{$message->id}','block');" {if (empty($draft) && 'closed'==$mail_status_reply) || $draft->params.closed==1}checked="checked"{/if}>{$translate->_('status.closed')|capitalize}</label>{/if}
-							<br>
+							<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+O)"{/if}><input type="radio" name="closed" value="0" class="status_open" onclick="toggleDiv('replyOpen{$message->id}','block');toggleDiv('replyClosed{$message->id}','none');" {if (empty($draft) && 'open'==$mail_status_reply) || $draft->params.closed==0}checked="checked"{/if}>{$translate->_('status.open')|capitalize}</label>
+							<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+W)"{/if}><input type="radio" name="closed" value="2" class="status_waiting" onclick="toggleDiv('replyOpen{$message->id}','block');toggleDiv('replyClosed{$message->id}','block');" {if (empty($draft) && 'waiting'==$mail_status_reply) || $draft->params.closed==2}checked="checked"{/if}>{$translate->_('status.waiting')|capitalize}</label>
+							{if $active_worker->hasPriv('core.ticket.actions.close') || ($ticket->is_closed && !$ticket->is_deleted)}<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+C)"{/if}><input type="radio" name="closed" value="1" class="status_closed" onclick="toggleDiv('replyOpen{$message->id}','none');toggleDiv('replyClosed{$message->id}','block');" {if (empty($draft) && 'closed'==$mail_status_reply) || $draft->params.closed==1}checked="checked"{/if}>{$translate->_('status.closed')|capitalize}</label>{/if}
 							<br>
 							
-							<div id="replyClosed{$message->id}" style="display:{if (empty($draft) && 'open'==$mail_status_reply) || (!empty($draft) && $draft->params.closed==0)}none{else}block{/if};margin-left:10px;margin-bottom:10px;">
+							<div id="replyClosed{$message->id}" style="display:{if (empty($draft) && 'open'==$mail_status_reply) || (!empty($draft) && $draft->params.closed==0)}none{else}block{/if};margin:10px 0px 0px 20px;">
 							<b>{$translate->_('display.reply.next.resume')}</b> {$translate->_('display.reply.next.resume_eg')}<br> 
 							<input type="text" name="ticket_reopen" size="55" value="{if !empty($draft)}{$draft->params.ticket_reopen}{elseif !empty($ticket->reopen_at)}{$ticket->reopen_at|devblocks_date}{/if}"><br>
 							{$translate->_('display.reply.next.resume_blank')}<br>
 							</div>
 							
+							<div style="margin-bottom:10px;"></div>
+							
 							{if $active_worker->hasPriv('core.ticket.actions.move')}
-							<b>{$translate->_('display.reply.next.move')}</b><br>  
+							<b>{$translate->_('display.reply.next.move')}</b>
+							<br>
 							<select name="bucket_id">
-								<option value="">-- {$translate->_('display.reply.next.move.no_thanks')|lower} --</option>
+								{$ticket_group_id = $ticket->group_id}
+								{$ticket_bucket_id = $ticket->bucket_id}
+								<option value="">-- No, leave it in the <b>{if $ticket_bucket_id}{$group_buckets.{$ticket_group_id}.{$ticket_bucket_id}->name} bucket{else}{'common.inbox'|devblocks_translate|lower}{/if}</b> of <b>{$groups.{$ticket_group_id}->name}</b> --</option>
 								{if empty($ticket->bucket_id)}{assign var=t_or_c value="t"}{else}{assign var=t_or_c value="c"}{/if}
 								<optgroup label="{$translate->_('common.inboxes')|capitalize}">
 								{foreach from=$groups item=group}
@@ -275,35 +293,36 @@
 							<button type="button" onclick="$(this).prev('select[name=owner_id]').val('{$active_worker->id}');">{'common.me'|devblocks_translate|lower}</button>
 							<button type="button" onclick="$(this).prevAll('select[name=owner_id]').first().val('');">{'common.nobody'|devblocks_translate|lower}</button>
 							<br>
-							<br>
 						</td>
 					</tr>
 				</table>
 			</fieldset>
-			
-			{if !empty($custom_fields) || !empty($group_fields)}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<div id="replyCustomFields{$message->id}" class="reply-custom-fields">
+			{if !empty($custom_fields)}
 			<fieldset class="peek">
 				<legend>{'common.custom_fields'|devblocks_translate|capitalize}</legend>
 				
-				{if !empty($draft) && !empty($draft->params.custom_fields)}
-					{$custom_field_values = $draft->params.custom_fields}
-				{/if}
-				
-				<div id="compose_cfields" style="margin:5px 0px 0px 10px;">
-					<div class="global">
-						{include file="devblocks:cerberusweb.core::internal/custom_fields/bulk/form.tpl" bulk=false}
-					</div>
-					<div class="group">
-						{include file="devblocks:cerberusweb.core::internal/custom_fields/bulk/form.tpl" custom_fields=$group_fields bulk=false}
-					</div>
-				</div>
+				<table cellpadding="2" cellspacing="0" border="0">
+					<tr>
+						<td nowrap="nowrap" valign="top">
+							{include file="devblocks:cerberusweb.core::internal/custom_fields/bulk/form.tpl" bulk=true}
+						</td>
+					</tr>
+				</table>
 			</fieldset>
 			{/if}
+			
+			{include file="devblocks:cerberusweb.core::internal/custom_fieldsets/peek_custom_fieldsets.tpl" context=CerberusContexts::CONTEXT_TICKET context_id=$ticket->id bulk=true}
+			</div>
 		</td>
 	</tr>
 	<tr>
 		<td id="reply{$message->id}_buttons">
-			<button type="button" class="send split-left" onclick="$(this).closest('td').find('ul li:first a').click();"><span class="cerb-sprite2 sprite-tick-circle"></span> {if $is_forward}{$translate->_('display.ui.forward')|capitalize}{else}{$translate->_('display.ui.send_message')}{/if}</button><!--
+			<button type="button" class="send split-left" onclick="$(this).closest('td').find('ul li:first a').click();" title="{if $pref_keyboard_shortcuts}(Ctrl+Shift+Enter){/if}"><span class="cerb-sprite2 sprite-tick-circle"></span> {if $is_forward}{$translate->_('display.ui.forward')|capitalize}{else}{$translate->_('display.ui.send_message')}{/if}</button><!--
 			--><button type="button" class="split-right" onclick="$(this).next('ul').toggle();"><span class="cerb-sprite sprite-arrow-down-white"></span></button>
 			<ul class="cerb-popupmenu cerb-float" style="margin-top:-5px;">
 				<li><a href="javascript:;" class="send">{if $is_forward}{$translate->_('display.ui.forward')}{else}{$translate->_('display.ui.send_message')}{/if}</a></li>
@@ -326,6 +345,15 @@
 		$frm = $('#reply{$message->id}_part1');
 		$frm2 = $('#reply{$message->id}_part2');
 		
+		// Disable ENTER submission on the FORM text input
+		$frm2
+			.find('input:text')
+			.keydown(function(e) {
+				if(e.which == 13)
+					e.preventDefault();
+			})
+			;
+		
 		// Autocompletes
 		ajax.emailAutoComplete('#reply{$message->id}_part1 input[name=to]', { multiple: true } );
 		ajax.emailAutoComplete('#reply{$message->id}_part1 input[name=cc]', { multiple: true } );
@@ -345,6 +373,13 @@
 		{if empty($mail_reply_textbox_size_inelastic)}
 		$content.elastic();
 		{/if}
+		
+		$frm2.find('input[name=ticket_reopen]')
+			.cerbDateInputHelper({
+				submit: function(e) {
+					$('#reply{$message->id}_buttons a.send').click();
+				}
+			})
 		
 		// Insert suggested on click
 		$('#reply{$message->id}_suggested').find('a.suggested').click(function(e) {
@@ -554,6 +589,50 @@
 				return;
 			
 			switch(event.which) {
+				case 13: // (RETURN) Send message
+					try {
+						event.preventDefault();
+						$('#reply{$message->id}_buttons a.send').click();
+					} catch(ex) { } 
+					break;
+				case 67: // (C) Set closed + focus reopen
+				case 79: // (O) Set open
+				case 87: // (W) Set waiting + focus reopen
+					try {
+						event.preventDefault();
+						
+						var $reply_status = $('#replyStatus{$message->id}');
+						var $radio = $reply_status.find('input:radio[name=closed]');
+						
+						switch(event.which) {
+							case 67: // closed
+								$radio.filter('.status_closed').click();
+								$reply_status
+									.find('input:text[name=ticket_reopen]')
+										.select()
+										.focus()
+									;
+								break;
+							case 79: // open
+								$radio.filter('.status_open').click();
+								$reply_status
+									.find('select[name=bucket_id]')
+										.select()
+										.focus()
+									;
+								break;
+							case 87: // waiting
+								$radio.filter('.status_waiting').click();
+								$reply_status
+									.find('input:text[name=ticket_reopen]')
+										.select()
+										.focus()
+									;
+								break;
+						}
+						
+					} catch(ex) {}
+					break;
 				case 71: // (G) Insert Signature
 					try {
 						event.preventDefault();

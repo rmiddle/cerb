@@ -5,13 +5,13 @@
 	<description>This plugin demonstrates how to create a new community portal.</description>
 	<author>Webgroup Media, LLC.</author>
 	<version>0.0.1</version>
-	<link>http://www.cerb5.com/</link>
+	<link>http://www.cerbweb.com/</link>
 	<!--<image>plugin.png</image>-->
  
  	<!-- Requirements -->
 
 	<requires>
-		<app_version min="6.3" max="6.3.99" />
+		<app_version min="6.5" max="6.5.99" />
 		<!--<php_extension name="curl" />-->
 	</requires>
  

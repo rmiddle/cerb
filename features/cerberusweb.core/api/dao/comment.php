@@ -24,13 +24,22 @@ class DAO_Comment extends Cerb_ORMHelper {
 	const OWNER_CONTEXT_ID = 'owner_context_id';
 	const COMMENT = 'comment';
 
-	static function create($fields, $also_notify_worker_ids=array()) {
+	static function create($fields, $also_notify_worker_ids=array(), $file_ids=array()) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
 		$db->Execute("INSERT INTO comment () VALUES ()");
 		$id = $db->LastInsertId();
 		
 		self::update($id, $fields);
+		
+		/*
+		 * Attachments
+		 */
+		
+		if(!empty($file_ids))
+		foreach($file_ids as $file_id) {
+			DAO_AttachmentLink::create(intval($file_id), CerberusContexts::CONTEXT_COMMENT, $id);
+		}
 		
 		/*
 		 * Log the activity of a new comment being created
@@ -415,15 +424,6 @@ class SearchFields_Comment implements IDevblocksSearchFields {
 			self::COMMENT => new DevblocksSearchField(self::COMMENT, 'comment', 'comment', $translate->_('common.comment')),
 		);
 		
-		// Custom Fields
-		//$fields = DAO_CustomField::getByContext(CerberusContexts::XXX);
-
-		//if(is_array($fields))
-		//foreach($fields as $field_id => $field) {
-		//	$key = 'cf_'.$field_id;
-		//	$columns[$key] = new DevblocksSearchField($key,$key,'field_value',$field->name,$field->type);
-		//}
-		
 		// Sort by label (translation-conscious)
 		DevblocksPlatform::sortObjects($columns, 'db_label');
 
@@ -777,8 +777,9 @@ class Context_Comment extends Extension_DevblocksContext {
 		
 		// Token labels
 		$token_labels = array(
+			'_label' => $prefix,
 			'comment' => $prefix.$translate->_('common.content'),
-			'created|date' => $prefix.$translate->_('common.created'),
+			'created' => $prefix.$translate->_('common.created'),
 			'owner_context' => $prefix.'Author Context',
 			'author_label' => $prefix.'Author Label',
 			'author_type' => $prefix.'Author Type',
@@ -787,17 +788,34 @@ class Context_Comment extends Extension_DevblocksContext {
 			'record_label' => $prefix.'Record Label',
 			'record_type' => $prefix.'Record Type Label',
 			'record_url' => $prefix.'Record URL',
+			//'record_watchers' => $prefix.'Record Watchers',
+			'record_watchers_emails' => $prefix.'Record Watchers Email List',
 		);
 		
-		if(is_array($fields))
-		foreach($fields as $cf_id => $field) {
-			$token_labels['custom_'.$cf_id] = $prefix.$field->name;
-		}
-
+		// Token types
+		$token_types = array(
+			'_label' => 'context_url',
+			'comment' => Model_CustomField::TYPE_MULTI_LINE,
+			'created' => Model_CustomField::TYPE_DATE,
+			'owner_context' => Model_CustomField::TYPE_SINGLE_LINE,
+			'author_label' => Model_CustomField::TYPE_SINGLE_LINE,
+			'author_type' => Model_CustomField::TYPE_SINGLE_LINE,
+			'author_url' => Model_CustomField::TYPE_URL,
+			'context' => Model_CustomField::TYPE_SINGLE_LINE,
+			'record_label' => Model_CustomField::TYPE_SINGLE_LINE,
+			'record_type' => Model_CustomField::TYPE_SINGLE_LINE,
+			'record_url' => Model_CustomField::TYPE_URL,
+		);
+		
+		// Custom field/fieldset token labels
+		if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
+			$token_labels = array_merge($token_labels, $custom_field_labels);
+		
 		// Token values
 		$token_values = array();
 		
 		$token_values['_context'] = CerberusContexts::CONTEXT_COMMENT;
+		$token_values['_types'] = $token_types;
 		
 		if($comment) {
 			$token_values['_loaded'] = true;
@@ -826,7 +844,7 @@ class Context_Comment extends Extension_DevblocksContext {
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
 		}
 		
 		switch($token) {
@@ -849,6 +867,21 @@ class Context_Comment extends Extension_DevblocksContext {
 				
 				$values['record_label'] = $meta['name'];
 				$values['record_url'] = $meta['permalink'];
+				break;
+				
+			case 'record_watchers':
+			case 'record_watchers_emails':
+				$watchers = CerberusContexts::getWatchers($dictionary['context'], $dictionary['context_id']);;
+				
+				$watchers_list = array();
+				
+				if(is_array($watchers))
+				foreach($watchers as $watcher) {
+					$watchers_list[] = $watcher->email;
+				}
+				
+				$values['record_watchers'] = $watchers;
+				$values['record_watchers_emails'] = implode(', ', $watchers_list);
 				break;
 				
 			case 'author_type':

@@ -1,10 +1,15 @@
 {$page_context = CerberusContexts::CONTEXT_WORKER}
 {$page_context_id = $worker->id}
 
+{$gravatar_plugin = DevblocksPlatform::getPlugin('cerberusweb.gravatar')}
+{$gravatar_enabled = $gravatar_plugin && $gravatar_plugin->enabled}
+
 <table cellpadding="0" cellspacing="0" border="0" width="100%">
 	<tr>
 		<td width="1%" nowrap="nowrap" rowspan="2" valign="top" style="padding-left:10px;">
+			{if $gravatar_enabled}
 			<img src="{if $is_ssl}https://secure.{else}http://www.{/if}gravatar.com/avatar/{$worker->email|trim|lower|md5}?s=64&d=http://cerbweb.com/gravatar/gravatar_nouser.jpg" height="64" width="64" border="0" style="margin:0px 5px 5px 0px;">
+			{/if}
 		</td>
 		<td width="98%" valign="top">
 			<h1 style="color:rgb(0,120,0);font-weight:bold;font-size:150%;margin:0px;">{$worker->getName()}</h1>
@@ -32,8 +37,29 @@
 
 <div style="clear:both;"></div>
 
+<div class="cerb-profile-toolbar" style="margin-top:5px;">
+	<form class="toolbar" action="javascript:;" method="POST" style="margin:0px 0px 5px 5px;" onsubmit="return false;">
+		<!-- Macros -->
+		{if $worker->id == $active_worker->id || $active_worker->is_superuser}
+			{if !empty($page_context) && !empty($page_context_id) && !empty($macros)}
+				{devblocks_url assign=return_url full=true}c=profiles&tab=worker&id={$page_context_id}-{$worker->getName()|devblocks_permalink}{/devblocks_url}
+				{include file="devblocks:cerberusweb.core::internal/macros/display/button.tpl" context=$page_context context_id=$page_context_id macros=$macros return_url=$return_url}
+			{/if}
+		{/if}
+	
+		{if $active_worker->is_superuser}
+			{if $worker->id != $active_worker->id}<button type="button" id="btnProfileWorkerPossess"><span class="cerb-sprite2 sprite-user-silhouette"></span> Impersonate</button>{/if}
+			<button type="button" id="btnProfileWorkerEdit" title="{'common.edit'|devblocks_translate|capitalize}">&nbsp;<span class="cerb-sprite2 sprite-gear"></span>&nbsp;</button>
+			<button type="button" title="{'display.shortcut.refresh'|devblocks_translate}" onclick="document.location='{devblocks_url}c=profiles&type=worker&id={$worker->id}{/devblocks_url}-{$worker->getName()|devblocks_permalink}';">&nbsp;<span class="cerb-sprite sprite-refresh"></span>&nbsp;</button>
+		{/if}
+	</form>
+</div>
+
 <fieldset class="properties">
 	<legend>Worker</legend>
+	
+	<div style="margin-left:15px;">
+	
 	{foreach from=$properties item=v key=k name=props}
 		<div class="property">
 			{if $k == '...'}
@@ -47,24 +73,13 @@
 			<br clear="all">
 		{/if}
 	{/foreach}
+	</div>
+	
 	<br clear="all">
-	
-	<form class="toolbar" action="javascript:;" method="POST" style="margin-top:5px;" onsubmit="return false;">
-		<!-- Macros -->
-		{if $worker->id == $active_worker->id || $active_worker->is_superuser}
-			{if !empty($page_context) && !empty($page_context_id) && !empty($macros)}
-				{devblocks_url assign=return_url full=true}c=profiles&tab=worker&id={$page_context_id}-{$worker->getName()|devblocks_permalink}{/devblocks_url}
-				{include file="devblocks:cerberusweb.core::internal/macros/display/button.tpl" context=$page_context context_id=$page_context_id macros=$macros return_url=$return_url}
-			{/if}
-		{/if}
-	
-		{if $active_worker->is_superuser}			
-			{if $worker->id != $active_worker->id}<button type="button" id="btnProfileWorkerPossess"><span class="cerb-sprite2 sprite-user-silhouette"></span> Impersonate</button>{/if}
-			<button type="button" id="btnProfileWorkerEdit"><span class="cerb-sprite sprite-document_edit"></span> {'common.edit'|devblocks_translate|capitalize}</button>
-		{/if}
-	</form>
 </fieldset>
-	
+
+{include file="devblocks:cerberusweb.core::internal/custom_fieldsets/profile_fieldsets.tpl" properties=$properties_custom_fieldsets}
+
 <div>
 {include file="devblocks:cerberusweb.core::internal/notifications/context_profile.tpl" context=$page_context context_id=$page_context_id}
 </div>
@@ -83,25 +98,20 @@
 		<li><a href="{devblocks_url}ajax.php?c=preferences&a=showMyNotificationsTab{/devblocks_url}">{'home.tab.my_notifications'|devblocks_translate}</a></li>
 		{/if}
 		
-		{$tabs[] = 'calendar'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showCalendarTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Calendar</a></li>
+		{$tabs[] = 'availability'}
+		<li><a href="{devblocks_url}ajax.php?c=internal&a=handleSectionAction&section=calendars&action=showCalendarAvailabilityTab&point={$point}&context={$page_context}&context_id={$page_context_id}&id={$profile_worker_prefs.availability_calendar_id}{/devblocks_url}">Availability</a></li>
 		
 		{$tabs[] = 'activity'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabActivityLog&scope=actor&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{'common.activity_log'|devblocks_translate|capitalize}</a></li>
+		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabActivityLog&scope=both&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{'common.activity_log'|devblocks_translate|capitalize}</a></li>
 		
 		{$tabs[] = 'comments'}
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabContextComments&context={$page_context}&id={$page_context_id}{/devblocks_url}">{'common.comments'|devblocks_translate|capitalize} <div class="tab-badge">{DAO_Comment::count($page_context, $page_context_id)|default:0}</div></a></li>
 
 		{if $active_worker->is_superuser || $worker->id == $active_worker->id}
-		{$tabs[] = 'attendant'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showAttendantTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Virtual Attendant</a></li>
+		{$tabs[] = 'attendants'}
+		<li><a href="{devblocks_url}ajax.php?c=internal&a=showAttendantsTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Virtual Attendants</a></li>
 		{/if}
 		
-		{if $active_worker->is_superuser || $worker->id == $active_worker->id}
-		{$tabs[] = 'behavior'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showScheduledBehaviorTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Scheduled Behavior</a></li>
-		{/if}
-
 		{$tabs[] = 'links'}
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabContextLinks&context={$page_context}&point={$point}&id={$page_context_id}{/devblocks_url}">Watchlist <div class="tab-badge">{DAO_ContextLink::count($page_context, $page_context_id)|default:0}</div></a></li>
 		

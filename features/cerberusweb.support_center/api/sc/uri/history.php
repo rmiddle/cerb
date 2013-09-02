@@ -213,6 +213,9 @@ class UmScHistoryController extends Extension_UmScController {
 			// field[]
 			if(is_array($files['name'])) {
 				foreach($files['name'] as $idx => $name) {
+					if(empty($name))
+						continue;
+					
 					$attach = new ParserFile();
 					$attach->setTempFile($files['tmp_name'][$idx],'application/octet-stream');
 					$attach->file_size = filesize($files['tmp_name'][$idx]);
@@ -220,6 +223,9 @@ class UmScHistoryController extends Extension_UmScController {
 				}
 				
 			} else {
+				if(!isset($files['name']) || empty($files['name']))
+					continue;
+				
 				$attach = new ParserFile();
 				$attach->setTempFile($files['tmp_name'],'application/octet-stream');
 				$attach->file_size = filesize($files['tmp_name']);
@@ -277,6 +283,12 @@ class UmSc_TicketHistoryView extends C4_AbstractView {
 		$tpl->assign('id', $this->id);
 		$tpl->assign('view', $this);
 
+		$groups = DAO_Group::getAll();
+		$tpl->assign('groups', $groups);
+		
+		$buckets = DAO_Bucket::getAll();
+		$tpl->assign('buckets', $buckets);
+		
 		$tpl->display("devblocks:cerberusweb.support_center:portal_".ChPortalHelper::getCode() . ":support_center/history/view.tpl");
 	}
 

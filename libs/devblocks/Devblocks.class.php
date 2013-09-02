@@ -53,8 +53,6 @@ class DevblocksPlatform extends DevblocksEngine {
 		if(empty($plugin_id))
 			return false;
 		
-		DevblocksPlatform::readPlugins(false);
-		DevblocksPlatform::clearCache();
 		return true;
 	}
 	
@@ -178,6 +176,10 @@ class DevblocksPlatform extends DevblocksEngine {
 	static private function _stripMagicQuotes(&$item, $key) {
 		if(is_string($item))
 			$item = stripslashes($item);
+	}
+
+	static function intClamp($n, $min, $max) {
+		return min(max((integer)$n, $min), $max);
 	}
 	
 	/**
@@ -800,9 +802,9 @@ class DevblocksPlatform extends DevblocksEngine {
 			} elseif($diffsecs >= 86400) { // days
 				$whole .= round($diffsecs/86400).' day';
 			} elseif($diffsecs >= 3600) { // hours
-				$whole .= round($diffsecs/3600).' hour';
+				$whole .= floor($diffsecs/3600).' hour';
 			} elseif($diffsecs >= 60) { // mins
-				$whole .= round($diffsecs/60).' min';
+				$whole .= floor($diffsecs/60).' min';
 			} elseif($diffsecs >= 0) { // secs
 				$whole .= $diffsecs.' sec';
 			}
@@ -815,9 +817,9 @@ class DevblocksPlatform extends DevblocksEngine {
 			} elseif($diffsecs <= -86400) { // days
 				$whole .= round($diffsecs/-86400).' day';
 			} elseif($diffsecs <= -3600) { // hours
-				$whole .= round($diffsecs/-3600).' hour';
+				$whole .= floor($diffsecs/-3600).' hour';
 			} elseif($diffsecs <= -60) { // mins
-				$whole .= round($diffsecs/-60).' min';
+				$whole .= floor($diffsecs/-60).' min';
 			} elseif($diffsecs <= 0) { // secs
 				$whole .= round($diffsecs/-1).' sec';
 			}
@@ -885,6 +887,110 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $tokens;
 	}
 	
+	/**
+	 * Indents a flat JSON string to make it more human-readable.
+	 *
+	 * @author http://www.daveperrett.com/articles/2008/03/11/format-json-with-php/
+	 * @todo This won't be needed when we require PHP 5.4+ with JSON_PRETTY_PRINT
+	 *
+	 * @param string $json The original JSON string to process.
+	 *
+	 * @return string Indented version of the original JSON string.
+	 */
+	static function strFormatJson($json) {
+		$result = '';
+		$pos = 0;
+		$strLen  = strlen($json);
+		$indentStr = '  ';
+		$newLine = "\n";
+		$prevChar = '';
+		$outOfQuotes = true;
+
+		for ($i=0; $i<=$strLen; $i++) {
+
+			// Grab the next character in the string.
+			$char = substr($json, $i, 1);
+
+			// Are we inside a quoted string?
+			if ($char == '"' && $prevChar != '\\') {
+				$outOfQuotes = !$outOfQuotes;
+
+				// If this character is the end of an element,
+				// output a new line and indent the next line.
+			} else if(($char == '}' || $char == ']') && $outOfQuotes) {
+				$result .= $newLine;
+				$pos --;
+				for ($j=0; $j<$pos; $j++) {
+					$result .= $indentStr;
+				}
+			}
+
+			// Add the character to the result string.
+			$result .= $char;
+
+			// If the last character was the beginning of an element,
+			// output a new line and indent the next line.
+			if (($char == ',' || $char == '{' || $char == '[') && $outOfQuotes) {
+				$result .= $newLine;
+				if ($char == '{' || $char == '[') {
+					$pos ++;
+				}
+
+				for ($j = 0; $j < $pos; $j++) {
+					$result .= $indentStr;
+				}
+			}
+
+			$prevChar = $char;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Returns a pointer to an arbitrary property in a deeply nested JSON tree.  The pointer
+	 * can be used to get or set the value at that location.
+	 *
+	 * @param array|string $json
+	 * @param string $path
+	 *
+	 * @return mixed Pointer to the value at $path, or FALSE on error
+	 */
+	static function &jsonGetPointerFromPath(array &$array, $path) {
+		if(empty($path))
+			return false;
+		
+		$keys = explode('.', $path);
+		$array_keys = array();
+
+		$ptr = null;
+		
+		if(!is_array($keys) || empty($keys))
+			return $ptr;
+		
+		foreach($keys as $idx => $k) {
+			if(preg_match('/(.*)\[(\d+)\]/', $k, $matches)) {
+				$array_keys[] = $matches[1];
+				$array_keys[] = $matches[2];
+			} else {
+				$array_keys[] = $k;
+			}
+		}
+
+		$ptr =& $array;
+
+		while(null !== ($key = array_shift($array_keys))) {
+			if(!isset($ptr[$key])) {
+				$ptr = null;
+				return $ptr;
+			}
+			
+			$ptr =& $ptr[$key];
+		}
+
+		return $ptr;
+	}
+
 	/**
 	 * Clears any platform-level plugin caches.
 	 *
@@ -1694,6 +1800,14 @@ class DevblocksPlatform extends DevblocksEngine {
 			return self::$locale;
 			
 		return 'en_US';
+	}
+	
+	static function getDateTimeFormat() {
+		return self::$dateTimeFormat;
+	}
+	
+	static function setDateTimeFormat($time_format) {
+		self::$dateTimeFormat = $time_format;
 	}
 	
 	/**

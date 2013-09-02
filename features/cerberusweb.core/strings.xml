@@ -39,6 +39,12 @@
 		
 		<!-- Activity points -->
 		
+		<tu tuid='activities.calendar_event.created'>
+			<tuv xml:lang="en_US"><seg>{{actor}} created event {{event}} on calendar {{target}}</seg></tuv>
+		</tu>
+		<tu tuid='activities.calendar_event_recurring.created'>
+			<tuv xml:lang="en_US"><seg>{{actor}} created recurring event {{event}} on calendar {{target}}</seg></tuv>
+		</tu>
 		<tu tuid='activities.comment.create'>
 			<tuv xml:lang="en_US"><seg>{{actor}} commented on {{object}} {{target}}: {{content}}</seg></tuv>
 		</tu>
@@ -108,6 +114,9 @@
 		<tu tuid='common.activity_log'>
 			<tuv xml:lang="en_US"><seg>Activity Log</seg></tuv>
 		</tu>
+		<tu tuid='common.actor'>
+			<tuv xml:lang="en_US"><seg>Actor</seg></tuv>
+		</tu>
 		<tu tuid='common.add'>
 			<tuv xml:lang="en_US"><seg>add</seg></tuv>
 		</tu>
@@ -116,6 +125,9 @@
 		</tu>
 		<tu tuid='common.anonymous'>
 			<tuv xml:lang="en_US"><seg>anonymous</seg></tuv>
+		</tu>
+		<tu tuid='common.any'>
+			<tuv xml:lang="en_US"><seg>any</seg></tuv>
 		</tu>
 		<tu tuid='common.anybody'>
 			<tuv xml:lang="en_US"><seg>anybody</seg></tuv>
@@ -131,6 +143,9 @@
 		</tu>
 		<tu tuid='common.available'>
 			<tuv xml:lang="en_US"><seg>Available</seg></tuv>
+		</tu>
+		<tu tuid='common.availability'>
+			<tuv xml:lang="en_US"><seg>Availability</seg></tuv>
 		</tu>
 		<tu tuid='common.behavior'>
 			<tuv xml:lang="en_US"><seg>Behavior</seg></tuv>
@@ -161,6 +176,9 @@
 		</tu>
 		<tu tuid='common.calendar'>
 			<tuv xml:lang="en_US"><seg>Calendar</seg></tuv>
+		</tu>
+		<tu tuid='common.calendars'>
+			<tuv xml:lang="en_US"><seg>Calendars</seg></tuv>
 		</tu>
 		<tu tuid='common.cancel'>
 			<tuv xml:lang="en_US"><seg>cancel</seg></tuv>
@@ -204,8 +222,17 @@
 		<tu tuid='common.created'>
 			<tuv xml:lang="en_US"><seg>created</seg></tuv>
 		</tu>
+		<tu tuid='common.custom_field'>
+			<tuv xml:lang="en_US"><seg>Custom Field</seg></tuv>
+		</tu>
 		<tu tuid='common.custom_fields'>
 			<tuv xml:lang="en_US"><seg>Custom Fields</seg></tuv>
+		</tu>
+		<tu tuid='common.custom_fieldset'>
+			<tuv xml:lang="en_US"><seg>Custom Fieldset</seg></tuv>
+		</tu>
+		<tu tuid='common.custom_fieldsets'>
+			<tuv xml:lang="en_US"><seg>Custom Fieldsets</seg></tuv>
 		</tu>
 		<tu tuid='common.customize'>
 			<tuv xml:lang="en_US"><seg>customize</seg></tuv>
@@ -222,11 +249,23 @@
 		<tu tuid='common.delete'>
 			<tuv xml:lang="en_US"><seg>delete</seg></tuv>
 		</tu>
+		<tu tuid='common.description'>
+			<tuv xml:lang="en_US"><seg>Description</seg></tuv>
+		</tu>
 		<tu tuid='common.disabled'>
 			<tuv xml:lang="en_US"><seg>Disabled</seg></tuv>
 		</tu>
 		<tu tuid='common.discard'>
 			<tuv xml:lang="en_US"><seg>discard</seg></tuv>
+		</tu>
+		<tu tuid='common.discussion'>
+			<tuv xml:lang="en_US"><seg>discussion</seg></tuv>
+		</tu>
+		<tu tuid='common.download'>
+			<tuv xml:lang="en_US"><seg>download</seg></tuv>
+		</tu>
+		<tu tuid='common.due'>
+			<tuv xml:lang="en_US"><seg>due</seg></tuv>
 		</tu>
 		<tu tuid='common.email'>
 			<tuv xml:lang="en_US"><seg>Email</seg></tuv>
@@ -248,6 +287,12 @@
 		</tu>
 		<tu tuid='common.field'>
 			<tuv xml:lang="en_US"><seg>field</seg></tuv>
+		</tu>
+		<tu tuid='common.fieldset'>
+			<tuv xml:lang="en_US"><seg>Fieldset</seg></tuv>
+		</tu>
+		<tu tuid='common.fieldsets'>
+			<tuv xml:lang="en_US"><seg>Fieldsets</seg></tuv>
 		</tu>
 		<tu tuid='common.filter'>
 			<tuv xml:lang="en_US"><seg>filter</seg></tuv>
@@ -279,11 +324,20 @@
 		<tu tuid='common.import'>
 			<tuv xml:lang="en_US"><seg>import</seg></tuv>
 		</tu>
+		<tu tuid='common.import.upload_csv'>
+			<tuv xml:lang="en_US"><seg>Upload .CSV File</seg></tuv>
+		</tu>
+		<tu tuid='common.import.upload_csv.tip'>
+			<tuv xml:lang="en_US"><seg>(any column order; the next step will let you choose where the data goes)</seg></tuv>
+		</tu>
 		<tu tuid='common.inbox'>
 			<tuv xml:lang="en_US"><seg>inbox</seg></tuv>
 		</tu>
 		<tu tuid='common.inboxes'>
 			<tuv xml:lang="en_US"><seg>inboxes</seg></tuv>
+		</tu>
+		<tu tuid='common.is_closed'>
+			<tuv xml:lang="en_US"><seg>Is Closed</seg></tuv>
 		</tu>
 		<tu tuid='common.keyboard'>
 			<tuv xml:lang="en_US"><seg>Keyboard</seg></tuv>
@@ -423,11 +477,17 @@
 		<tu tuid='common.print'>
 			<tuv xml:lang="en_US"><seg>Print</seg></tuv>
 		</tu>
+		<tu tuid='common.private'>
+			<tuv xml:lang="en_US"><seg>private</seg></tuv>
+		</tu>
 		<tu tuid='common.profiles'>
 			<tuv xml:lang="en_US"><seg>Profiles</seg></tuv>
 		</tu>
 		<tu tuid='common.properties'>
 			<tuv xml:lang="en_US"><seg>Properties</seg></tuv>
+		</tu>
+		<tu tuid='common.public'>
+			<tuv xml:lang="en_US"><seg>public</seg></tuv>
 		</tu>
 		<tu tuid='common.quick_compose'>
 			<tuv xml:lang="en_US"><seg>Quick Compose</seg></tuv>
@@ -446,6 +506,9 @@
 		</tu>
 		<tu tuid='common.reset'>
 			<tuv xml:lang="en_US"><seg>reset</seg></tuv>
+		</tu>
+		<tu tuid='common.retry'>
+			<tuv xml:lang="en_US"><seg>retry</seg></tuv>
 		</tu>
 		<tu tuid='common.roles'>
 			<tuv xml:lang="en_US"><seg>roles</seg></tuv>
@@ -479,6 +542,9 @@
 		</tu>
 		<tu tuid='common.signature'>
 			<tuv xml:lang="en_US"><seg>signature</seg></tuv>
+		</tu>
+		<tu tuid='common.size'>
+			<tuv xml:lang="en_US"><seg>size</seg></tuv>
 		</tu>
 		<tu tuid='common.snippets'>
 			<tuv xml:lang="en_US"><seg>snippets</seg></tuv>
@@ -558,6 +624,12 @@
 		<tu tuid='common.url.record'>
 			<tuv xml:lang="en_US"><seg>Record URL</seg></tuv>
 		</tu>
+		<tu tuid='common.virtual_attendant'>
+			<tuv xml:lang="en_US"><seg>Virtual Attendant</seg></tuv>
+		</tu>
+		<tu tuid='common.virtual_attendants'>
+			<tuv xml:lang="en_US"><seg>Virtual Attendants</seg></tuv>
+		</tu>
 		<tu tuid='common.watch'>
 			<tuv xml:lang="en_US"><seg>watch</seg></tuv>
 		</tu>
@@ -604,6 +676,33 @@
 		</tu>
 		<tu tuid='dao.calendar_event.date_end'>
 			<tuv xml:lang="en_US"><seg>End Date</seg></tuv>
+		</tu>
+		
+		<!-- CalendarRecurringProfile -->
+		
+		<tu tuid='dao.calendar_recurring_profile.event_name'>
+			<tuv xml:lang="en_US"><seg>Event Name</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.is_available'>
+			<tuv xml:lang="en_US"><seg>Is Available</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.tz'>
+			<tuv xml:lang="en_US"><seg>Timezone</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.event_start'>
+			<tuv xml:lang="en_US"><seg>Start</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.event_end'>
+			<tuv xml:lang="en_US"><seg>End</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.recur_end'>
+			<tuv xml:lang="en_US"><seg>Recur End</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.recur_start'>
+			<tuv xml:lang="en_US"><seg>Recur Start</seg></tuv>
+		</tu>
+		<tu tuid='dao.calendar_recurring_profile.patterns'>
+			<tuv xml:lang="en_US"><seg>Patterns</seg></tuv>
 		</tu>
 		
 		<!-- CerbPlugin -->
@@ -690,11 +789,6 @@
 
 		<!-- ACL -->
 		
-			<!-- Activity -->
-		<tu tuid='acl.core.activity'>
-			<tuv xml:lang="en_US"><seg>[Activity] Can view activity page</seg></tuv>
-		</tu>
-		
 			<!-- Address Book -->
 		<tu tuid='acl.core.addybook'>
 			<tuv xml:lang="en_US"><seg>[Address Book] Can browse the address book</seg></tuv>
@@ -752,9 +846,6 @@
 		</tu>
 
 			<!-- Mail page -->
-		<tu tuid='acl.core.mail'>
-			<tuv xml:lang="en_US"><seg>[Mail] Can view the mail page</seg></tuv>
-		</tu>
 		<tu tuid='acl.core.mail.send'>
 			<tuv xml:lang="en_US"><seg>[Mail] Can compose new messages</seg></tuv>
 		</tu>
@@ -1232,12 +1323,6 @@ For example: http://www.cerberusweb.com/support/</seg></tuv>
 			<tuv xml:lang="en_US"><seg>Worklist Type</seg></tuv>
 		</tu>
 
-		<!-- Display Ticket -->
-		
-		<tu tuid='display.invalid_ticket'>
-			<tuv xml:lang="en_US"><seg>Invalid Ticket!</seg></tuv>
-		</tu>
-		
 		<!-- Display: Conversation -->
 		
 		<tu tuid='display.convo.brief_headers'>
@@ -1840,7 +1925,7 @@ For example: *receipt*</seg></tuv>
 		<tu tuid='va.actions.ticket.relay.default_content'>
 			<tuv xml:lang="en_US"><seg>## Relayed from {{ticket_url}}
 ## Your reply to this message will be broadcast to the requesters. 
-## Instructions: http://wiki.cerb5.com/wiki/Email_Relay
+## Instructions: http://wiki.cerbweb.com/Email_Relay
 ##
 {{%s}}
 </seg></tuv>
@@ -1918,98 +2003,105 @@ For example: *receipt*</seg></tuv>
 			<tuv xml:lang="en_US"><seg>Worker</seg></tuv>
 		</tu>
 		
-	    <!-- My Account Preferences -->
+		<!-- My Account Preferences -->
 		
-	    <tu tuid='preferences.account.settings'>
+		<tu tuid='preferences.account.availability.calendar_id'>
+			<tuv xml:lang="en_US"><seg>Determine my availability using calendar:</seg></tuv>
+		</tu>
+		<tu tuid='preferences.account.settings'>
 			<tuv xml:lang="en_US"><seg>Account Settings</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.password.change'>
+		</tu>
+		<tu tuid='preferences.account.password.change'>
 			<tuv xml:lang="en_US"><seg>Change Password: </seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.password.new'>
+		</tu>
+		<tu tuid='preferences.account.password.new'>
 			<tuv xml:lang="en_US"><seg>New Password: </seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.password.verify'>
-	    	<tuv xml:lang="en_US"><seg>Verify Password: </seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.current'>
+		</tu>
+		<tu tuid='preferences.account.password.verify'>
+			<tuv xml:lang="en_US"><seg>Verify Password: </seg></tuv>
+		</tu>
+		<tu tuid='preferences.account.current'>
 			<tuv xml:lang="en_US"><seg>current:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.timezone'>
+		</tu>
+		<tu tuid='preferences.account.timeformat'>
+			<tuv xml:lang="en_US"><seg>Time Format:</seg></tuv>
+		</tu>
+		<tu tuid='preferences.account.timezone'>
 			<tuv xml:lang="en_US"><seg>Timezone:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.language'>
+		</tu>
+		<tu tuid='preferences.account.language'>
 			<tuv xml:lang="en_US"><seg>Language:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.email'>
+		</tu>
+		<tu tuid='preferences.account.email'>
 			<tuv xml:lang="en_US"><seg>Email Addresses</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.email.associated'>
+		</tu>
+		<tu tuid='preferences.account.email.associated'>
 			<tuv xml:lang="en_US"><seg>These addresses will be associated with your account.</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.email.address'>
+		</tu>
+		<tu tuid='preferences.account.email.address'>
 			<tuv xml:lang="en_US"><seg>Address</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.email.address.confirmed'>
+		</tu>
+		<tu tuid='preferences.account.email.address.confirmed'>
 			<tuv xml:lang="en_US"><seg>Confirmed</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.email.address.resend.confirm'>
+		</tu>
+		<tu tuid='preferences.account.email.address.resend.confirm'>
 			<tuv xml:lang="en_US"><seg>resend confirmation</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.email.address.add'>
+		</tu>
+		<tu tuid='preferences.account.email.address.add'>
 			<tuv xml:lang="en_US"><seg>Add email address:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.preferences'>
+		</tu>
+		<tu tuid='preferences.account.preferences'>
 			<tuv xml:lang="en_US"><seg>Preferences</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.assist'>
+		</tu>
+		<tu tuid='preferences.account.assist'>
 			<tuv xml:lang="en_US"><seg>Assist Mode:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.keyboard.shortcuts'>
+		</tu>
+		<tu tuid='preferences.account.keyboard.shortcuts'>
 			<tuv xml:lang="en_US"><seg>Keyboard Shortcuts:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail'>
+		</tu>
+		<tu tuid='preferences.account.mail'>
 			<tuv xml:lang="en_US"><seg>Mail:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.comments'>
+		</tu>
+		<tu tuid='preferences.account.mail.comments'>
 			<tuv xml:lang="en_US"><seg>Show comments in the conversation</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.readall'>
+		</tu>
+		<tu tuid='preferences.account.mail.readall'>
 			<tuv xml:lang="en_US"><seg>Always use 'read all' mode (expand messages and sort chronologically)</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.reply_textbox_size'>
+		</tu>
+		<tu tuid='preferences.account.mail.reply_textbox_size'>
 			<tuv xml:lang="en_US"><seg>While replying:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.reply_textbox_size.inelastic'>
+		</tu>
+		<tu tuid='preferences.account.mail.reply_textbox_size.inelastic'>
 			<tuv xml:lang="en_US"><seg>Don't automatically grow the text box as I type</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.reply_textbox_size.pixels'>
+		</tu>
+		<tu tuid='preferences.account.mail.reply_textbox_size.pixels'>
 			<tuv xml:lang="en_US"><seg>Set the initial text box height to </seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.reply_button'>
+		</tu>
+		<tu tuid='preferences.account.mail.reply_button'>
 			<tuv xml:lang="en_US"><seg>When I click the reply button:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.signature'>
+		</tu>
+		<tu tuid='preferences.account.mail.signature'>
 			<tuv xml:lang="en_US"><seg>Insert my signature:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.signature.above'>
+		</tu>
+		<tu tuid='preferences.account.mail.signature.above'>
 			<tuv xml:lang="en_US"><seg>Above the quoted message</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.signature.below'>
+		</tu>
+		<tu tuid='preferences.account.mail.signature.below'>
 			<tuv xml:lang="en_US"><seg>Below the quoted message</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.signature.none'>
+		</tu>
+		<tu tuid='preferences.account.mail.signature.none'>
 			<tuv xml:lang="en_US"><seg>Don't automatically insert my signature</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.status.compose'>
+		</tu>
+		<tu tuid='preferences.account.mail.status.compose'>
 			<tuv xml:lang="en_US"><seg>When composing a new outgoing message, default the status to:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.status.reply'>
+		</tu>
+		<tu tuid='preferences.account.mail.status.reply'>
 			<tuv xml:lang="en_US"><seg>When replying to mail, default the status to:</seg></tuv>
-	    </tu>
-	    <tu tuid='preferences.account.mail.no_discard_warning'>
+		</tu>
+		<tu tuid='preferences.account.mail.no_discard_warning'>
 			<tuv xml:lang="en_US"><seg>Don't warn me about losing unsaved changes if I click links while composing mail</seg></tuv>
-	    </tu>
+		</tu>
+		
 
 	</body>
 </tmx>

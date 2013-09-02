@@ -21,7 +21,7 @@ class ChDisplayPage extends CerberusPageExtension {
 		if(null == ($worker = CerberusApplication::getActiveWorker()))
 			return false;
 		
-		return $worker->hasPriv('core.mail');
+		return true;
 	}
 	
 	function render() {
@@ -452,17 +452,6 @@ class ChDisplayPage extends CerberusPageExtension {
 			$tpl->assign('suggested_recipients', $suggested_recipients);
 		}
 		
-		// Custom fields
-		$custom_fields = DAO_CustomField::getByContextAndGroupId(CerberusContexts::CONTEXT_TICKET, 0);
-		$tpl->assign('custom_fields', $custom_fields);
-
-		$group_fields = DAO_CustomField::getByContextAndGroupId(CerberusContexts::CONTEXT_TICKET, $ticket->group_id);
-		$tpl->assign('group_fields', $group_fields);
-		
-		$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_TICKET, $ticket->id);
-		if(isset($custom_field_values[$ticket->id]))
-			$tpl->assign('custom_field_values', $custom_field_values[$ticket->id]);
-		
 		// ReplyToolbarItem Extensions
 		$replyToolbarItems = DevblocksPlatform::getExtensions('cerberusweb.reply.toolbaritem', true);
 		if(!empty($replyToolbarItems))
@@ -498,14 +487,20 @@ class ChDisplayPage extends CerberusPageExtension {
 		
 		$tpl->assign('upload_max_filesize', ini_get('upload_max_filesize'));
 		
+		// Custom fields
+		
+		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TICKET, false);
+		$tpl->assign('custom_fields', $custom_fields);
+		
+		$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_TICKET, $ticket->id);
+		if(isset($custom_field_values[$ticket->id]))
+			$tpl->assign('custom_field_values', $custom_field_values[$ticket->id]);
+		
 		// VA macros
 		
-		$macros = DAO_TriggerEvent::getByOwners(
-			array(
-				array(CerberusContexts::CONTEXT_APPLICATION, null, null),
-				array(CerberusContexts::CONTEXT_GROUP, $ticket->group_id, $groups[$ticket->group_id]->name),
-				array(CerberusContexts::CONTEXT_WORKER, $active_worker->id, null),
-			),
+		// [TODO] Filter by $ticket->group_id
+		$macros = DAO_TriggerEvent::getReadableByActor(
+			$active_worker,
 			Event_MailDuringUiReplyByWorker::ID
 		);
 		$tpl->assign('macros', $macros);
@@ -514,16 +509,14 @@ class ChDisplayPage extends CerberusPageExtension {
 		
 		if(null != $active_worker) {
 			$actions = array();
-			
-			$macros = DAO_TriggerEvent::getByOwners(
-				array(
-					array(CerberusContexts::CONTEXT_APPLICATION, null, null),
-					array(CerberusContexts::CONTEXT_GROUP, $ticket->group_id, $groups[$ticket->group_id]->name),
-					array(CerberusContexts::CONTEXT_WORKER, $active_worker->id, null),
-				),
+
+			// [TODO] Filter by $ticket->group_id
+			$macros = DAO_TriggerEvent::getReadableByActor(
+				$active_worker,
 				Event_MailBeforeUiReplyByWorker::ID
 			);
-			
+
+			if(is_array($macros))
 			foreach($macros as $macro)
 				Event_MailBeforeUiReplyByWorker::trigger($macro->id, $message->id, $actions);
 

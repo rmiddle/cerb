@@ -43,11 +43,6 @@ class PageSection_ProfilesOrganization extends Extension_PageSection {
 		$contact = DAO_ContactOrg::get($id);
 		$tpl->assign('contact', $contact);
 		
-		// Custom fields
-		
-		$custom_fields = DAO_CustomField::getAll();
-		$tpl->assign('custom_fields', $custom_fields);
-		
 		// Properties
 		
 		$properties = array();
@@ -107,18 +102,22 @@ class PageSection_ProfilesOrganization extends Extension_PageSection {
 			'value' => $contact->created,
 		);
 		
+		// Custom Fields
+
 		@$values = array_shift(DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_ORG, $contact->id)) or array();
+		$tpl->assign('custom_field_values', $values);
 		
-		foreach($custom_fields as $cf_id => $cfield) {
-			if(!isset($values[$cf_id]))
-				continue;
+		$properties_cfields = Page_Profiles::getProfilePropertiesCustomFields(CerberusContexts::CONTEXT_ORG, $values);
 		
-			$properties['cf_' . $cf_id] = array(
-					'label' => $cfield->name,
-					'type' => $cfield->type,
-					'value' => $values[$cf_id],
-			);
-		}
+		if(!empty($properties_cfields))
+			$properties = array_merge($properties, $properties_cfields);
+		
+		// Custom Fieldsets
+
+		$properties_custom_fieldsets = Page_Profiles::getProfilePropertiesCustomFieldsets(CerberusContexts::CONTEXT_ORG, $contact->id, $values);
+		$tpl->assign('properties_custom_fieldsets', $properties_custom_fieldsets);
+		
+		// Properties
 		
 		$tpl->assign('properties', $properties);
 		
@@ -130,7 +129,11 @@ class PageSection_ProfilesOrganization extends Extension_PageSection {
 		$tpl->assign('tab_manifests', $tab_manifests);
 		
 		// Macros
-		$macros = DAO_TriggerEvent::getByOwner(CerberusContexts::CONTEXT_WORKER, $active_worker->id, 'event.macro.org');
+		
+		$macros = DAO_TriggerEvent::getReadableByActor(
+			$active_worker,
+			'event.macro.org'
+		);
 		$tpl->assign('macros', $macros);
 
 		// Template

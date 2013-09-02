@@ -226,11 +226,11 @@ class DAO_Attachment extends DevblocksORMHelper {
 	 * @param boolean $withCounts
 	 * @return array
 	 */
-	static function search($params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
+	static function search($columns, $params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
 		$db = DevblocksPlatform::getDatabaseService();
 
 		// Build search queries
-		$query_parts = self::getSearchQueryComponents(array(),$params,$sortBy,$sortAsc);
+		$query_parts = self::getSearchQueryComponents($columns,$params,$sortBy,$sortAsc);
 
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
@@ -667,6 +667,7 @@ class View_AttachmentLink extends C4_AbstractView implements IAbstractView_Subto
 
 	function getData() {
 		$objects = DAO_AttachmentLink::search(
+			$this->view_columns,
 			$this->getParams(),
 			$this->renderLimit,
 			$this->renderPage,
@@ -682,7 +683,7 @@ class View_AttachmentLink extends C4_AbstractView implements IAbstractView_Subto
 	}
 
 	function getSubtotalFields() {
-		$all_fields = $this->getParamsAvailable();
+		$all_fields = $this->getParamsAvailable(true);
 		
 		$fields = array();
 
@@ -906,6 +907,7 @@ class View_AttachmentLink extends C4_AbstractView implements IAbstractView_Subto
 		if(empty($ids))
 		do {
 			list($objects,$null) = DAO_AttachmentLink::search(
+				$this->view_columns,
 				$this->getParams(),
 				100,
 				$pg++,
@@ -977,6 +979,15 @@ class DAO_AttachmentLink extends Cerb_ORMHelper {
 		return array();
 	}
 	
+	static function getByAttachmentId($id) {
+		$links = self::getWhere(sprintf("%s = %d",
+			self::ATTACHMENT_ID,
+			$id
+		));
+		
+		return $links;
+	}
+	
 	static function create($attachment_id, $context, $context_id) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
@@ -990,6 +1001,16 @@ class DAO_AttachmentLink extends Cerb_ORMHelper {
 			$context_id,
 			$db->qstr($uuid)
 		));
+	}
+	
+	static function addLinks($context, $context_id, $attachment_ids) {
+		if(!is_array($attachment_ids))
+			$attachment_ids = array($attachment_ids);
+		
+		foreach($attachment_ids as $attachment_id)
+			DAO_AttachmentLink::create($attachment_id, $context, $context_id);
+		
+		return TRUE;
 	}
 	
 	/**
@@ -1234,11 +1255,11 @@ class DAO_AttachmentLink extends Cerb_ORMHelper {
 	 * @param boolean $withCounts
 	 * @return array
 	 */
-	static function search($params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
+	static function search($columns, $params, $limit=10, $page=0, $sortBy=null, $sortAsc=null, $withCounts=true) {
 		$db = DevblocksPlatform::getDatabaseService();
 
 		// Build search queries
-		$query_parts = self::getSearchQueryComponents(array(),$params,$sortBy,$sortAsc);
+		$query_parts = self::getSearchQueryComponents($columns,$params,$sortBy,$sortAsc);
 
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
