@@ -70,35 +70,49 @@
 					
 					{* Virtual Attendants *}
 					{if !empty($macros)}
-					<button type="button" title="(Ctrl+Shift+B)" class="split-left" onclick="$(this).next('button').click();"><span class="cerb-sprite2 sprite-robot"></span> Virtual Attendant</button><!--  
+					<button type="button" title="(Ctrl+Shift+B)" class="split-left" onclick="$(this).next('button').click();"><span class="cerb-sprite2 sprite-robot"></span> Virtual Attendants</button><!--  
 					--><button type="button" title="(Ctrl+Shift+B)" class="split-right" id="btnReplyMacros{$message->id}"><span class="cerb-sprite sprite-arrow-down-white"></span></button>
 					<ul class="cerb-popupmenu cerb-float" id="menuReplyMacros{$message->id}">
 						<li style="background:none;">
 							<input type="text" size="32" class="input_search filter">
 						</li>
-						{foreach from=$macros item=macro key=macro_id}
-						{$owner_ctx = Extension_DevblocksContext::get($macro->owner_context)}
-						<li class="item">
-							<div>
-								{if $macro->has_public_vars}
-								<a href="javascript:;" onclick="genericAjaxPopup('peek','c=display&a=showMacroReplyPopup&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}',$(this).closest('ul').get(),false,'400');$(this).closest('ul.cerb-popupmenu').hide();">
-								{else}
-								<a href="javascript:;" onclick="genericAjaxGet('','c=display&a=getMacroReply&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}', function(js) { $script=$('<div></div>').html(js); $('BODY').append($script); });$(this).closest('ul.cerb-popupmenu').hide();">
-								{/if}
-									{if !empty($macro->title)}
-										{$macro->title}
+						
+						{$vas = DAO_VirtualAttendant::getAll()}
+						
+						{foreach from=$vas item=va}
+							{capture name=behaviors}
+							{foreach from=$macros item=macro key=macro_id}
+							{if $macro->virtual_attendant_id == $va->id}
+							<li class="item item-behavior">
+								<div style="margin-left:10px;">
+									{if $macro->has_public_vars}
+									<a href="javascript:;" onclick="genericAjaxPopup('peek','c=display&a=showMacroReplyPopup&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}',$(this).closest('ul').get(),false,'400');$(this).closest('ul.cerb-popupmenu').hide();">
 									{else}
-										{$event = DevblocksPlatform::getExtension($macro->event_point, false)}
-										{$event->name}
+									<a href="javascript:;" onclick="genericAjaxGet('','c=display&a=getMacroReply&ticket_id={$message->ticket_id}&message_id={$message->id}&macro={$macro->id}', function(js) { $script=$('<div></div>').html(js); $('BODY').append($script); });$(this).closest('ul.cerb-popupmenu').hide();">
 									{/if}
-								</a>
-							</div>
-							<div style="margin-left:10px;">
-								{$meta = $owner_ctx->getMeta($macro->owner_context_id)}
-								{$meta.name} ({$owner_ctx->manifest->name})
-							</div>
-						</li>
+										{if !empty($macro->title)}
+											{$macro->title}
+										{else}
+											{$event = DevblocksPlatform::getExtension($macro->event_point, false)}
+											{$event->name}
+										{/if}
+									</a>
+								</div
+							</li>
+							{/if}
+							{/foreach}
+							{/capture}
+							
+							{if strlen(trim($smarty.capture.behaviors))}
+							<li class="item-va">
+								<div>
+									<a href="javascript:;" style="color:black;" tabindex="-1">{$va->name}</a>
+								</div>
+							</li>
+							{$smarty.capture.behaviors nofilter}
+							{/if}
 						{/foreach}
+						
 					</ul>
 					{/if}
 					
@@ -234,11 +248,13 @@
 							{if $active_worker->hasPriv('core.ticket.actions.close') || ($ticket->is_closed && !$ticket->is_deleted)}<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+C)"{/if}><input type="radio" name="closed" value="1" class="status_closed" onclick="toggleDiv('replyOpen{$message->id}','none');toggleDiv('replyClosed{$message->id}','block');" {if (empty($draft) && 'closed'==$mail_status_reply) || $draft->params.closed==1}checked="checked"{/if}>{$translate->_('status.closed')|capitalize}</label>{/if}
 							<br>
 							
-							<div id="replyClosed{$message->id}" style="display:{if (empty($draft) && 'open'==$mail_status_reply) || (!empty($draft) && $draft->params.closed==0)}none{else}block{/if};margin:10px 0px 10px 20px;">
+							<div id="replyClosed{$message->id}" style="display:{if (empty($draft) && 'open'==$mail_status_reply) || (!empty($draft) && $draft->params.closed==0)}none{else}block{/if};margin:10px 0px 0px 20px;">
 							<b>{$translate->_('display.reply.next.resume')}</b> {$translate->_('display.reply.next.resume_eg')}<br> 
 							<input type="text" name="ticket_reopen" size="55" value="{if !empty($draft)}{$draft->params.ticket_reopen}{elseif !empty($ticket->reopen_at)}{$ticket->reopen_at|devblocks_date}{/if}"><br>
 							{$translate->_('display.reply.next.resume_blank')}<br>
 							</div>
+							
+							<div style="margin-bottom:10px;"></div>
 							
 							{if $active_worker->hasPriv('core.ticket.actions.move')}
 							<b>{$translate->_('display.reply.next.move')}</b>

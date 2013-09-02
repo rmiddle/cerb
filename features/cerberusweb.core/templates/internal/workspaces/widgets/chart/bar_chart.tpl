@@ -20,10 +20,13 @@
 </div>
 
 <script type="text/javascript">
+$(function() {
 try {
 	$widget = $('#widget{$widget->id}');
 	width = $widget.width();
-	$widget.find('canvas').attr('width', width);
+	
+	if(width > 0)
+		$widget.find('canvas').attr('width', width);
 	
 	var options = {
 		series:[
@@ -39,7 +42,7 @@ try {
 		]
 	};
 	
-	drawBarGraph($('#widget{$widget->id}_canvas'), options);	
+	$('#widget{$widget->id}_canvas').devblocksCharts('bar', options);
 	
 	$('#widget{$widget->id}_axes_canvas')
 		.data('model', options)
@@ -166,4 +169,5 @@ try {
 	
 } catch(e) {
 }
+});
 </script>

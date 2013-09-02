@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2013080201);
-define("APP_VERSION", '6.4.4');
+define("APP_BUILD", 2013090101);
+define("APP_VERSION", '6.5.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -647,6 +647,7 @@ class CerberusContexts {
 	const CONTEXT_CALL = 'cerberusweb.contexts.call';
 	const CONTEXT_COMMENT = 'cerberusweb.contexts.comment';
 	const CONTEXT_CONTACT_PERSON = 'cerberusweb.contexts.contact_person';
+	const CONTEXT_CUSTOM_FIELD = 'cerberusweb.contexts.custom_field';
 	const CONTEXT_CUSTOM_FIELDSET = 'cerberusweb.contexts.custom_fieldset';
 	const CONTEXT_DOMAIN = 'cerberusweb.contexts.datacenter.domain';
 	const CONTEXT_DRAFT = 'cerberusweb.contexts.mail.draft';
@@ -670,6 +671,7 @@ class CerberusContexts {
 	const CONTEXT_TASK = 'cerberusweb.contexts.task';
 	const CONTEXT_TICKET = 'cerberusweb.contexts.ticket';
 	const CONTEXT_TIMETRACKING = 'cerberusweb.contexts.timetracking';
+	const CONTEXT_VIRTUAL_ATTENDANT = 'cerberusweb.contexts.virtual.attendant';
 	const CONTEXT_WORKER = 'cerberusweb.contexts.worker';
 	const CONTEXT_WORKSPACE_PAGE = 'cerberusweb.contexts.workspace.page';
 	const CONTEXT_WORKSPACE_TAB = 'cerberusweb.contexts.workspace.tab';
@@ -680,6 +682,7 @@ class CerberusContexts {
 			case 'cerberusweb.contexts.attachment':
 				self::_getAttachmentContext($context_object, $labels, $values, $prefix);
 				break;
+				
 			default:
 				// Migrated
 				if(null != ($ctx = DevblocksPlatform::getExtension($context, true))
@@ -695,7 +698,7 @@ class CerberusContexts {
 				'global_',
 				'(Global) ',
 				array(
-					'timestamp|date' => 'Current Date+Time',
+					'timestamp' => 'Current Date+Time',
 				),
 				array(
 					'timestamp' => time(),
@@ -747,13 +750,17 @@ class CerberusContexts {
 		}
 		
 		// Rename labels
+		// [TODO] mb_*
+
+		// [TODO] Phase out $labels
+		
 		foreach($labels as $idx => $label) {
-			// [TODO] mb_*
-			$labels[$idx] = ucfirst(strtolower(strtr($label,':',' ')));
+			$labels[$idx] = trim(ucfirst(strtolower(strtr($label,':',' '))));
 		}
 		
-		// Alphabetize
 		asort($labels);
+		
+		$values['_labels'] = $labels;
 		
 		return null;
 	}
@@ -794,10 +801,291 @@ class CerberusContexts {
 		}
 		
 		foreach($src_values as $token => $value) {
-			$dst_values[$token_prefix.$token] = $src_values[$token];
+			if(in_array($token, array('_labels', '_types')))
+				continue;
+			
+			$dst_values[$token_prefix.$token] = $value;
 		}
 
+		if(!isset($dst_values['_labels']))
+			$dst_values['_labels'] = array();
+		
+		if(isset($src_values['_labels']))
+		foreach($src_values['_labels'] as $key => $label) {
+			$dst_values['_labels'][$token_prefix.$key] = $label_prefix.$label;
+		}
+		
+		if(!isset($dst_values['_types']))
+			$dst_values['_types'] = array();
+		
+		if(isset($src_values['_types']))
+		foreach($src_values['_types'] as $key => $type) {
+			$dst_values['_types'][$token_prefix.$key] = $type;
+		}
+		
 		return true;
+	}
+	
+	public static function isSameObject($a, $b) {
+		if(false == ($a = CerberusContexts::polymorphActor($a)))
+			return false;
+		
+		if(false == ($b = CerberusContexts::polymorphActor($b)))
+			return false;
+		
+		return ((get_class($a) == get_class($b)) && (intval($a->id) == intval($b->id)));
+	}
+
+	// Polymorph actor from context array
+	public static function polymorphActor($actor) {
+		if(is_array($actor)) {
+			@list($actor_context, $actor_context_id) = $actor;
+			
+			switch($actor_context) {
+				case CerberusContexts::CONTEXT_APPLICATION:
+					$actor = new Model_Application();
+					break;
+				case CerberusContexts::CONTEXT_ROLE:
+					$actor = DAO_WorkerRole::get($actor_context_id);
+					break;
+				case CerberusContexts::CONTEXT_GROUP:
+					$actor = DAO_Group::get($actor_context_id);
+					break;
+				case CerberusContexts::CONTEXT_WORKER:
+					$actor = DAO_Worker::get($actor_context_id);
+					break;
+				case CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT:
+					$actor = DAO_VirtualAttendant::get($actor_context_id);
+					break;
+			}
+		}
+		
+		if(!is_object($actor))
+			return false;
+		
+		$actor_classes = array(
+			'Model_Application',
+			'Model_WorkerRole',
+			'Model_Group',
+			'Model_Worker',
+			'Model_VirtualAttendant',
+		);
+		
+		if(!in_array(get_class($actor), $actor_classes))
+			return false;
+		
+		return $actor;
+	}
+	
+	public static function isReadableByActor($owner_context, $owner_context_id, $actor) {
+		if(false == ($actor = CerberusContexts::polymorphActor($actor)))
+			return false;
+		
+		switch($owner_context) {
+			// Everyone can see app-owned content
+			case CerberusContexts::CONTEXT_APPLICATION:
+				return true;
+				break;
+			
+			// The role itself, or members of the role, can see it
+			case CerberusContexts::CONTEXT_ROLE:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole': /* @var $actor Model_WorkerRole */
+						return ($owner_context_id == $actor->id);
+						break;
+						
+					case 'Model_Group': /* @var $actor Model_Group */
+						break;
+						
+					case 'Model_Worker': /* @var $actor Model_Worker */
+						return in_array($owner_context_id, array_keys($actor->getRoles()));
+						break;
+						
+					case 'Model_VirtualAttendant': /* @var $actor Model_VirtualAttendant */
+						return self::isReadableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+				
+			case CerberusContexts::CONTEXT_GROUP:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole':
+						break;
+						
+					case 'Model_Group':
+						return ($owner_context_id == $actor->id);
+						break;
+						
+					case 'Model_Worker':
+						return in_array($owner_context_id, array_keys($actor->getMemberships()));
+						break;
+						
+					case 'Model_VirtualAttendant':
+						return self::isReadableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+				
+			case CerberusContexts::CONTEXT_WORKER:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole':
+						break;
+						
+					case 'Model_Group':
+						break;
+						
+					case 'Model_Worker':
+						return ($owner_context_id == $actor->id);
+						break;
+						
+					case 'Model_VirtualAttendant':
+						return self::isReadableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+				
+			case CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole':
+					case 'Model_Group':
+					case 'Model_Worker':
+						return self::isReadableByActor($va->owner_context, $va->owner_context_id, $actor);
+						break;
+						
+					case 'Model_VirtualAttendant':
+						return ($owner_context_id == $actor->id);
+						break;
+				}
+				break;
+		}
+		
+		return false;
+	}
+
+	public static function isWriteableByActor($owner_context, $owner_context_id, $actor) {
+		// Polymorph actor from context array
+		if(is_array($actor)) {
+			@list($actor_context, $actor_context_id) = $actor;
+			
+			switch($actor_context) {
+				case CerberusContexts::CONTEXT_ROLE:
+					$actor = DAO_WorkerRole::get($actor_context_id);
+					break;
+				case CerberusContexts::CONTEXT_GROUP:
+					$actor = DAO_Group::get($actor_context_id);
+					break;
+				case CerberusContexts::CONTEXT_WORKER:
+					$actor = DAO_Worker::get($actor_context_id);
+					break;
+				case CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT:
+					$actor = DAO_VirtualAttendant::get($actor_context_id);
+					break;
+			}
+		}
+		
+		if(!is_object($actor))
+			return false;
+		
+		switch($owner_context) {
+			// Everyone can see app-owned content
+			case CerberusContexts::CONTEXT_APPLICATION:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole': /* @var $actor Model_WorkerRole */
+						break;
+						
+					case 'Model_Group': /* @var $actor Model_Group */
+						break;
+						
+					case 'Model_Worker': /* @var $actor Model_Worker */
+						// [TODO]
+						return $actor->is_superuser;
+						break;
+						
+					case 'Model_VirtualAttendant': /* @var $actor Model_VirtualAttendant */
+						return self::isWriteableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+			
+			// The role itself, or members of the role, can see it
+			case CerberusContexts::CONTEXT_ROLE:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole': /* @var $actor Model_WorkerRole */
+						return ($owner_context_id == $actor->id);
+						break;
+						
+					case 'Model_Group': /* @var $actor Model_Group */
+						break;
+						
+					case 'Model_Worker': /* @var $actor Model_Worker */
+						// [TODO]
+						return $actor->is_superuser;
+						break;
+						
+					case 'Model_VirtualAttendant': /* @var $actor Model_VirtualAttendant */
+						return self::isWriteableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+				
+			case CerberusContexts::CONTEXT_GROUP:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole':
+						break;
+						
+					case 'Model_Group':
+						return ($owner_context_id == $actor->id);
+						break;
+						
+					case 'Model_Worker':
+						// [TODO]
+						return ($actor->is_superuser || $actor->isGroupManager($owner_context_id));
+						break;
+						
+					case 'Model_VirtualAttendant':
+						return self::isWriteableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+				
+			case CerberusContexts::CONTEXT_WORKER:
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole':
+						break;
+						
+					case 'Model_Group':
+						break;
+						
+					case 'Model_Worker':
+						// [TODO]
+						return ($actor->is_superuser || $owner_context_id == $actor->id);
+						break;
+						
+					case 'Model_VirtualAttendant':
+						return self::isWriteableByActor($owner_context, $owner_context_id, array($actor->owner_context, $actor->owner_context_id));
+						break;
+				}
+				break;
+				
+			case CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT:
+				if(false == ($va = DAO_VirtualAttendant::get($owner_context_id)))
+					return false;
+				
+				switch(get_class($actor)) {
+					case 'Model_WorkerRole':
+					case 'Model_Group':
+					case 'Model_Worker':
+						return self::isWriteableByActor($va->owner_context, $va->owner_context_id, $actor);
+						break;
+						
+					case 'Model_VirtualAttendant':
+						return ($owner_context_id == $actor->id);
+						break;
+				}
+				break;
+		}
+		
+		return false;
 	}
 	
 	static public function getWatchers($context, $context_id, $as_contexts=false) {
@@ -826,7 +1114,7 @@ class CerberusContexts {
 
 				CerberusContexts::getContext(CerberusContexts::CONTEXT_WORKER, $watcher_id, $null_labels, $watcher_values, null, true);
 				
-				$workers[$watcher_id] = $watcher_values;
+				$workers[$watcher_id] = new DevblocksDictionaryDelegate($watcher_values);
 			}
 			
 		// Or as Model_* objects?
@@ -1018,26 +1306,14 @@ class CerberusContexts {
 				&& null != ($trigger_id = end($stack))
 				&& !empty($trigger_id)
 				&& null != ($trigger = DAO_TriggerEvent::get($trigger_id))
+				&& false != ($trigger_va = $trigger->getVirtualAttendant())
 			) {
 				/* @var $trigger Model_TriggerEvent */
 				
-				switch($trigger->owner_context) {
-					case CerberusContexts::CONTEXT_GROUP:
-						$group = DAO_Group::get($trigger->owner_context_id);
-						$actor_name = $group->name . ' [' . $trigger->title . ']';
-						$actor_context = $trigger->owner_context;
-						$actor_context_id = $trigger->owner_context_id;
-						$actor_url = sprintf("ctx://%s:%d", CerberusContexts::CONTEXT_GROUP, $actor_context_id);
-						break;
-						
-					case CerberusContexts::CONTEXT_WORKER:
-						$worker = DAO_Worker::get($trigger->owner_context_id);
-						$actor_name = $worker->getName() . ' [' . $trigger->title . ']';
-						$actor_context = $trigger->owner_context;
-						$actor_context_id = $trigger->owner_context_id;
-						$actor_url = sprintf("ctx://%s:%d", CerberusContexts::CONTEXT_WORKER, $actor_context_id);
-						break;
-				}
+				$actor_name = sprintf("%s [%s]", $trigger_va->name, $trigger->title);
+				$actor_context = CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT;
+				$actor_context_id = $trigger_va->id;
+				$actor_url = sprintf("ctx://%s:%d", CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT, $trigger_va->id);
 				
 			// Otherwise see if we have an active session
 			} else {
@@ -1191,7 +1467,7 @@ class CerberusContexts {
 			'mime_type' => $prefix.$translate->_('attachment.mime_type'),
 			'name' => $prefix.$translate->_('attachment.display_name'),
 			'size' => $prefix.$translate->_('attachment.storage_size'),
-			'updated|date' => $prefix.$translate->_('common.updated'),
+			'updated' => $prefix.$translate->_('common.updated'),
 		);
 		
 		// Token values
@@ -1208,6 +1484,11 @@ class CerberusContexts {
 		return true;
 	}
 };
+
+class Model_Application {
+	public $id = 0;
+	public $name = 'Cerb';
+}
 
 class Context_Application extends Extension_DevblocksContext {
 	function authorize($context_id, Model_Worker $worker) {
@@ -1231,20 +1512,19 @@ class Context_Application extends Extension_DevblocksContext {
 	}
 	
 	function getMeta($context_id) {
-		if(null == ($worker_role = DAO_WorkerRole::get($context_id)))
-			return null;
-			
 		$url_writer = DevblocksPlatform::getUrlService();
 		
-		$who = sprintf("%d-%s",
-			$worker_role->id,
-			DevblocksPlatform::strToPermalink($worker_role->name)
-		);
-		
 		return array(
-			'id' => $worker_role->id,
-			'name' => $worker_role->name,
-			'permalink' => $url_writer->writeNoProxy('c=profiles&type=role&who='.$who, true),
+			'id' => 0,
+			'name' => 'Cerb',
+			'permalink' => null, //$url_writer->writeNoProxy('', true),
+		);
+	}
+
+	// [TODO] Interface
+	function getDefaultProperties() {
+		return array(
+			'name',
 		);
 	}
 	
@@ -1257,8 +1537,9 @@ class Context_Application extends Extension_DevblocksContext {
 		
 		// Polymorph
 		if(is_numeric($app)) {
-			//$app = DAO_WorkerRole::get($role);
-// 		} elseif($app instanceof Model_WorkerRole) {
+			$app = new Model_Application();
+			$app->name = 'Application';
+ 		} elseif($app instanceof Model_Application) {
 			// It's what we want already.
 		} else {
 			$app = null;
@@ -1266,8 +1547,14 @@ class Context_Application extends Extension_DevblocksContext {
 			
 		// Token labels
 		$token_labels = array(
-			//'name' => $prefix.$translate->_('common.name'),
-			//'record_url' => $prefix.$translate->_('common.url.record'),
+			'_label' => $prefix,
+			'name' => $prefix.$translate->_('common.name'),
+		);
+		
+		// Token types
+		$token_types = array(
+			'_label' => 'context_url',
+			'name' => Model_CustomField::TYPE_SINGLE_LINE,
 		);
 		
 		// Custom field/fieldset token labels
@@ -1278,17 +1565,13 @@ class Context_Application extends Extension_DevblocksContext {
 		$token_values = array();
 		
 		$token_values['_context'] = CerberusContexts::CONTEXT_APPLICATION;
+		$token_values['_types'] = $token_types;
 		
 		// Worker token values
-		if(null != $role) {
+		if(null != $app) {
 			$token_values['_loaded'] = true;
 			$token_values['_label'] = 'Application';
-			//$token_values['id'] = $role->id;
-			//$token_values['name'] = $role->name;
-			
-			// URL
-// 			$url_writer = DevblocksPlatform::getUrlService();
-// 			$token_values['record_url'] = $url_writer->writeNoProxy(sprintf("c=profiles&type=worker&id=%d-%s",$worker->id, DevblocksPlatform::strToPermalink($worker->getName())), true);
+			$token_values['name'] = 'Application';
 		}
 		
 		return true;
@@ -1437,10 +1720,11 @@ class CerberusSettings {
 	const LICENSE = 'license_json';
 	const RELAY_DISABLE_AUTH = 'relay_disable_auth';
 	const SESSION_LIFESPAN = 'session_lifespan';
+	const TIME_FORMAT = 'time_format';
 };
 
 class CerberusSettingsDefaults {
-	const HELPDESK_TITLE = 'Cerb6 - a fast and flexible web-based platform for business collaboration and automation.';
+	const HELPDESK_TITLE = 'Cerb - a fast and flexible web-based platform for business collaboration and automation.';
 	const SMTP_HOST = 'localhost';
 	const SMTP_AUTH_ENABLED = 0;
 	const SMTP_AUTH_USER = '';
@@ -1457,6 +1741,7 @@ class CerberusSettingsDefaults {
 	const AUTHORIZED_IPS = "127.0.0.1\n::1\n";
 	const RELAY_DISABLE_AUTH = 0;
 	const SESSION_LIFESPAN = 0;
+	const TIME_FORMAT = 'D, d M Y h:i a';
 };
 
 class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
@@ -1709,15 +1994,20 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 					break;
 				case Model_CustomField::TYPE_CHECKBOX:
 				case Model_CustomField::TYPE_DATE:
+				case Model_CustomField::TYPE_FILE:
+				case Model_CustomField::TYPE_FILES:
 				case Model_CustomField::TYPE_NUMBER:
 				case Model_CustomField::TYPE_WORKER:
 					$value_table = 'custom_field_numbervalue';
 					break;
-				default:
-				case Model_CustomField::TYPE_SINGLE_LINE:
 				case Model_CustomField::TYPE_DROPDOWN:
+				case Model_CustomField::TYPE_MULTI_CHECKBOX:
+				case Model_CustomField::TYPE_SINGLE_LINE:
 				case Model_CustomField::TYPE_URL:
 					$value_table = 'custom_field_stringvalue';
+					break;
+				default:
+					$value_table = null;
 					break;
 			}
 
@@ -1730,7 +2020,7 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 			
 			// If we have multiple values but we don't need to WHERE the JOIN, be efficient and don't GROUP BY
 			if(!Cerb_ORMHelper::paramExistsInSet('cf_'.$field_id, $params)) {
-				$select_sql .= sprintf(",(SELECT field_value FROM %s WHERE %s=context_id AND field_id=%d LIMIT 0,1) AS %s ",
+				$select_sql .= sprintf(",(SELECT GROUP_CONCAT(field_value SEPARATOR \"\\n\") FROM %s WHERE %s=context_id AND field_id=%d ORDER BY field_value) AS %s ",
 					$value_table,
 					$field_key,
 					$field_id,

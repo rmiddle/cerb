@@ -21,6 +21,7 @@
 </table>
 
 <script type="text/javascript">
+$(function() {
 try {
 	{$metric_value = $widget->params.metric_value}
 	{if $widget->params.metric_type == 'decimal'}{$decimals=2}{else}{$decimals=0}{/if}
@@ -36,7 +37,7 @@ try {
 		{$metric_label = DevblocksPlatform::strPrettyBytes($metric_value, 2)}
 	{/if}
 	
-	drawGauge($('#widget{$widget->id}_canvas'), {
+	var options = {
 		{if !empty($widget->params.threshold_values)}'threshold_values': {json_encode($widget->params.threshold_values) nofilter},{/if}
 		{if !empty($widget->params.threshold_colors)}'threshold_colors': {json_encode($widget->params.threshold_colors) nofilter},{/if}
 		{if !empty($metric_value)}'metric': {floatval($metric_value)},{/if}
@@ -44,8 +45,11 @@ try {
 		/*'metric_compare': 173,*/
 		'legend': false,
 		'radius': 90
-	});
+	};
+	
+	$('#widget{$widget->id}_canvas').devblocksCharts('gauge', options);
 	
 } catch(e) {
 }
+});
 </script>

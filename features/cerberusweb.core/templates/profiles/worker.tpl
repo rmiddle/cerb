@@ -102,21 +102,16 @@
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=handleSectionAction&section=calendars&action=showCalendarAvailabilityTab&point={$point}&context={$page_context}&context_id={$page_context_id}&id={$profile_worker_prefs.availability_calendar_id}{/devblocks_url}">Availability</a></li>
 		
 		{$tabs[] = 'activity'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabActivityLog&scope=actor&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{'common.activity_log'|devblocks_translate|capitalize}</a></li>
+		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabActivityLog&scope=both&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{'common.activity_log'|devblocks_translate|capitalize}</a></li>
 		
 		{$tabs[] = 'comments'}
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabContextComments&context={$page_context}&id={$page_context_id}{/devblocks_url}">{'common.comments'|devblocks_translate|capitalize} <div class="tab-badge">{DAO_Comment::count($page_context, $page_context_id)|default:0}</div></a></li>
 
 		{if $active_worker->is_superuser || $worker->id == $active_worker->id}
-		{$tabs[] = 'attendant'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showAttendantTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Virtual Attendant</a></li>
+		{$tabs[] = 'attendants'}
+		<li><a href="{devblocks_url}ajax.php?c=internal&a=showAttendantsTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Virtual Attendants</a></li>
 		{/if}
 		
-		{if $active_worker->is_superuser || $worker->id == $active_worker->id}
-		{$tabs[] = 'behavior'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showScheduledBehaviorTab&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">Scheduled Behavior</a></li>
-		{/if}
-
 		{$tabs[] = 'links'}
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabContextLinks&context={$page_context}&point={$point}&id={$page_context_id}{/devblocks_url}">Watchlist <div class="tab-badge">{DAO_ContextLink::count($page_context, $page_context_id)|default:0}</div></a></li>
 		
