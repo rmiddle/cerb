@@ -808,7 +808,7 @@
 				</param>
 			</params>
 		</extension>
-		
+		<!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.contact_person</id>
 			<name>Contact Person</name>
@@ -823,16 +823,12 @@
 				<param key="options">
 					<value>
 						<data key="custom_fields" />
-						<!--<data key="create" />-->
-						<!--<data key="find" />-->
-						<!--<data key="snippets" />-->
-						<data key="workspace" />
 					</value>
 				</param>
 				<param key="context_expand_export" value="email_" />
 			</params>
 		</extension>
-		
+		-->
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.custom_field</id>
 			<name>Custom Field</name>
@@ -856,7 +852,8 @@
 				</param>
 			</params>
 		</extension>
-		
+
+		<!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.address</id>
 			<name>Email Address</name>
@@ -881,7 +878,9 @@
 				<param key="context_expand_export" value="org_" />
 			</params>
 		</extension>
+		-->
 		
+		<!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.bucket</id>
 			<name>Bucket</name>
@@ -893,7 +892,7 @@
 				<param key="alias" value="bucket" />
 				<param key="dao_class" value="DAO_Bucket" />
 				<param key="view_class" value="View_Bucket" />
-				<!--
+				--> <!--
 				<param key="options">
 					<value>
 						<data key="find" />
@@ -902,10 +901,11 @@
 						<data key="workspace" />
 					</value>
 				</param>
-				-->
+				--> <!--
 			</params>
 		</extension>
-		
+		-->
+
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.calendar</id>
 			<name>Calendar</name>
@@ -1016,9 +1016,7 @@
 				<param key="view_class" value="View_CustomFieldset" />
 				<param key="options">
 					<value>
-						<!--<data key="create" />-->
 						<data key="find" />
-						<!--<data key="snippets" />-->
 						<data key="workspace" />
 					</value>
 				</param>
@@ -1046,7 +1044,8 @@
 			</params>
 		</extension>
 		
-		<extension point="devblocks.context">
+		<!--
+                <extension point="devblocks.context">
 			<id>cerberusweb.contexts.mail.draft</id>
 			<name>Draft</name>
 			<class>
@@ -1059,17 +1058,16 @@
 				<param key="view_class" value="View_MailQueue" />
 				<param key="options">
 					<value>
-						<!--<data key="create" />-->
-						<!--<data key="find" />-->
-						<!--<data key="snippets" />-->
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
 			</params>
 		</extension>
+                -->
 		
-		<extension point="devblocks.context">
+		<!--
+                <extension point="devblocks.context">
 			<id>cerberusweb.contexts.group</id>
 			<name>Group</name>
 			<class>
@@ -1091,7 +1089,9 @@
 				</param>
 			</params>
 		</extension>
-		
+                -->
+
+		<!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.message</id>
 			<name>Message</name>
@@ -1112,7 +1112,8 @@
 				<param key="context_expand_export" value="ticket_,ticket_bucket,ticket_group,sender_,sender_org_" />
 			</params>
 		</extension>
-		
+                -->
+
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.notification</id>
 			<name>Notification</name>
@@ -1126,7 +1127,6 @@
 				<param key="view_class" value="View_Notification" />
 				<param key="options">
 					<value>
-						<!--<data key="snippets" />-->
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
@@ -1181,7 +1181,8 @@
 				<param key="context_expand_export" value="owner_" />
 			</params>
 		</extension>
-		
+                
+                <!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.task</id>
 			<name>Task</name>
@@ -1205,7 +1206,9 @@
 				</param>
 			</params>
 		</extension>
+                -->
 
+                <!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.ticket</id>
 			<name>Ticket</name>
@@ -1230,7 +1233,8 @@
 				<param key="context_expand_export" value="group_,bucket_,owner_,latest_message_sender_" />
 			</params>
 		</extension>
-		
+                -->
+
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.virtual.attendant</id>
 			<name>Virtual Attendant</name>

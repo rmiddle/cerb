@@ -5,15 +5,18 @@
  * @version 2013-08-13
  */
 
-$plugin_id = 'example.plugin';
-$plugin_namespace = 'example';
+$plugin_id = 'feg.core';
+$plugin_namespace = 'Feg';
 
 $tables = array();
 
-$tables['Example_Object'] = "
-id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-name VARCHAR(255) DEFAULT '',
-updated_at INT UNSIGNED NOT NULL DEFAULT 0,
+$tables['feg_export_type_params'] = "
+id INT UNSIGNED DEFAULT 0 NOT NULL,
+recipient_type TINYINT UNSIGNED DEFAULT 0 NOT NULL,
+name VARCHAR(255) DEFAULT '' NOT NULL,
+type VARCHAR(1) DEFAULT 'S' NOT NULL,
+pos SMALLINT UNSIGNED DEFAULT 0 NOT NULL,
+options_json LONGTEXT,
 ";
 
 foreach($tables as $table_name => $field_strs) {
@@ -593,8 +596,13 @@ foreach($fields as $field_name => $field_type) {
 		$custom_fields = DAO_CustomField::getByContext('<?php echo $ctx_ext_id; ?>');
 		$tpl->assign('custom_fields', $custom_fields);
 
-		$tpl->assign('view_template', 'devblocks:<?php echo $plugin_id; ?>::<?php echo $table_name; ?>/view.tpl');
-		$tpl->display('devblocks:cerberusweb.core::internal/views/subtotals_and_view.tpl');
+                switch($this->renderTemplate) {
+			case 'contextlinks_chooser':
+			default:
+                		$tpl->assign('view_template', 'devblocks:<?php echo $plugin_id; ?>::<?php echo $table_name; ?>/view.tpl');
+                		$tpl->display('devblocks:cerberusweb.core::internal/views/subtotals_and_view.tpl');
+				break;
+		}
 	}
 
 	function renderCriteria($field) {
