@@ -1361,11 +1361,6 @@
         <seg>Telefoon</seg>
       </tuv>
     </tu>
-    <tu tuid="crm.opportunity.created_date">
-      <tuv xml:lang="nl_NL">
-        <seg>Datum aangemaakt</seg>
-      </tuv>
-    </tu>
     <tu tuid="crm.opportunity.email_address">
       <tuv xml:lang="nl_NL">
         <seg>E-mailadres</seg>
@@ -1404,11 +1399,6 @@
     <tu tuid="crm.opportunity.primary_email_id">
       <tuv xml:lang="nl_NL">
         <seg>E-mail ID</seg>
-      </tuv>
-    </tu>
-    <tu tuid="crm.opportunity.updated_date">
-      <tuv xml:lang="nl_NL">
-        <seg>Datum bijgewerkt</seg>
       </tuv>
     </tu>
     <tu tuid="crm.opportunity.worker_id">
@@ -1714,11 +1704,6 @@
     <tu tuid="display.shortcut.read_all">
       <tuv xml:lang="nl_NL">
         <seg>Lees alle berichten in chronologische volgorde (A)</seg>
-      </tuv>
-    </tu>
-    <tu tuid="display.shortcut.refresh">
-      <tuv xml:lang="nl_NL">
-        <seg>Herlaad deze ticket</seg>
       </tuv>
     </tu>
     <tu tuid="display.shortcut.spam">
