@@ -41,7 +41,6 @@ class DAO_Notification extends DevblocksORMHelper {
 		// If a worker was provided
 		if(isset($fields[self::WORKER_ID])) {
 			// Invalidate the worker notification count cache
-			$cache = DevblocksPlatform::getCacheService();
 			self::clearCountCache($fields[self::WORKER_ID]);
 			
 			// Trigger notification
@@ -460,6 +459,14 @@ class Model_Notification {
 		
 		return $url;
 	}
+	
+	function markRead() {
+		DAO_Notification::update($this->id, array(
+			DAO_Notification::IS_READ => 1,
+		));
+		
+		DAO_Notification::clearCountCache($this->worker_id);
+	}
 };
 
 class View_Notification extends C4_AbstractView implements IAbstractView_Subtotals {
@@ -791,6 +798,28 @@ class Context_Notification extends Extension_DevblocksContext {
 			'name' => $notification->message,
 			'permalink' => $url,
 		);
+	}
+	
+	function getPropertyLabels(DevblocksDictionaryDelegate $dict) {
+		$labels = $dict->_labels;
+		$prefix = $labels['_label'];
+		
+		if(!empty($prefix)) {
+			array_walk($labels, function(&$label, $key) use ($prefix) {
+				$label = preg_replace(sprintf("#^%s #", preg_quote($prefix)), '', $label);
+				
+				// [TODO] Use translations
+				switch($key) {
+				}
+				
+				$label = mb_convert_case($label, MB_CASE_LOWER);
+				$label[0] = mb_convert_case($label[0], MB_CASE_UPPER);
+			});
+		}
+		
+		asort($labels);
+		
+		return $labels;
 	}
 	
 	// [TODO] Interface

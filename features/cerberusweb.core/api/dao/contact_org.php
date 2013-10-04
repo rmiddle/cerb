@@ -1006,10 +1006,31 @@ class Context_Org extends Extension_DevblocksContext implements IDevblocksContex
 		return DAO_ContactOrg::random();
 	}
 	
+	function getPropertyLabels(DevblocksDictionaryDelegate $dict) {
+		$labels = $dict->_labels;
+		$prefix = $labels['_label'];
+		
+		if(!empty($prefix)) {
+			array_walk($labels, function(&$label, $key) use ($prefix) {
+				$label = preg_replace(sprintf("#^%s #", preg_quote($prefix)), '', $label);
+				
+				// [TODO] Use translations
+				switch($key) {
+				}
+				
+				$label = mb_convert_case($label, MB_CASE_LOWER);
+				$label[0] = mb_convert_case($label[0], MB_CASE_UPPER);
+			});
+		}
+		
+		asort($labels);
+		
+		return $labels;
+	}
+	
 	// [TODO] Interface
 	function getDefaultProperties() {
 		return array(
-			'name',
 			'street',
 			'city',
 			'province',
@@ -1058,7 +1079,7 @@ class Context_Org extends Extension_DevblocksContext implements IDevblocksContex
 			'city' => Model_CustomField::TYPE_SINGLE_LINE,
 			'country' => Model_CustomField::TYPE_SINGLE_LINE,
 			'created' => Model_CustomField::TYPE_DATE,
-			'phone' => Model_CustomField::TYPE_SINGLE_LINE,
+			'phone' => 'phone',
 			'postal' => Model_CustomField::TYPE_SINGLE_LINE,
 			'province' => Model_CustomField::TYPE_SINGLE_LINE,
 			'street' => Model_CustomField::TYPE_SINGLE_LINE,

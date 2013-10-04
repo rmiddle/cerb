@@ -1609,7 +1609,7 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
-			SearchFields_Ticket::TICKET_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_ID, 't', 'id', $translate->_('ticket.id'), Model_CustomField::TYPE_NUMBER),
+			SearchFields_Ticket::TICKET_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_ID, 't', 'id', $translate->_('common.id'), Model_CustomField::TYPE_NUMBER),
 			SearchFields_Ticket::TICKET_MASK => new DevblocksSearchField(SearchFields_Ticket::TICKET_MASK, 't', 'mask', $translate->_('ticket.mask'), Model_CustomField::TYPE_SINGLE_LINE),
 			SearchFields_Ticket::TICKET_SUBJECT => new DevblocksSearchField(SearchFields_Ticket::TICKET_SUBJECT, 't', 'subject', $translate->_('ticket.subject'), Model_CustomField::TYPE_SINGLE_LINE),
 			
@@ -3134,19 +3134,49 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		);
 	}
 
+	function getPropertyLabels(DevblocksDictionaryDelegate $dict) {
+		$labels = $dict->_labels;
+		$prefix = $labels['_label'];
+		
+		if(!empty($prefix)) {
+			array_walk($labels, function(&$label, $key) use ($prefix) {
+				$label = preg_replace(sprintf("#^%s #", preg_quote($prefix)), '', $label);
+				
+				// [TODO] Use translations
+				switch($key) {
+					case 'initial_message_sender__label':
+						$label = 'First wrote';
+						break;
+						
+					case 'latest_message_sender__label':
+						$label = 'Last wrote';
+						break;
+				}
+				
+				$label = mb_convert_case($label, MB_CASE_LOWER);
+				$label[0] = mb_convert_case($label[0], MB_CASE_UPPER);
+			});
+		}
+		
+		asort($labels);
+		
+		return $labels;
+	}
+	
 	// [TODO] Interface
 	function getDefaultProperties() {
 		return array(
 			'status',
+			'reopen_date',
 			'group__label',
-			'bucket_name',
+			'bucket__label',
 			'initial_message_sender__label',
 			'latest_message_sender__label',
 			'org__label',
-			'reopen_date',
+			'owner__label',
 			'spam_score',
-			'created',
 			'updated',
+			'num_messages',
 		);
 	}
 	
@@ -3312,7 +3342,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		CerberusContexts::merge(
 			'initial_message_',
-			'Ticket:Initial:',
+			$prefix.'Initial:',
 			$merge_token_labels,
 			$merge_token_values,
 			$token_labels,
@@ -3327,7 +3357,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		CerberusContexts::merge(
 			'initial_response_message_',
-			'Ticket:Initial:Response:',
+			$prefix.'Initial:Response:',
 			$merge_token_labels,
 			$merge_token_values,
 			$token_labels,
@@ -3342,7 +3372,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		CerberusContexts::merge(
 			'latest_message_',
-			'Ticket:Latest:',
+			$prefix.'Latest:',
 			$merge_token_labels,
 			$merge_token_values,
 			$token_labels,
@@ -3368,7 +3398,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 			CerberusContexts::merge(
 				'owner_',
-				'Ticket:Owner:',
+				$prefix.'Owner:',
 				$merge_token_labels,
 				$merge_token_values,
 				$token_labels,
@@ -3382,7 +3412,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		
 			CerberusContexts::merge(
 				'org_',
-				'Ticket:Org:',
+				$prefix.'Org:',
 				$merge_token_labels,
 				$merge_token_values,
 				$token_labels,

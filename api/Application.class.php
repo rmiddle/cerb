@@ -46,7 +46,7 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2013090101);
+define("APP_BUILD", 2013092001);
 define("APP_VERSION", '6.5.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
@@ -801,26 +801,31 @@ class CerberusContexts {
 		}
 		
 		foreach($src_values as $token => $value) {
-			if(in_array($token, array('_labels', '_types')))
-				continue;
-			
-			$dst_values[$token_prefix.$token] = $value;
-		}
+			if(in_array($token, array('_labels', '_types'))) {
 
-		if(!isset($dst_values['_labels']))
-			$dst_values['_labels'] = array();
-		
-		if(isset($src_values['_labels']))
-		foreach($src_values['_labels'] as $key => $label) {
-			$dst_values['_labels'][$token_prefix.$key] = $label_prefix.$label;
-		}
-		
-		if(!isset($dst_values['_types']))
-			$dst_values['_types'] = array();
-		
-		if(isset($src_values['_types']))
-		foreach($src_values['_types'] as $key => $type) {
-			$dst_values['_types'][$token_prefix.$key] = $type;
+				switch($token) {
+					case '_labels':
+						if(!isset($dst_values['_labels']))
+							$dst_values['_labels'] = array();
+						
+						foreach($value as $key => $label) {
+							$dst_values['_labels'][$token_prefix.$key] = $label_prefix.$label;
+						}
+						break;
+						
+					case '_types':
+						if(!isset($dst_values['_types']))
+							$dst_values['_types'] = array();
+						
+						foreach($value as $key => $type) {
+							$dst_values['_types'][$token_prefix.$key] = $type;
+						}
+						break;
+				}
+				
+			} else {
+				$dst_values[$token_prefix.$token] = $value;
+			}
 		}
 		
 		return true;
@@ -1668,7 +1673,7 @@ class CerberusLicense {
 	}
 	
 	public static function getReleases() {
-		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600,'6.2.0'=>1353888000,'6.3.0'=>1364169600,'6.4.0'=>1370217600);/*
+		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600,'6.2.0'=>1353888000,'6.3.0'=>1364169600,'6.4.0'=>1370217600,'6.5.0'=>1379289600);/*
 		 * Major versions by release date in GMT
 		 */
 		return array(
@@ -1685,6 +1690,7 @@ class CerberusLicense {
 			'6.2.0' => gmmktime(0,0,0,11,26,2012),
 			'6.3.0' => gmmktime(0,0,0,3,25,2013),
 			'6.4.0' => gmmktime(0,0,0,6,3,2013),
+			'6.5.0' => gmmktime(0,0,0,9,16,2013),
 		);
 	}
 	
