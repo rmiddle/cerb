@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2013092001);
-define("APP_VERSION", '6.5.0');
+define("APP_BUILD", 2013100301);
+define("APP_VERSION", '6.5.1');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -1708,6 +1708,7 @@ class CerberusLicense {
 
 class CerberusSettings {
 	const HELPDESK_TITLE = 'helpdesk_title';
+	const HELPDESK_FAVICON_URL = 'helpdesk_favicon_url';
 	const HELPDESK_LOGO_URL = 'helpdesk_logo_url';
 	const SMTP_HOST = 'smtp_host';
 	const SMTP_AUTH_ENABLED = 'smtp_auth_enabled';
