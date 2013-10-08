@@ -46,7 +46,7 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2013100301);
+define("APP_BUILD", 2013100701);
 define("APP_VERSION", '6.5.1');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
@@ -1960,10 +1960,10 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 		return false;
 	}
 	
-	static protected function _getRandom($table) {
+	static protected function _getRandom($table, $pkey='id') {
 		$db = DevblocksPlatform::getDatabaseService();
 		$offset = $db->GetOne(sprintf("SELECT ROUND(RAND()*(SELECT COUNT(*)-1 FROM %s))", $table));
-		return $db->GetOne(sprintf("SELECT id FROM %s LIMIT %d,1", $table, $offset));
+		return $db->GetOne(sprintf("SELECT %s FROM %s LIMIT %d,1", $pkey, $table, $offset));
 	}
 	
 	static protected function _appendSelectJoinSqlForCustomFieldTables($tables, $params, $key, $select_sql, $join_sql) {
