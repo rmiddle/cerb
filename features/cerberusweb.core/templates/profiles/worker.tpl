@@ -50,7 +50,7 @@
 		{if $active_worker->is_superuser}
 			{if $worker->id != $active_worker->id}<button type="button" id="btnProfileWorkerPossess"><span class="cerb-sprite2 sprite-user-silhouette"></span> Impersonate</button>{/if}
 			<button type="button" id="btnProfileWorkerEdit" title="{'common.edit'|devblocks_translate|capitalize}">&nbsp;<span class="cerb-sprite2 sprite-gear"></span>&nbsp;</button>
-			<button type="button" title="{'display.shortcut.refresh'|devblocks_translate}" onclick="document.location='{devblocks_url}c=profiles&type=worker&id={$worker->id}{/devblocks_url}-{$worker->getName()|devblocks_permalink}';">&nbsp;<span class="cerb-sprite sprite-refresh"></span>&nbsp;</button>
+			<button type="button" title="{'common.refresh'|devblocks_translate|capitalize}" onclick="document.location='{devblocks_url}c=profiles&type=worker&id={$worker->id}{/devblocks_url}-{$worker->getName()|devblocks_permalink}';">&nbsp;<span class="cerb-sprite sprite-refresh"></span>&nbsp;</button>
 		{/if}
 	</form>
 </div>
@@ -63,7 +63,7 @@
 	{foreach from=$properties item=v key=k name=props}
 		<div class="property">
 			{if $k == '...'}
-				<b>{$translate->_('...')|capitalize}:</b>
+				<b>{'...'|devblocks_translate|capitalize}:</b>
 				...
 			{else}
 				{include file="devblocks:cerberusweb.core::internal/custom_fields/profile_cell_renderer.tpl"}
@@ -117,7 +117,7 @@
 		
 		{if $active_worker->is_superuser || $worker->id == $active_worker->id}
 		{$tabs[] = 'snippets'}
-		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabSnippets&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{$translate->_('common.snippets')|capitalize}</a></li>
+		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabSnippets&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{'common.snippets'|devblocks_translate|capitalize}</a></li>
 		{/if}
 		
 		{foreach from=$tab_manifests item=tab_manifest}

@@ -1971,9 +1971,14 @@ class ChInternalController extends DevblocksControllerExtension {
 					$cols = array();
 					if(is_array($columns))
 					foreach($columns as $col) {
-						$cols[] = sprintf("\"%s\"",
-							str_replace('"','\"',$row[$col])
-						);
+						$value = '';
+						
+						if(isset($row[$col]))
+							$value = sprintf("\"%s\"",
+								str_replace('"','\"',$row[$col])
+							);
+						
+						$cols[] = $value;
 					}
 					echo implode(',', $cols) . "\r\n";
 				}
@@ -1994,7 +1999,12 @@ class ChInternalController extends DevblocksControllerExtension {
 				$object = array();
 				if(is_array($columns))
 				foreach($columns as $col) {
-					$object[$col] = $row[$col];
+					$value = '';
+					
+					if(isset($row[$col]))
+						$value = $row[$col];
+						
+					$object[$col] = $value;
 				}
 				
 				$objects[] = $object;
@@ -2014,11 +2024,13 @@ class ChInternalController extends DevblocksControllerExtension {
 			list($results, $null) = $view->getData();
 			if(is_array($results))
 			foreach($results as $row) {
-				$result =& $xml->addChild("result");
+				$result = $xml->addChild("result");
 				if(is_array($columns))
 				foreach($columns as $col) {
-					$field =& $result->addChild("field",htmlspecialchars($row[$col],null,LANG_CHARSET_CODE));
-					$field->addAttribute("id", $col);
+					if(isset($row[$col])) {
+						$field = $result->addChild("field",htmlspecialchars($row[$col],null,LANG_CHARSET_CODE));
+						$field->addAttribute("id", $col);
+					}
 				}
 			}
 
@@ -2306,7 +2318,6 @@ class ChInternalController extends DevblocksControllerExtension {
 				DAO_ContextScheduledBehavior::RUN_DATE => $run_timestamp,
 				DAO_ContextScheduledBehavior::RUN_RELATIVE => $run_relative,
 				DAO_ContextScheduledBehavior::RUN_LITERAL => $run_date,
-				DAO_ContextScheduledBehavior::RUN_DATE => $run_timestamp,
 				DAO_ContextScheduledBehavior::VARIABLES_JSON => json_encode($vars),
 				DAO_ContextScheduledBehavior::REPEAT_JSON => json_encode($repeat_params),
 			));
@@ -2565,9 +2576,6 @@ class ChInternalController extends DevblocksControllerExtension {
 
 		if(!$va->isReadableByActor($active_worker))
 			return;
-		
-		$is_writeable = $va->isWriteableByActor($active_worker) ? true : false;
-		$tpl->assign('is_writeable', $is_writeable);
 		
 		// Events
 		
