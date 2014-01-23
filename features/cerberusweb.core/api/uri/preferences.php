@@ -194,6 +194,7 @@ class ChPreferencesPage extends CerberusPageExtension {
 		), true);
 		$myNotificationsView->addParamsRequired(array(
 			SearchFields_Notification::WORKER_ID => new DevblocksSearchCriteria(SearchFields_Notification::WORKER_ID,'=',$active_worker->id),
+			SearchFields_Notification::IS_READ => new DevblocksSearchCriteria(SearchFields_Notification::IS_READ,'=',0),
 		), true);
 
 		/*
