@@ -63,7 +63,7 @@
 			<div id="divDraftStatus{$message->id}"></div>
 			
 			<div>
-				<fieldset style="display:inline-block;">
+				<fieldset style="display:inline-block;margin-bottom:0;">
 					<legend>Actions</legend>
 					{assign var=headers value=$message->getHeaders()}
 					<button name="saveDraft" type="button"><span class="cerb-sprite2 sprite-tick-circle"></span> Save Draft</button>
@@ -126,7 +126,7 @@
 					{/if}
 				</fieldset>
 				
-				<fieldset style="display:inline-block;">
+				<fieldset style="display:inline-block;margin-bottom:0;">
 					<legend>{'common.snippets'|devblocks_translate|capitalize}</legend>
 					<div>
 						Insert: 
@@ -144,6 +144,11 @@
 
 <div id="replyToolbarOptions{$message->id}"></div>
 
+{$message_content = $message->getContent()}
+{$mail_reply_html = DAO_WorkerPref::get($active_worker->id, 'mail_reply_html', 0)}
+{$mail_reply_textbox_size_inelastic = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_inelastic', 0)}
+{$mail_reply_textbox_size_px = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_px', 300)}
+
 <form id="reply{$message->id}_part2" action="{devblocks_url}{/devblocks_url}" method="POST" enctype="multipart/form-data">
 <table cellpadding="2" cellspacing="0" border="0" width="100%">
 	<tr>
@@ -157,16 +162,15 @@
 <input type="hidden" name="draft_id" value="{$draft->id}">
 <input type="hidden" name="reply_mode" value="">
 {if $is_forward}<input type="hidden" name="is_forward" value="1">{/if}
+<input type="hidden" name="group_id" value="{$ticket->group_id}">
+<input type="hidden" name="bucket_id" value="{$ticket->bucket_id}">
+<input type="hidden" name="format" value="{if $mail_reply_html}parsedown{/if}">
 
 <!-- {* Copy these dynamically so a plugin dev doesn't need to conflict with the reply <form> *} -->
 <input type="hidden" name="to" value="{if !empty($draft)}{$draft->params.to}{else}{if $is_forward}{else}{foreach from=$requesters item=req_addy name=reqs}{$req_addy->email}{if !$smarty.foreach.reqs.last}, {/if}{/foreach}{/if}{/if}">
 <input type="hidden" name="cc" value="{$draft->params.cc}">
 <input type="hidden" name="bcc" value="{$draft->params.bcc}">
 <input type="hidden" name="subject" value="{if !empty($draft)}{$draft->params.subject}{else}{if $is_forward}Fwd: {/if}{$ticket->subject}{/if}">
-
-{$message_content = $message->getContent()}
-{$mail_reply_textbox_size_inelastic = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_inelastic', 0)}
-{$mail_reply_textbox_size_px = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_px', 300)}
 
 {if $is_forward}
 <textarea name="content" id="reply_{$message->id}" class="reply" style="width:98%;height:{$mail_reply_textbox_size_px|default:300}px;border:1px solid rgb(180,180,180);padding:5px;">
@@ -209,7 +213,7 @@
 	</tr>
 	<tr>
 		<td>
-			<fieldset class="peek">
+			<fieldset class="peek reply-attachments">
 				<legend>{'common.attachments'|devblocks_translate|capitalize}</legend>
 				
 				<button type="button" class="chooser_file"><span class="cerb-sprite2 sprite-plus-circle"></span></button>
@@ -342,8 +346,8 @@
 		var draftAutoSaveInterval = null;
 	
 	$(function(e) {
-		$frm = $('#reply{$message->id}_part1');
-		$frm2 = $('#reply{$message->id}_part2');
+		var $frm = $('#reply{$message->id}_part1');
+		var $frm2 = $('#reply{$message->id}_part2');
 		
 		// Disable ENTER submission on the FORM text input
 		$frm2
@@ -370,6 +374,92 @@
 		
 		var $content = $('#reply_{$message->id}');
 		
+		// Text editor
+		
+		var markitupPlaintextSettings = $.extend(true, { }, markitupPlaintextDefaults);
+		var markitupParsedownSettings = $.extend(true, { }, markitupParsedownDefaults);
+		
+		markitupPlaintextSettings.markupSet.unshift(
+			{ name:'Switch to Markdown', openWith: 
+				function(markItUp) { 
+					var $editor = $(markItUp.textarea);
+					$editor.markItUpRemove().markItUp(markitupParsedownSettings);
+					{if empty($mail_reply_textbox_size_inelastic)}
+					$editor.elastic();
+					{/if}
+					$editor.closest('form').find('input:hidden[name=format]').val('parsedown');
+				},
+				key: 'H',
+				className:'parsedown'
+			}
+		);
+		
+		markitupParsedownSettings.previewParser = function(content) {
+			genericAjaxPost(
+				$frm2,
+				'',
+				'c=display&a=getReplyMarkdownPreview',
+				function(o) {
+					content = o;
+				},
+				{
+					async: false
+				}
+			);
+			
+			return content;
+		};
+		
+		markitupParsedownSettings.markupSet.unshift(
+			{ name:'Switch to Plaintext', openWith: 
+				function(markItUp) { 
+					var $editor = $(markItUp.textarea);
+					$editor.markItUpRemove().markItUp(markitupPlaintextSettings);
+					{if empty($mail_reply_textbox_size_inelastic)}
+					$editor.elastic();
+					{/if}
+					$editor.closest('form').find('input:hidden[name=format]').val('');
+				},
+				key: 'H',
+				className:'plaintext'
+			},
+			{ separator:'---------------' }
+		);
+		
+		markitupParsedownSettings.markupSet.splice(
+			6,
+			0,
+			{ name:'Upload an Image', openWith: 
+				function(markItUp) {
+					$chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=1',null,true,'750');
+					
+					$chooser.one('chooser_save', function(event) {
+						if(!event.response || 0 == event.response)
+							return;
+						
+						$content.insertAtCursor("![inline-image](" + event.response[0].url + ")");
+					});
+				},
+				key: 'U',
+				className:'image-inline'
+			}
+			//{ separator:'---------------' }
+		);
+		
+		try {
+			{if $mail_reply_html}
+			$content.markItUp(markitupParsedownSettings);
+			{else}
+			$content.markItUp(markitupPlaintextSettings);
+			{/if}
+			
+		} catch(e) {
+			if(window.console)
+				console.log(e);
+		}
+		
+		// Elastic
+
 		{if empty($mail_reply_textbox_size_inelastic)}
 		$content.elastic();
 		{/if}
@@ -382,6 +472,7 @@
 			})
 		
 		// Insert suggested on click
+		
 		$('#reply{$message->id}_suggested').find('a.suggested').click(function(e) {
 			$this = $(this);
 			$sug = $this.text();

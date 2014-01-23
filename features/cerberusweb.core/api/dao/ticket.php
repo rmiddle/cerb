@@ -1431,8 +1431,10 @@ class DAO_Ticket extends Cerb_ORMHelper {
 			case SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER:
 				$member = DAO_Worker::get($param->value);
 				$roster = $member->getMemberships();
+				
 				if(empty($roster))
-					break;
+					$roster = array(0 => 0);
+				
 				$args['where_sql'] .= sprintf("AND t.group_id IN (%s) ", implode(',', array_keys($roster)));
 				break;
 				
@@ -3559,7 +3561,7 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 				
 			default:
 				if(substr($token,0,7) == 'custom_') {
-					$fields = $this->_lazyLoadCustomFields($context, $context_id);
+					$fields = $this->_lazyLoadCustomFields($token, $context, $context_id);
 					$values = array_merge($values, $fields);
 				}
 				break;
@@ -3573,8 +3575,9 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		$active_worker = CerberusApplication::getActiveWorker();
 		
 		if(null != ($view = parent::getSearchView($view_id))) {
-			$view->addParamsRequired(array(
-				SearchFields_Ticket::TICKET_GROUP_ID => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_GROUP_ID,'in',array_keys($active_worker->getMemberships())),
+			$view->addParamsDefault(array(
+				SearchFields_Ticket::VIRTUAL_STATUS => new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS,'in',array('open', 'waiting')),
+				SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER => new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER,'=',$active_worker->id),
 			), true);
 		}
 		return $view;
@@ -3605,14 +3608,11 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 			SearchFields_Ticket::VIRTUAL_STATUS => new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS,'in',array('open','waiting')),
 		);
 		
+		if($active_worker)
+			$params[SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER] = new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER,'=',$active_worker->id);
+		
 		$view->addParams($params, true);
 		$view->addParamsDefault($params, true);
-		
-		if($active_worker) {
-			$view->addParamsRequired(array(
-				SearchFields_Ticket::TICKET_GROUP_ID => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_GROUP_ID,'in',array_keys($active_worker->getMemberships())),
-			), true);
-		}
 		
 		$view->renderSortBy = SearchFields_Ticket::TICKET_UPDATED_DATE;
 		$view->renderSortAsc = false;
@@ -3675,9 +3675,9 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		$groups = DAO_Group::getAll();
 		$tpl->assign('groups', $groups);
 		
-		// Groups+Buckets
-		$group_buckets = DAO_Bucket::getGroups();
-		$tpl->assign('group_buckets', $group_buckets);
+		// Buckets
+		$buckets = DAO_Bucket::getAll();
+		$tpl->assign('buckets', $buckets);
 
 		// Workers
 		$workers = DAO_Worker::getAll();
@@ -3792,8 +3792,8 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		$groups = DAO_Group::getAll();
 		$tpl->assign('groups', $groups);
 		
-		$group_buckets = DAO_Bucket::getGroups();
-		$tpl->assign('group_buckets', $group_buckets);
+		$buckets = DAO_Bucket::getAll();
+		$tpl->assign('buckets', $buckets);
 		
 		// Watchers
 		$object_watchers = DAO_ContextLink::getContextLinks(CerberusContexts::CONTEXT_TICKET, array($ticket->id), CerberusContexts::CONTEXT_WORKER);
