@@ -278,6 +278,8 @@ class DAO_TriggerEvent extends Cerb_ORMHelper {
 		
 		$db->Execute(sprintf("DELETE FROM trigger_event_history WHERE trigger_id IN (%s)", $ids_list));
 		
+		DAO_ContextScheduledBehavior::deleteByBehavior($ids);
+		
 		self::clearCache();
 		return true;
 	}
@@ -537,6 +539,7 @@ class Model_TriggerEvent {
 				$value = !empty($value) ? 1 : 0;
 				break;
 				
+			case Model_CustomField::TYPE_LINK:
 			case Model_CustomField::TYPE_NUMBER:
 				settype($value, 'integer');
 				break;

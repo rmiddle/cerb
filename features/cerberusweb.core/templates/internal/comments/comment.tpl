@@ -1,6 +1,6 @@
 {$owner_meta = $comment->getOwnerMeta()}
 <div id="comment{$comment->id}">
-	<div class="block" style="overflow:auto;">
+	<div class="block" style="overflow:auto;margin-bottom:10px;">
 		<span class="tag" style="color:rgb(71,133,210);">{'common.comment'|devblocks_translate|lower}</span>
 		
 		<b style="font-size:1.3em;">
@@ -35,7 +35,7 @@
 		{/foreach}
 		<br>
 		
-		{if isset($comment->created)}<b>{'message.header.date'|devblocks_translate|capitalize}:</b> {$comment->created|devblocks_date} (<abbr title="{$comment->created|devblocks_date}">{$comment->created|devblocks_prettytime}</abbr>)<br>{/if}
+		{if isset($comment->created)}<b>{'message.header.date'|devblocks_translate|capitalize}:</b> {$comment->created|devblocks_date} ({$comment->created|devblocks_prettytime})<br>{/if}
 		
 		<pre class="emailbody" style="padding-top:10px;">{$comment->comment|trim|escape|devblocks_hyperlinks nofilter}</pre>
 		<br clear="all">
@@ -43,7 +43,6 @@
 		{* Attachments *}
 		{include file="devblocks:cerberusweb.core::internal/attachments/list.tpl" context="{CerberusContexts::CONTEXT_COMMENT}" context_id=$comment->id}
 	</div>
-	<br>
 </div>
 
 <script type="text/javascript">

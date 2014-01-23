@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2013122801);
-define("APP_VERSION", '6.5.3');
+define("APP_BUILD", 2014012301);
+define("APP_VERSION", '6.6.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -1292,7 +1292,7 @@ class CerberusContexts {
 				&& $ctx instanceof Extension_DevblocksContext) {
 				$meta = $ctx->getMeta($actor_context_id);
 				$actor_name = $meta['name'];
-				$actor_url = $meta['permalink'];
+				$actor_url = sprintf("ctx://%s:%d", $actor_context, $actor_context_id);
 			}
 		}
 		
@@ -1401,6 +1401,26 @@ class CerberusContexts {
 			$watchers,
 			$also_notify_worker_ids
 		);
+		
+		// And include any worker-based custom fields with the 'send watcher notifications' option
+		$target_custom_fields = DAO_CustomField::getByContext($target_context, true);
+		
+		if(is_array($target_custom_fields))
+		foreach($target_custom_fields as $target_custom_field_id => $target_custom_field) {
+			if($target_custom_field->type != Model_CustomField::TYPE_WORKER)
+				continue;
+			
+			if(!isset($target_custom_field->params['send_notifications']) || empty($target_custom_field->params['send_notifications']))
+				continue;
+			
+			$values = DAO_CustomFieldValue::getValuesByContextIds($target_context, $target_context_id);
+			
+			if(isset($values[$target_context_id]) && isset($values[$target_context_id][$target_custom_field_id]))
+				$watchers = array_merge(
+					$watchers,
+					array($values[$target_context_id][$target_custom_field_id])
+				);
+		}
 		
 		// Remove dupe watchers
 		$watcher_ids = array_unique($watchers);
@@ -1600,7 +1620,7 @@ class Context_Application extends Extension_DevblocksContext {
 		switch($token) {
 			default:
 				if(substr($token,0,7) == 'custom_') {
-					$fields = $this->_lazyLoadCustomFields($context, $context_id);
+					$fields = $this->_lazyLoadCustomFields($token, $context, $context_id);
 					$values = array_merge($values, $fields);
 				}
 				break;
@@ -2003,6 +2023,7 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 				case Model_CustomField::TYPE_DATE:
 				case Model_CustomField::TYPE_FILE:
 				case Model_CustomField::TYPE_FILES:
+				case Model_CustomField::TYPE_LINK:
 				case Model_CustomField::TYPE_NUMBER:
 				case Model_CustomField::TYPE_WORKER:
 					$value_table = 'custom_field_numbervalue';

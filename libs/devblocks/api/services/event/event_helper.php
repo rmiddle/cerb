@@ -164,13 +164,13 @@ class DevblocksEventHelper {
 				break;
 				
 			case Model_CustomField::TYPE_DROPDOWN:
-				$tpl->assign('options', $custom_field->options);
+				$tpl->assign('options', @$custom_field->params['options']);
 				$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_dropdown.tpl');
 				$tpl->clearAssign('options');
 				break;
 				
 			case Model_CustomField::TYPE_MULTI_CHECKBOX:
-				$tpl->assign('options', $custom_field->options);
+				$tpl->assign('options', @$custom_field->params['options']);
 				$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_multi_checkbox.tpl');
 				$tpl->clearAssign('options');
 				break;
@@ -3391,6 +3391,26 @@ class DevblocksEventHelper {
 				
 				$result = $mailer->send($mail);
 				unset($mail);
+				
+				/*
+				 * Log activity (ticket.message.relay)
+				 */
+				if($context == CerberusContexts::CONTEXT_TICKET) {
+					$entry = array(
+						//{{actor}} relayed ticket {{target}} to {{worker}} ({{worker_email}})
+						'message' => 'activities.ticket.message.relay',
+						'variables' => array(
+							'target' => sprintf("[%s] %s", $dict->ticket_mask, $dict->ticket_subject),
+							'worker' => $worker->getName(),
+							'worker_email' => $worker_address->address,
+							),
+						'urls' => array(
+							'target' => sprintf("ctx://%s:%d", CerberusContexts::CONTEXT_TICKET, $context_id),
+							'worker' => sprintf("ctx://%s:%d", CerberusContexts::CONTEXT_WORKER, $worker->id),
+							)
+					);
+					CerberusContexts::logActivity('ticket.message.relay', CerberusContexts::CONTEXT_TICKET, $context_id, $entry);
+				}
 				
 				if(!$result) {
 					return false;

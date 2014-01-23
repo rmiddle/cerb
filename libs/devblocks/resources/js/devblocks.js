@@ -263,7 +263,6 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 		draggable : true,
 		modal : false,
 		resizable : false,
-		stack: true,
 		width : '600px',
 		close: function(event, ui) {
 			$(this).unbind().find(':focus').blur();
@@ -278,7 +277,10 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 				var offset = $popup.closest('div.ui-dialog').offset();
 				var left = offset.left - $(document).scrollLeft();
 				var top = offset.top - $(document).scrollTop();
-				options.position = [ left, top ];
+				options.position = { 
+					my: 'left top',
+					at: 'left+' + left + ' top+' + top 
+				};
 			} catch(e) { }
 		}
 		target = null;
@@ -313,9 +315,6 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 				}
 			}
 			
-			if(null == options.position)
-				options.position = [ 'center', 'top' ];
-
 			// Max height
 			var max_height = Math.round($(window).height() * 0.85);
 			$popup.css('max-height', max_height + 'px');
@@ -329,6 +328,9 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 			$popup.html(html);
 			
 			$popup.trigger('popup_open');
+			
+			if(null == options.position)
+				$popup.dialog('option', 'position', { my: 'top center', at: 'center' } );
 			
 			// Callback
 			try { cb(html); } catch(e) { }

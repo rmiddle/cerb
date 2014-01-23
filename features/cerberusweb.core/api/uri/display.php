@@ -381,6 +381,26 @@ class ChDisplayPage extends CerberusPageExtension {
 		return $activities;
 	}
 	
+	function getReplyMarkdownPreviewAction() {
+		@$group_id = DevblocksPlatform::importGPC($_REQUEST['group_id'],'integer',0);
+		@$bucket_id = DevblocksPlatform::importGPC($_REQUEST['bucket_id'],'integer',0);
+		@$content = DevblocksPlatform::importGPC($_REQUEST['content'],'string','');
+
+		$output = DevblocksPlatform::parseMarkdown($content, true);
+
+		if(false != ($group = DAO_Group::get($group_id))
+			&& false != ($html_template = $group->getReplyHtmlTemplate($bucket_id))) {
+			
+			$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+			$dirty_html = $tpl_builder->build($html_template->content, array('message_body' => $output));
+			
+			echo DevblocksPlatform::purifyHTML($dirty_html, true);
+			return;
+		}
+		
+		echo $output;
+	}
+	
 	function replyAction() {
 		@$id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer',0);
 		@$is_forward = DevblocksPlatform::importGPC($_REQUEST['forward'],'integer',0);
@@ -443,6 +463,7 @@ class ChDisplayPage extends CerberusPageExtension {
 		}
 
 		// Suggested recipients
+		
 		if(!$is_forward) {
 			$requesters = $ticket->getRequesters();
 			$tpl->assign('requesters', $requesters);
@@ -555,6 +576,7 @@ class ChDisplayPage extends CerberusPageExtension {
 			'bcc' => DevblocksPlatform::importGPC(@$_REQUEST['bcc']),
 			'subject' => DevblocksPlatform::importGPC(@$_REQUEST['subject'],'string'),
 			'content' => DevblocksPlatform::importGPC(@$_REQUEST['content']),
+			'content_format' => DevblocksPlatform::importGPC(@$_REQUEST['format'],'string',''),
 			'closed' => DevblocksPlatform::importGPC(@$_REQUEST['closed'],'integer',0),
 			'bucket_id' => DevblocksPlatform::importGPC(@$_REQUEST['bucket_id'],'string',''),
 			'owner_id' => DevblocksPlatform::importGPC(@$_REQUEST['owner_id'],'integer',0),
@@ -752,6 +774,44 @@ class ChDisplayPage extends CerberusPageExtension {
 		}
 	}
 	
+	function showRelayMessagePopupAction() {
+		@$message_id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer',0);
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		$active_worker = CerberusApplication::getActiveWorker();
+
+		if(false == ($message = DAO_Message::get($message_id)))
+			return;
+		
+		$tpl->assign('message', $message);
+		
+		if(false == ($ticket = DAO_Ticket::get($message->ticket_id)))
+			return;
+		
+		$tpl->assign('ticket', $ticket);
+		
+		if(false == ($sender = $message->getSender()))
+			return;
+		
+		$tpl->assign('sender', $sender);
+		
+		$workers_with_relays = DAO_AddressToWorker::getByWorkers();
+		$tpl->assign('workers_with_relays', $workers_with_relays);
+		
+		$tpl->display('devblocks:cerberusweb.core::display/rpc/relay_message.tpl');
+	}
+	
+	function saveRelayMessagePopupAction() {
+		@$message_id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer',0);
+		@$emails = DevblocksPlatform::importGPC($_REQUEST['emails'],'array',array());
+		@$content = DevblocksPlatform::importGPC($_REQUEST['content'], 'string', '');
+		@$include_attachments = DevblocksPlatform::importGPC($_REQUEST['include_attachments'], 'integer', 0);
+
+		$active_worker = CerberusApplication::getActiveWorker();
+
+		CerberusMail::relay($message_id, $emails, $include_attachments, $content, CerberusContexts::CONTEXT_WORKER, $active_worker->id);
+	}
+	
 	function showMacroReplyPopupAction() {
 		@$macro_id = DevblocksPlatform::importGPC($_REQUEST['macro'],'integer',0);
 		@$ticket_id = DevblocksPlatform::importGPC($_REQUEST['ticket_id'],'integer',0);
@@ -946,6 +1006,43 @@ class ChDisplayPage extends CerberusPageExtension {
 				}
 				$convo_timeline[$key] = array('d', $draft_id);
 			}
+		}
+		
+		// Inline activity log
+		
+		if(DAO_WorkerPref::get($active_worker->id, 'mail_display_inline_log', 0)) {
+			$activity_log = DAO_ContextActivityLog::getWhere(
+				sprintf("%s = %s AND %s = %d",
+					DAO_ContextActivityLog::TARGET_CONTEXT,
+					Cerb_ORMHelper::qstr(CerberusContexts::CONTEXT_TICKET),
+					DAO_ContextActivityLog::TARGET_CONTEXT_ID,
+					$ticket->id
+				),
+				DAO_ContextActivityLog::CREATED,
+				true
+			);
+			
+			$activity_log = array_filter($activity_log, function($entry) {
+				// Filter these events out
+				switch($entry->activity_point) {
+					case 'comment.create':
+					case 'ticket.message.outbound':
+					case 'ticket.message.inbound':
+						return false;
+						break;
+				}
+				
+				return true;
+			});
+			
+			if(!empty($activity_log)) {
+				foreach($activity_log as $activity_entry) { /* @var $activity_entry Model_ContextActivityLog */
+					$key = $activity_entry->created . '_l' . $activity_entry->id;
+					$convo_timeline[$key] = array('l', $activity_entry->id);
+				}
+			}
+			
+			$tpl->assign('activity_log', $activity_log);
 		}
 		
 		// sort the timeline

@@ -502,8 +502,7 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $str;
 	}
 	
-	static function purifyHTML($dirty_html, $options=array()) {
-		// Register HTMLPurifier
+	static function purifyHTML($dirty_html, $inline_css=false, $options=array()) {
 		require_once(DEVBLOCKS_PATH . 'libs/htmlpurifier/HTMLPurifier.standalone.php');
 		
 		// If we're passed a file pointer, load the literal string
@@ -513,6 +512,17 @@ class DevblocksPlatform extends DevblocksEngine {
 			while(!feof($fp))
 				$dirty_html .= fread($fp, 4096);
 		}
+
+		// Handle inlining CSS
+		
+		if($inline_css) {
+			$css_converter = new CssToInlineStyles();
+			$css_converter->setHTML($dirty_html);
+			$css_converter->setUseInlineStylesBlock(true);
+			$dirty_html = $css_converter->convert();
+		}
+		
+		// Purify
 		
 		$config = HTMLPurifier_Config::createDefault();
 		$config->set('HTML.Doctype', 'HTML 4.01 Transitional');
@@ -531,17 +541,19 @@ class DevblocksPlatform extends DevblocksEngine {
 			$config->set($k, $v);
 		
 		$purifier = new HTMLPurifier($config);
-		
 		return $purifier->purify($dirty_html);
 	}
 	
-	static function parseMarkdown($text) {
-		static $parser = null;
-		
-		if(is_null($parser))
-			$parser = new markdown();
+	static function parseMarkdown($text, $use_parsedown=false) {
+		if($use_parsedown) {
+			$parser = new Parsedown();
+			$parser->set_breaks_enabled(true);
+			return $parser->parse($text);
 			
-		return $parser->parse($text);
+		} else {
+			$parser = new markdown();
+			return $parser->parse($text);
+		}
 	}
 	
 	static function parseRss($url) {
@@ -1101,11 +1113,11 @@ class DevblocksPlatform extends DevblocksEngine {
 		return empty($tables);
 	}
 	
-	static function getDatabaseTables() {
+	static function getDatabaseTables($nocache=false) {
 		$cache = self::getCacheService();
 		$tables = array();
 		
-		if(null === ($tables = $cache->load(self::CACHE_TABLES))) {
+		if($nocache || null === ($tables = $cache->load(self::CACHE_TABLES))) {
 			$db = self::getDatabaseService();
 			
 			// Make sure the database connection is valid or error out.
@@ -1113,7 +1125,9 @@ class DevblocksPlatform extends DevblocksEngine {
 				return array();
 			
 			$tables = $db->metaTables();
-			$cache->save($tables, self::CACHE_TABLES);
+			
+			if(!$nocache)
+				$cache->save($tables, self::CACHE_TABLES);
 		}
 		return $tables;
 	}
@@ -1738,16 +1752,21 @@ class DevblocksPlatform extends DevblocksEngine {
 		// Handle $profile polymorphism
 		if($profile instanceof Model_DevblocksStorageProfile) {
 			$extension = $profile->extension_id;
-			$params = $profile->params;
+			$params['_profile_id'] = $profile->id;
+			$params = array_merge($params, $profile->params);
+			
 		} else if(is_numeric($profile)) {
 			$storage_profile = DAO_DevblocksStorageProfile::get($profile);
 			$extension = $storage_profile->extension_id;
-			$params = $storage_profile->params;
+			$params['_profile_id'] = $storage_profile->id;
+			$params = array_merge($params, $storage_profile->params);
+			
 		} else if(is_string($profile)) {
 			$extension = $profile;
+			$params['_profile_id'] = 0;
 			
 			if(isset($args[1]) && is_array($args[1]))
-				$params = $args[1];
+				$params = array_merge($params, $args[1]);
 		}
 		
 		return _DevblocksStorageManager::getEngine($extension, $params);

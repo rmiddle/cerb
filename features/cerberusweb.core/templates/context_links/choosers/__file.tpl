@@ -2,7 +2,7 @@
 <input type="hidden" name="c" value="internal">
 <input type="hidden" name="a" value="chooserOpenFileUpload">
 
-<fieldset>
+<fieldset class="peek">
 	<legend>Upload File</legend>
 	<input type="file" name="file_data[]" {if !$single}multiple="multiple"{/if}>
 </fieldset>
@@ -37,6 +37,7 @@
 		
 			// Trigger event
 			event = jQuery.Event('chooser_save');
+			event.response = $json;
 			event.labels = $labels;
 			event.values = $values;
 			$popup.trigger(event);
