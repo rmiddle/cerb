@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -279,10 +279,16 @@ class ChDisplayPage extends CerberusPageExtension {
 		
 		@$also_notify_worker_ids = DevblocksPlatform::importGPC($_REQUEST['notify_worker_ids'],'array',array());
 
-		// Merge in ticket watchers
+		// Get watchers
+		$watcher_ids = array_keys(CerberusContexts::getWatchers(CerberusContexts::CONTEXT_TICKET, $ticket_id));
+		
+		// Remove the active worker from the watcher list
+		$watcher_ids = array_diff($watcher_ids, array($worker->id));
+		
+		// Merge ticket watchers with the notify list
 		$also_notify_worker_ids = array_merge(
 			$also_notify_worker_ids,
-			array_keys(CerberusContexts::getWatchers(CerberusContexts::CONTEXT_TICKET, $ticket_id))
+			$watcher_ids
 		);
 		
 		$fields = array(
@@ -385,20 +391,37 @@ class ChDisplayPage extends CerberusPageExtension {
 		@$group_id = DevblocksPlatform::importGPC($_REQUEST['group_id'],'integer',0);
 		@$bucket_id = DevblocksPlatform::importGPC($_REQUEST['bucket_id'],'integer',0);
 		@$content = DevblocksPlatform::importGPC($_REQUEST['content'],'string','');
+		@$html_template_id = DevblocksPlatform::importGPC($_REQUEST['html_template_id'],'integer',0);
+
+		header("Content-Type: text/html; charset=" . LANG_CHARSET_CODE);
 
 		$output = DevblocksPlatform::parseMarkdown($content, true);
-
-		if(false != ($group = DAO_Group::get($group_id))
-			&& false != ($html_template = $group->getReplyHtmlTemplate($bucket_id))) {
-			
-			$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-			$dirty_html = $tpl_builder->build($html_template->content, array('message_body' => $output));
-			
-			echo DevblocksPlatform::purifyHTML($dirty_html, true);
-			return;
-		}
 		
-		echo $output;
+		$html_template = null;
+		
+		// Use an override template if given
+		if($html_template_id)
+			$html_template = DAO_MailHtmlTemplate::get($html_template_id);
+		
+		// Cascade to group/bucket template
+		if(!$html_template && false != ($group = DAO_Group::get($group_id)))
+			$html_template = $group->getReplyHtmlTemplate($bucket_id);
+		
+		// Cascade to default reply-to
+		if(!$html_template && false != ($replyto = DAO_AddressOutgoing::getDefault()))
+			$html_template = $replyto->getReplyHtmlTemplate();
+
+		// Wrap the reply in a template if we have one
+		if($html_template) {
+			$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+			$output = $tpl_builder->build($html_template->content, array('message_body' => $output));
+		}
+			
+		echo sprintf('<html><head><meta http-equiv="content-type" content="text/html; charset=%s"></head><body>',
+			LANG_CHARSET_CODE
+		);
+		echo DevblocksPlatform::purifyHTML($output, true);
+		echo '</body></html>';
 	}
 	
 	function replyAction() {
@@ -490,9 +513,9 @@ class ChDisplayPage extends CerberusPageExtension {
 		$groups = DAO_Group::getAll();
 		$tpl->assign('groups', $groups);
 		
-		$group_buckets = DAO_Bucket::getGroups();
-		$tpl->assign('group_buckets', $group_buckets);
-
+		$buckets = DAO_Bucket::getAll();
+		$tpl->assign('buckets', $buckets);
+		
 		if(null != $active_worker) {
 			// Signatures
 			@$ticket_group = $groups[$ticket->group_id]; /* @var $ticket_group Model_Group */
@@ -516,6 +539,11 @@ class ChDisplayPage extends CerberusPageExtension {
 		$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_TICKET, $ticket->id);
 		if(isset($custom_field_values[$ticket->id]))
 			$tpl->assign('custom_field_values', $custom_field_values[$ticket->id]);
+		
+		// HTML templates
+		
+		$html_templates = DAO_MailHtmlTemplate::getAll();
+		$tpl->assign('html_templates', $html_templates);
 		
 		// VA macros
 		
@@ -577,8 +605,10 @@ class ChDisplayPage extends CerberusPageExtension {
 			'subject' => DevblocksPlatform::importGPC(@$_REQUEST['subject'],'string'),
 			'content' => DevblocksPlatform::importGPC(@$_REQUEST['content']),
 			'content_format' => DevblocksPlatform::importGPC(@$_REQUEST['format'],'string',''),
+			'html_template_id' => DevblocksPlatform::importGPC(@$_REQUEST['html_template_id'],'integer',0),
 			'closed' => DevblocksPlatform::importGPC(@$_REQUEST['closed'],'integer',0),
-			'bucket_id' => DevblocksPlatform::importGPC(@$_REQUEST['bucket_id'],'string',''),
+			'group_id' => DevblocksPlatform::importGPC(@$_REQUEST['group_id'],'integer',0),
+			'bucket_id' => DevblocksPlatform::importGPC(@$_REQUEST['bucket_id'],'integer',0),
 			'owner_id' => DevblocksPlatform::importGPC(@$_REQUEST['owner_id'],'integer',0),
 			'ticket_reopen' => DevblocksPlatform::importGPC(@$_REQUEST['ticket_reopen'],'string',''),
 			'worker_id' => @$worker->id,

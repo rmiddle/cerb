@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -210,16 +210,21 @@ class DAO_VirtualAttendant extends Cerb_ORMHelper {
 		return true;
 	}
 	
-	public static function deleteByOwner($context, $context_id) {
+	public static function deleteByOwner($context, $context_ids) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		if(empty($context) || empty($context_id))
+		if(empty($context) || empty($context_ids))
 			return false;
 		
-		$vas = DAO_VirtualAttendant::getByOwner($context, $context_id, true);
+		if(!is_array($context_ids))
+			$context_ids = array($context_ids);
 		
-		if(is_array($vas) && !empty($vas))
-			DAO_VirtualAttendant::delete(array_keys($vas));
+		foreach($context_ids as $context_id) {
+			$vas = DAO_VirtualAttendant::getByOwner($context, $context_id, true);
+			
+			if(is_array($vas) && !empty($vas))
+				DAO_VirtualAttendant::delete(array_keys($vas));
+		}
 	}
 	
 	public static function getSearchQueryComponents($columns, $params, $sortBy=null, $sortAsc=null) {

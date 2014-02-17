@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -708,13 +708,19 @@ class Model_Group {
 	}
 	
 	public function getReplyHtmlTemplate($bucket_id=0) {
-		if(!empty($bucket_id)) {
-			if(null != ($bucket = DAO_Bucket::get($bucket_id)))
-				return $bucket->getReplyHtmlTemplate();
-		}
+		// Cascade to bucket
+		if($bucket_id && null != ($bucket = DAO_Bucket::get($bucket_id)))
+			return $bucket->getReplyHtmlTemplate();
 		
-		if(!empty($this->reply_html_template_id))
-			return DAO_MailHtmlTemplate::get($this->reply_html_template_id);
+		// Cascade to group
+		if($this->reply_html_template_id && false != ($html_template = DAO_MailHtmlTemplate::get($this->reply_html_template_id)))
+			return $html_template;
+		
+		// Finally, cascade to reply-to
+		if(false != ($replyto = $this->getReplyTo())) {
+			if(false != ($html_template = $replyto->getReplyHtmlTemplate()))
+				return $html_template;
+		}
 		
 		return null;
 	}

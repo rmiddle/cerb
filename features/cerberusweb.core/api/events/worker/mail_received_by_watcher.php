@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -228,6 +228,7 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 	
 	function getConditionExtensions() {
 		$labels = $this->getLabels();
+		$types = $this->getTypes();
 		
 		$labels['is_first'] = 'Message is first in conversation';
 		$labels['sender_is_worker'] = 'Message sender is a worker';
@@ -243,11 +244,11 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 		$labels['ticket_org_watcher_count'] = 'Ticket org watcher count';
 		$labels['ticket_watcher_count'] = 'Ticket watcher count';
 		
-		$types['is_first'] = null;
-		$types['sender_is_worker'] = null;
-		$types['sender_is_me'] = null;
+		$types['is_first'] = Model_CustomField::TYPE_CHECKBOX;
+		$types['sender_is_worker'] = Model_CustomField::TYPE_CHECKBOX;
+		$types['sender_is_me'] = Model_CustomField::TYPE_CHECKBOX;
 		
-		$types['ticket_has_owner'] = null;
+		$types['ticket_has_owner'] = Model_CustomField::TYPE_CHECKBOX;
 		
 		$types['group_id'] = null;
 		$types['group_and_bucket'] = null;
@@ -270,10 +271,6 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 			$tpl->assign('namePrefix','condition'.$seq);
 		
 		switch($token) {
-			case 'ticket_has_owner':
-				$tpl->display('devblocks:cerberusweb.core::internal/decisions/conditions/_bool.tpl');
-				break;
-			
 			case 'group_id':
 				$groups = DAO_Group::getAll();
 				$tpl->assign('groups', $groups);
@@ -451,6 +448,10 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 				
 			case 'send_email_recipients':
 				$tpl->assign('workers', DAO_Worker::getAll());
+				
+				$html_templates = DAO_MailHtmlTemplate::getAll();
+				$tpl->assign('html_templates', $html_templates);
+				
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_owner/action_send_email_recipients.tpl');
 				break;
 				
@@ -562,12 +563,16 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 				// Translate message tokens
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 				
-				$content = $tpl_builder->build($params['content'], $dict);
+				@$content = $tpl_builder->build($params['content'], $dict);
+				@$format = $params['format'];
+				@$html_template_id = $params['html_template_id'];
 				
 				$properties = array(
 					'ticket_id' => $ticket_id,
 					'message_id' => $message_id,
 					'content' => $content,
+					'content_format' => $format,
+					'html_template_id' => $html_template_id,
 					'worker_id' => 0,
 				);
 				

@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -36,9 +36,16 @@ class PageSection_SetupBranding extends Extension_PageSection {
 			@$favicon = DevblocksPlatform::importGPC($_POST['favicon'],'string','');
 			@$logo = DevblocksPlatform::importGPC($_POST['logo'],'string');
 	
-			// [TODO] New branding
 			if(empty($title))
 				$title = CerberusSettingsDefaults::HELPDESK_TITLE;
+			
+			// Test the logo
+			if(!empty($logo) && null == parse_url($logo, PHP_URL_SCHEME))
+				throw new Exception("The logo URL is not valid. Please include a full URL like http://example.com/logo.png");
+			
+			// Test the favicon
+			if(!empty($favicon) && null == parse_url($favicon, PHP_URL_SCHEME))
+				throw new Exception("The favicon URL is not valid. Please include a full URL like http://example.com/favicon.ico");
 				
 			$settings = DevblocksPlatform::getPluginSettingsService();
 			$settings->set('cerberusweb.core',CerberusSettings::HELPDESK_TITLE, $title);

@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -89,7 +89,7 @@ class ChFilesController extends DevblocksControllerExtension {
 		
 		switch(strtolower($file->mime_type)) {
 			case 'text/html':
-				header("Content-Type: " . $file->mime_type . '; charset=UTF-8');
+				header("Content-Type: text/html; charset=" . LANG_CHARSET_CODE);
 				
 				// If we're downloading the HTML, just pass the raw bytes
 				if($is_download) {
@@ -101,8 +101,16 @@ class ChFilesController extends DevblocksControllerExtension {
 					// If the 'tidy' extension exists, and the file size is less than 5MB
 					if(extension_loaded('tidy') && $file_stats['size'] < 1024000 * 5) {
 						$tidy = new tidy();
+						
+						$config = array (
+							'clean' => true,
+							'indent' => false,
+							'output-xhtml' => true,
+							'wrap' => '0',
+						);
+						
 						if(null != ($fp_filename = DevblocksPlatform::getTempFileInfo($fp))) {
-							file_put_contents($fp_filename, $tidy->repairFile($fp_filename));
+							file_put_contents($fp_filename, $tidy->repairFile($fp_filename, $config, DB_CHARSET_CODE));
 							fseek($fp, 0);
 						}
 					}

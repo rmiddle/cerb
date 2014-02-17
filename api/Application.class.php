@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2014012301);
-define("APP_VERSION", '6.6.0');
+define("APP_BUILD", 2014021402);
+define("APP_VERSION", '6.6.2');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -1346,7 +1346,7 @@ class CerberusContexts {
 		}
 		
 		if(empty($actor_context)) {
-			$actor_name = 'The system';
+			$actor_name = 'Cerb';
 		}
 		
 		$entry_array['variables']['actor'] = $actor_name;
@@ -1693,7 +1693,7 @@ class CerberusLicense {
 	}
 	
 	public static function getReleases() {
-		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600,'6.2.0'=>1353888000,'6.3.0'=>1364169600,'6.4.0'=>1370217600,'6.5.0'=>1379289600);/*
+		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600,'6.2.0'=>1353888000,'6.3.0'=>1364169600,'6.4.0'=>1370217600,'6.5.0'=>1379289600,'6.6.0'=>1391126400);/*
 		 * Major versions by release date in GMT
 		 */
 		return array(
@@ -1711,6 +1711,7 @@ class CerberusLicense {
 			'6.3.0' => gmmktime(0,0,0,3,25,2013),
 			'6.4.0' => gmmktime(0,0,0,6,3,2013),
 			'6.5.0' => gmmktime(0,0,0,9,16,2013),
+			'6.6.0' => gmmktime(0,0,0,1,31,2014),
 		);
 	}
 	
@@ -1969,15 +1970,16 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 	}
 	
 	static protected function paramExistsInSet($key, $params) {
-		foreach($params as $k => $param) {
-			if(!is_object($param))
-				continue;
-			
-			if(0==strcasecmp($param->field,$key))
-				return true;
-		}
+		$exists = false;
 		
-		return false;
+		if(is_array($params))
+		array_walk_recursive($params, function($param) use ($key, &$exists) {
+			if($param instanceof DevblocksSearchCriteria
+				&& 0 == strcasecmp($param->field, $key))
+					$exists = true;
+		});
+		
+		return $exists;
 	}
 	
 	static protected function _getRandom($table, $pkey='id') {
@@ -2042,17 +2044,19 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 			$has_multiple_values = false;
 			switch($custom_fields[$field_id]->type) {
 				case Model_CustomField::TYPE_MULTI_CHECKBOX:
+				case Model_CustomField::TYPE_FILES:
 					$has_multiple_values = true;
 					break;
 			}
 			
 			// If we have multiple values but we don't need to WHERE the JOIN, be efficient and don't GROUP BY
 			if(!Cerb_ORMHelper::paramExistsInSet('cf_'.$field_id, $params)) {
-				$select_sql .= sprintf(",(SELECT %s FROM %s WHERE %s=context_id AND field_id=%d ORDER BY field_value) AS %s ",
+				$select_sql .= sprintf(",(SELECT %s FROM %s WHERE %s=context_id AND field_id=%d ORDER BY field_value%s) AS %s ",
 					($has_multiple_values ? 'GROUP_CONCAT(field_value SEPARATOR "\n")' : 'field_value'),
 					$value_table,
 					$field_key,
 					$field_id,
+					($has_multiple_values ? '' : ' LIMIT 1'),
 					$field_table
 				);
 				

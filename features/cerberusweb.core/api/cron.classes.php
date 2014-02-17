@@ -2,7 +2,7 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2013, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
@@ -40,6 +40,11 @@ class ParseCron extends CerberusCronPageExtension {
 		
 		if (!extension_loaded("mailparse")) {
 			$logger->err("[Parser] The 'mailparse' extension is not loaded.  Aborting!");
+			return false;
+		}
+		
+		if (!extension_loaded("mbstring")) {
+			$logger->err("[Parser] The 'mbstring' extension is not loaded.  Aborting!");
 			return false;
 		}
 
