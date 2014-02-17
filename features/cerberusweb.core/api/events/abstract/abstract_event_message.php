@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -261,10 +261,10 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		$labels['sender_watcher_count'] = 'Message sender watcher count';
 		
 		$types['header'] = null;
-		$types['is_first'] = null;
-		$types['sender_is_worker'] = null;
-		$types['ticket_has_owner'] = null;
-		$types['ticket_watcher_count'] = null;
+		$types['is_first'] = Model_CustomField::TYPE_CHECKBOX;
+		$types['sender_is_worker'] = Model_CustomField::TYPE_CHECKBOX;
+		$types['ticket_has_owner'] = Model_CustomField::TYPE_CHECKBOX;
+		$types['ticket_watcher_count'] = Model_CustomField::TYPE_NUMBER;
 		
 		$types['group_id'] = null;
 		$types['group_and_bucket'] = null;
@@ -291,12 +291,6 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			$tpl->assign('namePrefix','condition'.$seq);
 		
 		switch($token) {
-			case 'ticket_has_owner':
-				$tpl->display('devblocks:cerberusweb.core::internal/decisions/conditions/_bool.tpl');
-				break;
-			case 'ticket_watcher_count':
-				$tpl->display('devblocks:cerberusweb.core::internal/decisions/conditions/_number.tpl');
-				break;
 			case 'ticket_spam_score':
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_group/condition_spam_score.tpl');
 				break;
@@ -693,6 +687,10 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				
 			case 'send_email_recipients':
 				$tpl->assign('workers', DAO_Worker::getAll());
+				
+				$html_templates = DAO_MailHtmlTemplate::getAll();
+				$tpl->assign('html_templates', $html_templates);
+				
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_owner/action_send_email_recipients.tpl');
 				break;
 				
@@ -931,12 +929,16 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				// Translate message tokens
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 
-				$content = $tpl_builder->build($params['content'], $dict);
+				@$content = $tpl_builder->build($params['content'], $dict);
+				@$format = $params['format'];
+				@$html_template_id = $params['html_template_id'];
 
 				$properties = array(
 					'ticket_id' => $ticket_id,
 					'message_id' => $message_id,
 					'content' => $content,
+					'content_format' => $format,
+					'html_template_id' => $html_template_id,
 					'worker_id' => 0,
 				);
 				

@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -632,6 +632,10 @@ class Search_MessageContent {
 					
 					// Truncate to 10KB
 					$content = $search->truncateOnWhitespace($content, 10000);
+					
+					// Prepend per-message subject
+					if(false !== ($subject = DAO_MessageHeader::getOne($id, 'subject')))
+						$content = $subject . ' ' . $content;
 					
 					$search->index($ns, $id, $content, true);
 				}
@@ -1915,7 +1919,7 @@ class Context_Message extends Extension_DevblocksContext {
 
 		CerberusContexts::merge(
 			'worker_',
-			'Message:Sender:Worker',
+			'Message:Sender:Worker:',
 			$merge_token_labels,
 			$merge_token_values,
 			$token_labels,

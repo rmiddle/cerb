@@ -2,7 +2,7 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2013, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
@@ -996,6 +996,12 @@ class View_CrmOpportunity extends C4_AbstractView implements IAbstractView_Subto
 							array(CerberusContexts::CONTEXT_OPPORTUNITY, $opp_id),
 						),
 					);
+					
+					if(isset($params['format']))
+						$json_params['format'] = $params['format'];
+					
+					if(isset($params['html_template_id']))
+						$json_params['html_template_id'] = intval($params['html_template_id']);
 					
 					if(isset($params['file_ids']))
 						$json_params['file_ids'] = $params['file_ids'];

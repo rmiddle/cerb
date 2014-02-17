@@ -179,6 +179,7 @@ function showLoadingPanel() {
 	}
 
 	// Set the content
+	// [TODO] Is this bugged with URL rewriting off?
 	$("#loadingPanel").html('<img src="' + DevblocksAppPath + 'resource/cerberusweb.core/images/wgm/ajax-loader.gif"><h3>Loading, please wait...</h3>');
 	
 	// Render
@@ -262,7 +263,7 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 		closeOnEscape : true,
 		draggable : true,
 		modal : false,
-		resizable : false,
+		resizable : true,
 		width : '600px',
 		close: function(event, ui) {
 			$(this).unbind().find(':focus').blur();
@@ -284,6 +285,13 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 			} catch(e) { }
 		}
 		target = null;
+		
+	} else if(target && typeof target == "object" && null != target.my && null != target.at) {
+		options.position = {
+			my: target.my,
+			at: target.at
+		};
+		
 	}
 	
 	// Reset (if exists)
@@ -330,7 +338,7 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 			$popup.trigger('popup_open');
 			
 			if(null == options.position)
-				$popup.dialog('option', 'position', { my: 'top center', at: 'center' } );
+				$popup.dialog('option', 'position', { my: 'top', at: 'top+20px' } ); // { my: 'top center', at: 'center' }
 			
 			// Callback
 			try { cb(html); } catch(e) { }

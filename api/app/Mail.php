@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -91,7 +91,7 @@ class CerberusMail {
 		return $results;
 	}
 	
-	static function quickSend($to, $subject, $body, $from_addy=null, $from_personal=null, $custom_headers=array()) {
+	static function quickSend($to, $subject, $body, $from_addy=null, $from_personal=null, $custom_headers=array(), $format=null, $html_template_id=null) {
 		try {
 			$mail_service = DevblocksPlatform::getMailService();
 			$mailer = $mail_service->getMailer(CerberusMail::getMailerDefaults());
@@ -136,7 +136,15 @@ class CerberusMail {
 			
 			// Body
 			
-			$mail->setBody($body);
+			switch($format) {
+				case 'parsedown':
+					self::_generateBodyMarkdown($mail, $body, null, null, $html_template_id);
+					break;
+					
+				default:
+					$mail->setBody($body);
+					break;
+			}
 		
 			// [TODO] Report when the message wasn't sent.
 			if(!$mailer->send($mail)) {
@@ -162,6 +170,7 @@ class CerberusMail {
 		 'subject'
 		 'content'
 		 'content_format'
+		 'html_template_id'
 		 'files'
 		 'forward_files'
 		 'closed'
@@ -200,6 +209,7 @@ class CerberusMail {
 		@$subject = $properties['subject'];
 		@$content = $properties['content'];
 		@$content_format = $properties['content_format'];
+		@$html_template_id = $properties['html_template_id'];
 		@$files = $properties['files'];
 		@$embedded_files = array();
 		@$forward_files = $properties['forward_files'];
@@ -290,7 +300,7 @@ class CerberusMail {
 			
 			switch($content_format) {
 				case 'parsedown':
-					$embedded_files = self::_generateBodyMarkdown($email, $content, $group_id, $bucket_id);
+					$embedded_files = self::_generateBodyMarkdown($email, $content, $group_id, $bucket_id, $html_template_id);
 					break;
 					
 				default:
@@ -331,7 +341,7 @@ class CerberusMail {
 				}
 			}
 			
-			if(empty($dont_send)) {
+			if(!empty($toList) && empty($dont_send)) {
 				if(!@$mailer->send($email)) {
 					throw new Exception('Mail failed to send: unknown reason');
 				}
@@ -536,10 +546,12 @@ class CerberusMail {
 		'bcc'
 		'content'
 		'content_format' // markdown, parsedown, html
+		'html_template_id'
 		'headers'
 		'files'
 		'closed'
 		'ticket_reopen'
+		'group_id'
 		'bucket_id'
 		'owner_id'
 		'worker_id'
@@ -577,6 +589,7 @@ class CerberusMail {
 			// Re-read properties
 			@$content = $properties['content'];
 			@$content_format = $properties['content_format'];
+			@$html_template_id = intval($properties['html_template_id']);
 			@$files = $properties['files'];
 			@$is_forward = $properties['is_forward'];
 			@$is_broadcast = $properties['is_broadcast'];
@@ -744,7 +757,7 @@ class CerberusMail {
 			
 			switch($content_format) {
 				case 'parsedown':
-					$embedded_files = self::_generateBodyMarkdown($mail, $content, $ticket->group_id, $ticket->bucket_id);
+					$embedded_files = self::_generateBodyMarkdown($mail, $content, $ticket->group_id, $ticket->bucket_id, $html_template_id);
 					break;
 					
 				default:
@@ -991,11 +1004,23 @@ class CerberusMail {
 		}
 
 		// Move
-		if(!empty($properties['bucket_id'])) {
-			// [TODO] Use API to move, or fire event
-			list($group_id, $bucket_id) = CerberusApplication::translateGroupBucketCode($properties['bucket_id']);
-			$change_fields[DAO_Ticket::GROUP_ID] = $group_id;
-			$change_fields[DAO_Ticket::BUCKET_ID] = $bucket_id;
+		if(isset($properties['group_id']) || isset($properties['bucket_id'])) {
+			@$move_to_group_id = intval($properties['group_id']);
+			@$move_to_bucket_id = intval($properties['bucket_id']);
+			
+			// Move to the new group if it exists
+			if($move_to_group_id && false != ($move_to_group = DAO_Group::get($move_to_group_id)))
+				$change_fields[DAO_Ticket::GROUP_ID] = $move_to_group_id;
+			
+			// Move to the new bucket if it is an inbox, or it belongs to the group
+			if(
+				empty($move_to_bucket_id)
+				|| (
+					false != ($move_to_bucket = DAO_Bucket::get($move_to_bucket_id))
+					&& $move_to_bucket->group_id == $move_to_group_id
+					)
+				)
+				$change_fields[DAO_Ticket::BUCKET_ID] = $move_to_bucket_id;
 		}
 			
 		if(!empty($ticket_id) && !empty($change_fields)) {
@@ -1245,22 +1270,23 @@ class CerberusMail {
 		}
 	}
 	
-	static private function _generateBodyMarkdown(&$mail, &$content, $group_id=0, $bucket_id=0) {
+	static private function _generateBodyMarkdown(&$mail, &$content, $group_id=0, $bucket_id=0, $html_template_id=0) {
 		$embedded_files = array();
 		
 		$url_writer = DevblocksPlatform::getUrlService();
 		$base_url = $url_writer->write('c=files', true) . '/';
 		
-		if($group_id)
-			$group = DAO_Group::get($group_id);
-		
 		// Generate an HTML part using Parsedown
 		if(false !== ($html_body = DevblocksPlatform::parseMarkdown($content, true))) {
 			
-			// If this group has an HTML template, use it.
-			if($group && null != ($html_template = $group->getReplyHtmlTemplate($bucket_id))) {
-				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-				$html_body = $tpl_builder->build($html_template->content, array('message_body' => $html_body));
+			// Use an HTML template if we have one (or can discern it)
+			if(
+				($html_template_id && null != ($html_template = DAO_MailHtmlTemplate::get($html_template_id)))
+				|| (false != ($group = DAO_Group::get($group_id)) && null != ($html_template = $group->getReplyHtmlTemplate($bucket_id)))
+				) {
+				
+					$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+					$html_body = $tpl_builder->build($html_template->content, array('message_body' => $html_body));
 			}
 			
 			// Purify the HTML and inline the CSS
@@ -1320,6 +1346,14 @@ class CerberusMail {
 			error_log($e->getMessage());
 		}
 		
+		try {
+			$content = DevblocksPlatform::parseMarkdown($content, true);
+			$content = DevblocksPlatform::stripHTML($content);
+			
+		} catch (Exception $e) {
+			error_log($e->getMessage());
+		}
+			
 		$mail->addPart($content, 'text/plain');
 		
 		return $embedded_files;

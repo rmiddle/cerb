@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -160,7 +160,7 @@ class ChTicketsPage extends CerberusPageExtension {
 				$model->pos = $pos++;
 				$model->params = array(
 					'id' => $id,
-					'url' => $url_writer->writeNoProxy(sprintf("c=profiles&type=ticket&id=%s", $row[SearchFields_Message::TICKET_MASK]), true),
+					'url' => $url_writer->writeNoProxy(sprintf("c=profiles&type=ticket&id=%s&show=message&msgid=%d", $row[SearchFields_Message::TICKET_MASK], $id), true),
 				);
 				$models[] = $model;
 			}
@@ -383,6 +383,7 @@ class ChTicketsPage extends CerberusPageExtension {
 		@$subject = DevblocksPlatform::importGPC($_POST['subject'],'string','(no subject)');
 		@$content = DevblocksPlatform::importGPC($_POST['content'],'string');
 		@$content_format = DevblocksPlatform::importGPC($_POST['format'],'string','');
+		@$html_template_id = DevblocksPlatform::importGPC($_POST['html_template_id'],'integer',0);
 
 		// Properties
 		
@@ -398,12 +399,6 @@ class ChTicketsPage extends CerberusPageExtension {
 		
 		@$file_ids = DevblocksPlatform::importGPC($_POST['file_ids'],'array',array());
 		$file_ids = DevblocksPlatform::sanitizeArray($file_ids, 'integer', array('unique', 'nonzero'));
-		
-		// No destination?
-		
-		if(empty($to)) {
-			return;
-		}
 		
 		// Org
 		
@@ -432,6 +427,7 @@ class ChTicketsPage extends CerberusPageExtension {
 			'subject' => $subject,
 			'content' => $content,
 			'content_format' => $content_format,
+			'html_template_id' => $html_template_id,
 			'forward_files' => $file_ids,
 			'closed' => $closed,
 			'ticket_reopen' => $ticket_reopen,
@@ -1116,6 +1112,10 @@ class ChTicketsPage extends CerberusPageExtension {
 		// Broadcast
 		CerberusContexts::getContext(CerberusContexts::CONTEXT_TICKET, null, $token_labels, $token_values);
 		
+		// HTML templates
+		$html_templates = DAO_MailHtmlTemplate::getAll();
+		$tpl->assign('html_templates', $html_templates);
+		
 		// Signature
 		$translate = DevblocksPlatform::getTranslationService();
 		$token_labels['signature'] = mb_convert_case($translate->_('common.signature'), MB_CASE_TITLE);
@@ -1240,12 +1240,16 @@ class ChTicketsPage extends CerberusPageExtension {
 		if($active_worker->hasPriv('core.ticket.view.actions.broadcast_reply')) {
 			@$do_broadcast = DevblocksPlatform::importGPC($_REQUEST['do_broadcast'],'string',null);
 			@$broadcast_message = DevblocksPlatform::importGPC($_REQUEST['broadcast_message'],'string',null);
+			@$broadcast_format = DevblocksPlatform::importGPC($_REQUEST['broadcast_format'],'string',null);
+			@$broadcast_html_template_id = DevblocksPlatform::importGPC($_REQUEST['broadcast_html_template_id'],'integer',0);
 			@$broadcast_file_ids = DevblocksPlatform::sanitizeArray(DevblocksPlatform::importGPC($_REQUEST['broadcast_file_ids'],'array',array()), 'integer', array('nonzero','unique'));
 			@$broadcast_is_queued = DevblocksPlatform::importGPC($_REQUEST['broadcast_is_queued'],'integer',0);
 			
 			if(0 != strlen($do_broadcast) && !empty($broadcast_message)) {
 				$do['broadcast'] = array(
 					'message' => $broadcast_message,
+					'format' => $broadcast_format,
+					'html_template_id' => $broadcast_html_template_id,
 					'is_queued' => $broadcast_is_queued,
 					'file_ids' => $broadcast_file_ids,
 					'worker_id' => $active_worker->id,
@@ -1303,6 +1307,8 @@ class ChTicketsPage extends CerberusPageExtension {
 		
 		if($active_worker->hasPriv('core.ticket.view.actions.broadcast_reply')) {
 			@$broadcast_message = DevblocksPlatform::importGPC($_REQUEST['broadcast_message'],'string',null);
+			@$broadcast_format = DevblocksPlatform::importGPC($_REQUEST['broadcast_format'],'string',null);
+			@$broadcast_html_template_id = DevblocksPlatform::importGPC($_REQUEST['broadcast_html_template_id'],'integer',0);
 
 			@$filter = DevblocksPlatform::importGPC($_REQUEST['filter'],'string','');
 			@$ids = DevblocksPlatform::importGPC($_REQUEST['ids'],'string','');
@@ -1337,18 +1343,57 @@ class ChTicketsPage extends CerberusPageExtension {
 				if(false === ($out = $tpl_builder->build($broadcast_message, $token_values))) {
 					// If we failed, show the compile errors
 					$errors = $tpl_builder->getErrors();
-					$success= false;
+					$success = false;
 					$output = @array_shift($errors);
+					
 				} else {
 					// If successful, return the parsed template
 					$success = true;
 					$output = $out;
+					
+					switch($broadcast_format) {
+						case 'parsedown':
+							// Markdown
+							$output = DevblocksPlatform::parseMarkdown($output, true);
+							
+							// HTML Template
+							
+							$html_template = null;
+							
+							if($broadcast_html_template_id)
+								$html_template = DAO_MailHtmlTemplate::get($broadcast_html_template_id);
+							
+							if(!$html_template && false != ($group = DAO_Group::get($token_values['group_id'])))
+								$html_template = $group->getReplyHtmlTemplate($token_values['bucket_id']);
+							
+							if(!$html_template && false != ($replyto = DAO_AddressOutgoing::getDefault()))
+								$html_template = $replyto->getReplyHtmlTemplate();
+							
+							if($html_template)
+								$output = $tpl_builder->build($html_template->content, array('message_body' => $output));
+							
+							// HTML Purify
+							$output = DevblocksPlatform::purifyHTML($output, true);
+							break;
+							
+						default:
+							$output = nl2br(htmlentities($output));
+							break;
+					}
 				}
 			}
 			
-			$tpl->assign('success', $success);
-			$tpl->assign('output', $output);
-			$tpl->display('devblocks:cerberusweb.core::internal/renderers/test_results.tpl');
+			if($success) {
+				header("Content-Type: text/html; charset=" . LANG_CHARSET_CODE);
+				echo sprintf('<html><head><meta http-equiv="content-type" content="text/html; charset=%s"></head><body>',
+					LANG_CHARSET_CODE
+				);
+				echo $output;
+				echo '</body></html>';
+				
+			} else {
+				echo $output;
+			}
 		}
 	}
 	
