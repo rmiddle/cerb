@@ -28,7 +28,7 @@
 	</li>
 	{/if}
 
-	<li class="{if $page->id=='core.page.search'}selected{/if}" style="float:right;">
+	<li class="tour-navmenu-search{if $page->id=='core.page.search'} selected{/if}" style="float:right;">
 		<a href="javascript:;" class="submenu">{'common.search'|devblocks_translate|lower} <span class="cerb-sprite {if $page->id=='core.page.search'}sprite-arrow-down-white{else}sprite-arrow-down-black{/if}" style="height:12px;width:12px;"></span></a>
 		<ul class="cerb-popupmenu cerb-float">
 			{foreach from=$contexts item=context key=context_id}
@@ -64,7 +64,7 @@
 		items:'> li.drag',
 		distance: 20,
 		update:function(e) {
-			$pages = $(this).find('li.drag[page_id=*]');
+			$pages = $(this).find('li.drag[page_id]');
 			page_ids = $pages.map(function(e) {
 				return $(this).attr('page_id');
 			}).get().join(',');
@@ -104,6 +104,18 @@
 			out:function(e) {
 				$(this).find('ul:first').hide();
 			}
+		})
+		.click(function(e) {
+			$menu = $(this).find('ul:first');
+			$menu
+				.show()
+				.css('position','absolute')
+				.css('top',$(this).offset().top+7+($(this).height())+'px')
+				.css('left',$(this).offset().left+10-($menu.width()-$(this).width())+'px')
+			;
+			$menu.find('li:first a')
+				.focus()
+				;
 		})
 		.find('.cerb-popupmenu > li')
 			.click(function(e) {

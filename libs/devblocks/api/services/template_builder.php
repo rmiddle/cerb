@@ -241,6 +241,14 @@ class DevblocksDictionaryDelegate {
 		
 		return $new_dict;
 	}
+	
+	public function scrubKeys($prefix) {
+		if(is_array($this->_dictionary))
+		foreach(array_keys($this->_dictionary) as $key) {
+			if($prefix == substr($key, 0, strlen($prefix)))
+				unset($this->_dictionary[$key]);
+		}
+	}
 };
 
 class _DevblocksTwigExpressionVisitor implements Twig_NodeVisitorInterface {
@@ -249,6 +257,10 @@ class _DevblocksTwigExpressionVisitor implements Twig_NodeVisitorInterface {
 	public function enterNode(Twig_NodeInterface $node, Twig_Environment $env) {
 		if($node instanceof Twig_Node_Expression_Name) {
 			$this->_tokens[$node->getAttribute('name')] = true;
+			
+		} elseif($node instanceof Twig_Node_SetTemp) {
+			$this->_tokens[$node->getAttribute('name')] = true;
+			
 		}
 		return $node;
 	}

@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2013, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2014012201);
-define("APP_VERSION", '6.5.5');
+define("APP_BUILD", 2014021801);
+define("APP_VERSION", '6.6.3');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -1277,7 +1277,7 @@ class CerberusContexts {
 		}
 	}
 	
-	static public function logActivity($activity_point, $target_context, $target_context_id, $entry_array, $actor_context=null, $actor_context_id=null, $also_notify_worker_ids=array()) {
+	static public function logActivity($activity_point, $target_context, $target_context_id, &$entry_array, $actor_context=null, $actor_context_id=null, $also_notify_worker_ids=array()) {
 		// Target meta
 		if(!isset($target_meta)) {
 			if(null != ($target_ctx = DevblocksPlatform::getExtension($target_context, true))
@@ -1346,7 +1346,7 @@ class CerberusContexts {
 		}
 		
 		if(empty($actor_context)) {
-			$actor_name = 'The system';
+			$actor_name = 'Cerb';
 		}
 		
 		$entry_array['variables']['actor'] = $actor_name;
@@ -1355,7 +1355,7 @@ class CerberusContexts {
 			$entry_array['urls']['actor'] = $actor_url;
 		
 		// Activity Log
-		DAO_ContextActivityLog::create(array(
+		$activity_entry_id = DAO_ContextActivityLog::create(array(
 			DAO_ContextActivityLog::ACTIVITY_POINT => $activity_point,
 			DAO_ContextActivityLog::CREATED => time(),
 			DAO_ContextActivityLog::ACTOR_CONTEXT => $actor_context,
@@ -1367,88 +1367,129 @@ class CerberusContexts {
 		
 		// Tell target watchers about the activity
 		
-		$watchers = array();
+		$do_notifications = true;
 		
-		// Merge in the record owner if defined
-		if(isset($target_meta) && isset($target_meta['owner_id']) && !empty($target_meta['owner_id'])) {
-			$watchers = array_merge(
-				$watchers,
-				array($target_meta['owner_id'])
-			);
+		// Only fire notifications if supported by the activity options (!no_notifications)
+		
+		$activity_points = DevblocksPlatform::getActivityPointRegistry();
+		
+		if(isset($activity_points[$activity_point])) {
+			$activity_mft = $activity_points[$activity_point];
+			if(
+				isset($activity_mft['params'])
+				&& isset($activity_mft['params']['options'])
+				&& in_array('no_notifications', DevblocksPlatform::parseCsvString($activity_mft['params']['options']))
+				)
+				$do_notifications = false;
 		}
 		
-		// Merge in watchers of the actor (if not a worker)
-		if(CerberusContexts::CONTEXT_WORKER != $actor_context) {
-			$watchers = array_merge(
-				$watchers,
-				array_keys(CerberusContexts::getWatchers($actor_context, $actor_context_id))
-			);
-		}
+		// Send notifications
 		
-		// And watchers of the target (if not a worker)
-		if(CerberusContexts::CONTEXT_WORKER != $target_context) {
-			$watchers = array_merge(
-				$watchers,
-				array_keys(CerberusContexts::getWatchers($target_context, $target_context_id))
-			);
-		}
-		
-		// Include the 'also notify' list
-		if(!is_array($also_notify_worker_ids))
-			$also_notify_worker_ids = array();
-		
-		$watchers = array_merge(
-			$watchers,
-			$also_notify_worker_ids
-		);
-		
-		// Remove dupe watchers
-		$watcher_ids = array_unique($watchers);
-		
-		$url_writer = DevblocksPlatform::getUrlService();
-		
-		// Fire off notifications
-		if(is_array($watcher_ids)) {
-			$message = CerberusContexts::formatActivityLogEntry($entry_array, 'plaintext');
-			@$url = reset($entry_array['urls']);
+		if($do_notifications) {
+			$watchers = array();
 			
-			if(0 == strcasecmp('ctx://',substr($url,0,6))) {
-				$url = self::parseContextUrl($url);
-			} elseif(0 != strcasecmp('http',substr($url,0,4))) {
-				$url = $url_writer->writeNoProxy($url, true);
+			// Merge in the record owner if defined
+			if(isset($target_meta) && isset($target_meta['owner_id']) && !empty($target_meta['owner_id'])) {
+				$watchers = array_merge(
+					$watchers,
+					array($target_meta['owner_id'])
+				);
 			}
 			
-			foreach($watcher_ids as $watcher_id) {
-				// If not inside a VA
-				if(0 == EventListener_Triggers::getDepth()) {
-					// Skip a watcher if they are the actor
-					if($actor_context == CerberusContexts::CONTEXT_WORKER
-						&& $actor_context_id == $watcher_id) {
-							// If they explicitly added themselves to the notify, allow it.
-							// Otherwise, don't tell them what they just did.
-							if(!in_array($watcher_id, $also_notify_worker_ids))
-								continue;
-					}
+			// Merge in watchers of the actor (if not a worker)
+			if(CerberusContexts::CONTEXT_WORKER != $actor_context) {
+				$watchers = array_merge(
+					$watchers,
+					array_keys(CerberusContexts::getWatchers($actor_context, $actor_context_id))
+				);
+			}
+			
+			// And watchers of the target (if not a worker)
+			if(CerberusContexts::CONTEXT_WORKER != $target_context) {
+				$watchers = array_merge(
+					$watchers,
+					array_keys(CerberusContexts::getWatchers($target_context, $target_context_id))
+				);
+			}
+			
+			// Include the 'also notify' list
+			if(!is_array($also_notify_worker_ids))
+				$also_notify_worker_ids = array();
+			
+			$watchers = array_merge(
+				$watchers,
+				$also_notify_worker_ids
+			);
+			
+			// And include any worker-based custom fields with the 'send watcher notifications' option
+			$target_custom_fields = DAO_CustomField::getByContext($target_context, true);
+			
+			if(is_array($target_custom_fields))
+			foreach($target_custom_fields as $target_custom_field_id => $target_custom_field) {
+				if($target_custom_field->type != Model_CustomField::TYPE_WORKER)
+					continue;
+				
+				if(!isset($target_custom_field->params['send_notifications']) || empty($target_custom_field->params['send_notifications']))
+					continue;
+				
+				$values = DAO_CustomFieldValue::getValuesByContextIds($target_context, $target_context_id);
+				
+				if(isset($values[$target_context_id]) && isset($values[$target_context_id][$target_custom_field_id]))
+					$watchers = array_merge(
+						$watchers,
+						array($values[$target_context_id][$target_custom_field_id])
+					);
+			}
+			
+			// Remove dupe watchers
+			$watcher_ids = array_unique($watchers);
+			
+			$url_writer = DevblocksPlatform::getUrlService();
+			
+			// Fire off notifications
+			if(is_array($watcher_ids)) {
+				$message = CerberusContexts::formatActivityLogEntry($entry_array, 'plaintext');
+				@$url = reset($entry_array['urls']);
+				
+				if(0 == strcasecmp('ctx://',substr($url,0,6))) {
+					$url = self::parseContextUrl($url);
+				} elseif(0 != strcasecmp('http',substr($url,0,4))) {
+					$url = $url_writer->writeNoProxy($url, true);
 				}
 				
-				// Does the worker want this kind of notification?
-				$dont_notify_on_activities = WorkerPrefs::getDontNotifyOnActivities($watcher_id);
-				if(in_array($activity_point, $dont_notify_on_activities))
-					continue;
+				foreach($watcher_ids as $watcher_id) {
+					// If not inside a VA
+					if(0 == EventListener_Triggers::getDepth()) {
+						// Skip a watcher if they are the actor
+						if($actor_context == CerberusContexts::CONTEXT_WORKER
+							&& $actor_context_id == $watcher_id) {
+								// If they explicitly added themselves to the notify, allow it.
+								// Otherwise, don't tell them what they just did.
+								if(!in_array($watcher_id, $also_notify_worker_ids))
+									continue;
+						}
+					}
 					
-				// If yes, send it
-				DAO_Notification::create(array(
-					DAO_Notification::CONTEXT => $target_context,
-					DAO_Notification::CONTEXT_ID => $target_context_id,
-					DAO_Notification::CREATED_DATE => time(),
-					DAO_Notification::IS_READ => 0,
-					DAO_Notification::WORKER_ID => $watcher_id,
-					DAO_Notification::MESSAGE => $message,
-					DAO_Notification::URL => $url,
-				));
+					// Does the worker want this kind of notification?
+					$dont_notify_on_activities = WorkerPrefs::getDontNotifyOnActivities($watcher_id);
+					if(in_array($activity_point, $dont_notify_on_activities))
+						continue;
+						
+					// If yes, send it
+					DAO_Notification::create(array(
+						DAO_Notification::CONTEXT => $target_context,
+						DAO_Notification::CONTEXT_ID => $target_context_id,
+						DAO_Notification::CREATED_DATE => time(),
+						DAO_Notification::IS_READ => 0,
+						DAO_Notification::WORKER_ID => $watcher_id,
+						DAO_Notification::MESSAGE => $message,
+						DAO_Notification::URL => $url,
+					));
+				}
 			}
-		}
+		} // end if($do_notifications)
 		
+		return $activity_entry_id;
 	}
 	
 	private static function _getAttachmentContext($attachment, &$token_labels, &$token_values, $prefix=null) {
@@ -1600,7 +1641,7 @@ class Context_Application extends Extension_DevblocksContext {
 		switch($token) {
 			default:
 				if(substr($token,0,7) == 'custom_') {
-					$fields = $this->_lazyLoadCustomFields($context, $context_id);
+					$fields = $this->_lazyLoadCustomFields($token, $context, $context_id);
 					$values = array_merge($values, $fields);
 				}
 				break;
@@ -1673,7 +1714,7 @@ class CerberusLicense {
 	}
 	
 	public static function getReleases() {
-		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600,'6.2.0'=>1353888000,'6.3.0'=>1364169600,'6.4.0'=>1370217600,'6.5.0'=>1379289600);/*
+		/*																																																																																																																														*/return array('5.0.0'=>1271894400,'5.1.0'=>1281830400,'5.2.0'=>1288569600,'5.3.0'=>1295049600,'5.4.0'=>1303862400,'5.5.0'=>1312416000,'5.6.0'=>1317686400,'5.7.0'=>1326067200,'6.0.0'=>1338163200,'6.1.0'=>1346025600,'6.2.0'=>1353888000,'6.3.0'=>1364169600,'6.4.0'=>1370217600,'6.5.0'=>1379289600,'6.6.0'=>1391126400);/*
 		 * Major versions by release date in GMT
 		 */
 		return array(
@@ -1691,6 +1732,7 @@ class CerberusLicense {
 			'6.3.0' => gmmktime(0,0,0,3,25,2013),
 			'6.4.0' => gmmktime(0,0,0,6,3,2013),
 			'6.5.0' => gmmktime(0,0,0,9,16,2013),
+			'6.6.0' => gmmktime(0,0,0,1,31,2014),
 		);
 	}
 	
@@ -1949,15 +1991,16 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 	}
 	
 	static protected function paramExistsInSet($key, $params) {
-		foreach($params as $k => $param) {
-			if(!is_object($param))
-				continue;
-			
-			if(0==strcasecmp($param->field,$key))
-				return true;
-		}
+		$exists = false;
 		
-		return false;
+		if(is_array($params))
+		array_walk_recursive($params, function($param) use ($key, &$exists) {
+			if($param instanceof DevblocksSearchCriteria
+				&& 0 == strcasecmp($param->field, $key))
+					$exists = true;
+		});
+		
+		return $exists;
 	}
 	
 	static protected function _getRandom($table, $pkey='id') {
@@ -2003,6 +2046,7 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 				case Model_CustomField::TYPE_DATE:
 				case Model_CustomField::TYPE_FILE:
 				case Model_CustomField::TYPE_FILES:
+				case Model_CustomField::TYPE_LINK:
 				case Model_CustomField::TYPE_NUMBER:
 				case Model_CustomField::TYPE_WORKER:
 					$value_table = 'custom_field_numbervalue';
@@ -2021,17 +2065,19 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 			$has_multiple_values = false;
 			switch($custom_fields[$field_id]->type) {
 				case Model_CustomField::TYPE_MULTI_CHECKBOX:
+				case Model_CustomField::TYPE_FILES:
 					$has_multiple_values = true;
 					break;
 			}
 			
 			// If we have multiple values but we don't need to WHERE the JOIN, be efficient and don't GROUP BY
 			if(!Cerb_ORMHelper::paramExistsInSet('cf_'.$field_id, $params)) {
-				$select_sql .= sprintf(",(SELECT %s FROM %s WHERE %s=context_id AND field_id=%d ORDER BY field_value) AS %s ",
+				$select_sql .= sprintf(",(SELECT %s FROM %s WHERE %s=context_id AND field_id=%d ORDER BY field_value%s) AS %s ",
 					($has_multiple_values ? 'GROUP_CONCAT(field_value SEPARATOR "\n")' : 'field_value'),
 					$value_table,
 					$field_key,
 					$field_id,
+					($has_multiple_values ? '' : ' LIMIT 1'),
 					$field_table
 				);
 				

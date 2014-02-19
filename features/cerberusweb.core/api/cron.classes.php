@@ -2,7 +2,7 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2013, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
@@ -40,6 +40,11 @@ class ParseCron extends CerberusCronPageExtension {
 		
 		if (!extension_loaded("mailparse")) {
 			$logger->err("[Parser] The 'mailparse' extension is not loaded.  Aborting!");
+			return false;
+		}
+		
+		if (!extension_loaded("mbstring")) {
+			$logger->err("[Parser] The 'mbstring' extension is not loaded.  Aborting!");
 			return false;
 		}
 
@@ -247,6 +252,43 @@ class MaintCron extends CerberusCronPageExtension {
 			}
 		}
 		$logger->info('[Maint] Cleaned up import directories.');
+		
+		// Clean up /tmp/php* files if ctime > 12 hours ago
+		
+		$tmp_dir = APP_TEMP_PATH . DIRECTORY_SEPARATOR;
+		$tmp_deletes = 0;
+		$tmp_ctime_max = time() - (60*60*12);
+		
+		if(false !== ($php_tmpfiles = glob($tmp_dir . 'php*', GLOB_NOSORT))) {
+			// If created more than 12 hours ago
+			foreach($php_tmpfiles as $php_tmpfile) {
+				if(filectime($php_tmpfile) < $tmp_ctime_max) {
+					unlink($php_tmpfile);
+					$tmp_deletes++;
+				}
+			}
+			
+			$logger->info(sprintf('[Maint] Cleaned up %d temporary PHP files.', $tmp_deletes));
+		}
+		
+		// Clean up /tmp/mime* files if ctime > 12 hours ago
+		
+		$tmp_dir = APP_TEMP_PATH . DIRECTORY_SEPARATOR;
+		$tmp_deletes = 0;
+		$tmp_ctime_max = time() - (60*60*12);
+		
+		if(false !== ($php_tmpmimes = glob($tmp_dir . 'mime*', GLOB_NOSORT))) {
+			foreach($php_tmpmimes as $php_tmpmime) {
+				// If created more than 12 hours ago
+				if(filectime($php_tmpmime) < $tmp_ctime_max) {
+					unlink($php_tmpmime);
+					$tmp_deletes++;
+				}
+			}
+			
+			$logger->info(sprintf('[Maint] Cleaned up %d temporary MIME files.', $tmp_deletes));
+		}
+		
 	}
 
 	function configure($instance) {
@@ -753,17 +795,25 @@ class ImportCron extends CerberusCronPageExtension {
 					$sFileContent = base64_decode($sFileContentB64);
 					unset($sFileContentB64);
 					
-					$fields = array(
-						DAO_Attachment::DISPLAY_NAME => $sFileName,
-						DAO_Attachment::MIME_TYPE => $sMimeType,
-					);
-					$file_id = DAO_Attachment::create($fields);
+					// Dupe detection
+					$sha1_hash = sha1($sFileContent, false);
 					
-					// Link
-					DAO_AttachmentLink::create($file_id, CerberusContexts::CONTEXT_MESSAGE, $email_id);
+					if(false == ($file_id = DAO_Attachment::getBySha1Hash($sha1_hash, $sFileName))) {
+						$fields = array(
+							DAO_Attachment::DISPLAY_NAME => $sFileName,
+							DAO_Attachment::MIME_TYPE => $sMimeType,
+							DAO_Attachment::STORAGE_SHA1HASH => $sha1_hash,
+						);
+						
+						$file_id = DAO_Attachment::create($fields);
+						
+						// Write file to storage
+						Storage_Attachments::put($file_id, $sFileContent);
+					}
+
+					if(!empty($file_id))
+						DAO_AttachmentLink::create($file_id, CerberusContexts::CONTEXT_MESSAGE, $email_id);
 					
-					// Write file to storage
-					Storage_Attachments::put($file_id, $sFileContent);
 					unset($sFileContent);
 				}
 				
@@ -1201,7 +1251,7 @@ class Pop3Cron extends CerberusCronPageExtension {
 					$filename = APP_MAIL_PATH . 'new' . DIRECTORY_SEPARATOR . $unique;
 				} while(file_exists($filename));
 
-				$fp = fopen($filename,'w');
+				$fp = fopen($filename,'w+');
 
 				if($fp) {
 					$mailbox_xheader = "X-Cerberus-Mailbox: " . $account->nickname . "\r\n";
@@ -1274,14 +1324,53 @@ class Pop3Cron extends CerberusCronPageExtension {
 class StorageCron extends CerberusCronPageExtension {
 	function run() {
 		$logger = DevblocksPlatform::getConsoleLog();
+		
 		$runtime = microtime(true);
 		
 		$logger->info("[Storage] Starting...");
 
 		$max_runtime = time() + 30; // [TODO] Make configurable
 		
+		// Run any pending batch DELETEs
+		$pending_profiles = DAO_DevblocksStorageQueue::getPendingProfiles();
+		
+		if(is_array($pending_profiles))
+		foreach($pending_profiles as $pending_profile) {
+			if($max_runtime < time())
+				continue;
+			
+			// Use a profile or a base extension
+			$engine =
+				!empty($pending_profile['storage_profile_id'])
+				? $pending_profile['storage_profile_id']
+				: $pending_profile['storage_extension']
+				;
+				
+			$storage = DevblocksPlatform::getStorageService($engine);
+			
+			// Get one page of 500 pending delete keys for this profile
+			$keys = DAO_DevblocksStorageQueue::getKeys($pending_profile['storage_namespace'], $pending_profile['storage_extension'], $pending_profile['storage_profile_id'], 500);
+			
+			$logger->info(sprintf("[Storage] Batch deleting %d %s object(s) for %s:%d",
+				count($keys),
+				$pending_profile['storage_namespace'],
+				$pending_profile['storage_extension'],
+				$pending_profile['storage_profile_id']
+			));
+			
+			// Pass the keys to the storage engine
+			if(false !== ($keys = $storage->batchDelete($pending_profile['storage_namespace'], $keys))) {
+
+				// Remove the entries on success
+				if(is_array($keys) && !empty($keys))
+					DAO_DevblocksStorageQueue::purgeKeys($keys, $pending_profile['storage_namespace'], $pending_profile['storage_extension'], $pending_profile['storage_profile_id']);
+			}
+		}
+		
 		// Synchronize storage schemas (active+archive)
 		$storage_schemas = DevblocksPlatform::getExtensions('devblocks.storage.schema', true);
+		
+		if(is_array($storage_schemas))
 		foreach($storage_schemas as $schema) { /* @var $schema Extension_DevblocksStorageSchema */
 			if($max_runtime > time())
 				$schema->unarchive($max_runtime);
