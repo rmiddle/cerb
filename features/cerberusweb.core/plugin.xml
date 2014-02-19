@@ -917,7 +917,6 @@
 			</params>
 		</extension>
 
-		<!--
 		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.address</id>
 			<name>Email Address</name>
@@ -942,7 +941,6 @@
 				<param key="context_expand_export" value="org_" />
 			</params>
 		</extension>
-		-->
 		
 		<!--
 		<extension point="devblocks.context">
