@@ -395,9 +395,61 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $output;
 	}
 	
-	static function stripHTML($str, $strip_whitespace=true) {
+	static function stripHTML($str, $strip_whitespace=true, $skip_blockquotes=false) {
+		
+		// Pre-process blockquotes
+		if(!$skip_blockquotes) {
+			$dom = new DOMDocument('1.0', LANG_CHARSET_CODE);
+			$dom->strictErrorChecking = false;
+			$dom->recover = true;
+			$dom->validateOnParse = false;
+			
+			libxml_use_internal_errors(true);
+			
+			$dom->loadHTML(sprintf('<?xml encoding="%s">', LANG_CHARSET_CODE) . $str);
+			
+			$errors = libxml_get_errors();
+			libxml_clear_errors();
+			
+			$xpath = new DOMXPath($dom);
+			
+			while(($blockquotes = $xpath->query('//blockquote')) && $blockquotes->length) {
+			
+				foreach($blockquotes as $blockquote) { /* @var $blockquote DOMElement */
+					$nested = $xpath->query('.//blockquote', $blockquote);
+					
+					// If the blockquote contains another blockquote, ignore it for now
+					if($nested->length > 0)
+						continue;
+					
+					// Change the blockquote tags to DIV, prefixed with '>'
+					$div = $dom->createElement('span');
+					
+					$plaintext = DevblocksPlatform::stripHTML($dom->saveXML($blockquote), $strip_whitespace, true);
+					
+					$out = explode("\n", trim($plaintext));
+					
+					array_walk($out, function($line) use ($dom, $div) {
+						$text = $dom->createTextNode('> ' . $line);
+						$div->appendChild($text);
+						$div->appendChild($dom->createElement('br'));
+					});
+					
+					$blockquote->parentNode->replaceChild($div, $blockquote);
+				}
+			}
+			
+			$html = $dom->saveXML();
+			
+			// Make sure it's not blank before trusting it.
+			if(!empty($html)) {
+				$str = $html;
+				unset($html);
+			}
+		}
+		
 		$str = preg_replace_callback(
-			'@<code[^>]*?>(.*?)</code>@siu',
+			'@<code[^>]*?>(.*?)</code>@si',
 			function($matches) {
 				if(isset($matches[1])) {
 					$out = $matches[1];
@@ -409,7 +461,7 @@ class DevblocksPlatform extends DevblocksEngine {
 		);
 		
 		$str = preg_replace_callback(
-			'#<pre.*?/pre\>#s',
+			'#<pre.*?/pre\>#si',
 			function($matches) {
 				if(isset($matches[0])) {
 					$out = $matches[0];
@@ -489,49 +541,18 @@ class DevblocksPlatform extends DevblocksEngine {
 		
 		// Strip non-content tags
 		$search = array(
-			'@<head[^>]*?>.*?</head>@siu',
-			'@<style[^>]*?>.*?</style>@siu',
-			'@<script[^>]*?.*?</script>@siu',
-			'@<object[^>]*?.*?</object>@siu',
-			'@<embed[^>]*?.*?</embed>@siu',
-			'@<applet[^>]*?.*?</applet>@siu',
-			'@<noframes[^>]*?.*?</noframes>@siu',
-			'@<noscript[^>]*?.*?</noscript>@siu',
-			'@<noembed[^>]*?.*?</noembed>@siu',
+			'@<head[^>]*?>.*?</head>@si',
+			'@<style[^>]*?>.*?</style>@si',
+			'@<script[^>]*?.*?</script>@si',
+			'@<object[^>]*?.*?</object>@si',
+			'@<embed[^>]*?.*?</embed>@si',
+			'@<applet[^>]*?.*?</applet>@si',
+			'@<noframes[^>]*?.*?</noframes>@si',
+			'@<noscript[^>]*?.*?</noscript>@si',
+			'@<noembed[^>]*?.*?</noembed>@si',
 		);
 		$str = preg_replace($search, '', $str);
 		
-		// Handle blockquotes
-		
-		$quote_blockquotes_regexp = '{<blockquote[^>]*?>((?:(?:(?!<blockquote[^>]*>|</blockquote>).)++|<blockquote[^>]*>(?1)</blockquote>)*)</blockquote>}si';
-		
-		$quote_blockquotes = function($matches) use ($quote_blockquotes_regexp, &$quote_blockquotes) {
-			if(isset($matches[1])) {
-				$out = $matches[1];
-				
-				$out = preg_replace_callback(
-					$quote_blockquotes_regexp,
-					$quote_blockquotes,
-					$out
-				);
-				
-				$out = explode("\n", trim(strip_tags($out)));
-				
-				array_walk($out, function(&$line) {
-					$line = '&gt; ' . $line . "\n";
-				});
-				$out = implode('', $out);
-				return $out;
-			}
-		};
-		
-		// Convert blockquotes to '>' prefixed lines
-		$str = preg_replace_callback(
-			$quote_blockquotes_regexp,
-			$quote_blockquotes,
-			$str
-		);
-
 		// Strip tags
 		$str = strip_tags($str);
 		
@@ -779,6 +800,9 @@ class DevblocksPlatform extends DevblocksEngine {
 	static function strToPermalink($string) {
 		if(empty($string))
 			return '';
+		
+		// Unidecode
+		$string = DevblocksPlatform::strUnidecode($string, LANG_CHARSET_CODE);
 		
 		// Remove certain marks
 		$string = preg_replace('#[\'\"]#', '', $string);
