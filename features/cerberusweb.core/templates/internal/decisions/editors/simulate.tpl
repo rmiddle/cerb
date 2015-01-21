@@ -63,12 +63,15 @@
 </form>
 
 <script type="text/javascript">
+$(function() {
 	var $popup = genericAjaxPopupFetch('simulate_behavior');
+	
 	$popup.one('popup_open', function(event,ui) {
 		var $this = $(this);
 		
-		$this.dialog('option','title',"Simulate: {$trigger->title}");
+		$this.dialog('option','title',"Simulate: {$trigger->title|escape:'javascript' nofilter}");
 		
 		$('#simulatorTabs').tabs();
 	});
+});
 </script>

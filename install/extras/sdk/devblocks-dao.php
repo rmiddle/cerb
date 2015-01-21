@@ -239,7 +239,7 @@ foreach($fields as $field_name => $field_type) {
 			);
 			
 		$join_sql = "FROM <?php echo $table_name; ?> ".
-			(isset($tables['context_link']) ? "INNER JOIN context_link ON (context_link.to_context = '<?php echo $ctx_ext_id; ?>' AND context_link.to_context_id = <?php echo $table_name; ?>.id) " : " ").
+			(isset($tables['context_link']) ? sprintf("INNER JOIN context_link ON (context_link.to_context = %s AND context_link.to_context_id = <?php echo $table_name; ?>.id) ", Cerb_ORMHelper::qstr('<?php echo $ctx_ext_id; ?>')) : " ").
 			'';
 		
 		// Custom field joins
@@ -349,12 +349,8 @@ foreach($fields as $field_name => $field_type) {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_<?php echo $class_name; ?>::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -454,7 +450,7 @@ foreach($fields as $field_name => $field_type) {
 </textarea>
 
 <textarea style="width:98%;height:200px;">
-class View_<?php echo $class_name; ?> extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_<?php echo $class_name; ?> extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = '<?php echo strtolower($class_name); ?>';
 
 	function __construct() {
@@ -586,6 +582,68 @@ foreach($fields as $field_name => $field_type) {
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		// [TODO] Implement quick search fields
+	
+		/*
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_<?php echo $class_name; ?>::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'created' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_<?php echo $class_name; ?>::CREATED_AT),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_<?php echo $class_name; ?>::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_<?php echo $class_name; ?>::UPDATED_AT),
+				),
+			'watchers' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_<?php echo $class_name; ?>::VIRTUAL_WATCHERS),
+				),
+		);
+		*/
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(<?php echo $ctx_ext_id; ?>, $fields, null);
+		
+		// Sort by keys
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	// [TODO] Implement quick search fields
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {
@@ -925,7 +983,7 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 		} elseif($<?php echo $ctx_var_model; ?> instanceof Model_<?php echo $class_name; ?>) {
 			// It's what we want already.
 		} elseif(is_array($<?php echo $ctx_var_model; ?>)) {
-			$<?php echo $ctx_var_model; ?> = Cerb_ORMHelper::recastArrayToModel($<?php echo $ctx_var_model; ?>, 'Model_<?php echo $class_name; ?>'); ?>;
+			$<?php echo $ctx_var_model; ?> = Cerb_ORMHelper::recastArrayToModel($<?php echo $ctx_var_model; ?>, 'Model_<?php echo $class_name; ?>');
 		} else {
 			$<?php echo $ctx_var_model; ?> = null;
 		}
@@ -1042,8 +1100,8 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;
@@ -1086,9 +1144,8 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 
 		// Comments
 		$comments = DAO_Comment::getByContext('<?php echo $ctx_ext_id; ?>', $context_id);
-		$last_comment = array_shift($comments);
-		unset($comments);
-		$tpl->assign('last_comment', $last_comment);
+		$comments = array_reverse($comments, true);
+		$tpl->assign('comments', $comments);
 		
 		$tpl->display('devblocks:<?php echo $plugin_id; ?>::<?php echo $table_name; ?>/peek.tpl');
 	}
@@ -1199,19 +1256,13 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/peek_custom_fieldsets.tpl" context='<?php echo $ctx_ext_id; ?>' context_id=$model->id}
 
-{* Comment *}
-{if !empty($last_comment)}
-	{include file="devblocks:cerberusweb.core::internal/comments/comment.tpl" readonly=true comment=$last_comment}
-{/if}
+{* Comments *}
+{include file="devblocks:cerberusweb.core::internal/peek/peek_comments_pager.tpl" comments=$comments}
 
 <fieldset class="peek">
 	<legend>{'common.comment'|devblocks_translate|capitalize}</legend>
-	&lt;textarea name="comment" rows="5" cols="45" style="width:98%;"&gt;&lt;/textarea&gt;
-	<div class="notify" style="display:none;">
-		<b>{'common.notify_watchers_and'|devblocks_translate}:</b>
-		<button type="button" class="chooser_notify_worker"><span class="cerb-sprite sprite-view"></span></button>
-		<ul class="chooser-container bubbles" style="display:block;"></ul>
-	</div>
+	<div class="cerb-form-hint">{'comment.notify.at_mention'|devblocks_translate}</div>
+	&lt;textarea name="comment" rows="5" cols="45" style="width:98%; title="{'comment.notify.at_mention'|devblocks_translate}"&gt;&lt;/textarea&gt;
 </fieldset>
 
 {if !empty($model->id)}
@@ -1241,28 +1292,41 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 </form>
 
 <script type="text/javascript">
-	$popup = genericAjaxPopupFetch('peek');
+	var $popup = genericAjaxPopupFetch('peek');
+	
 	$popup.one('popup_open', function(event,ui) {
+		var $textarea = $(this).find('textarea[name=comment]');
+		
 		$(this).dialog('option','title',"{'<?php echo $object_name; ?>'|escape:'javascript' nofilter}");
 		
 		$(this).find('button.chooser_watcher').each(function() {
 			ajax.chooser(this,'cerberusweb.contexts.worker','add_watcher_ids', { autocomplete:true });
 		});
 		
-		$(this).find('textarea[name=comment]').keyup(function() {
-			if($(this).val().length > 0) {
-				$(this).next('DIV.notify').show();
-			} else {
-				$(this).next('DIV.notify').hide();
-			}
-		});
-		
-		$('#frm<?php echo $class_name; ?>Peek button.chooser_notify_worker').each(function() {
-			ajax.chooser(this,'cerberusweb.contexts.worker','notify_worker_ids', { autocomplete:true });
-		});
-		
 		$(this).find('input:text:first').focus();
-	} );
+		
+		// Form hints
+		
+		$textarea
+			.focusin(function() {
+				$(this).siblings('div.cerb-form-hint').fadeIn();
+			})
+			.focusout(function() {
+				$(this).siblings('div.cerb-form-hint').fadeOut();
+			})
+			;
+		
+		// @mentions
+		
+		var atwho_workers = {CerberusApplication::getAtMentionsWorkerDictionaryJson() nofilter};
+
+		$textarea.atwho({
+			at: '@',
+			{literal}tpl: '<li data-value="@${at_mention}">${name} <small style="margin-left:10px;">${title}</small></li>',{/literal}
+			data: atwho_workers,
+			limit: 10
+		});
+	});
 </script>
 </textarea>
 
@@ -1284,7 +1348,7 @@ $field_prefix = strtolower(substr($table_name,0,1));
 		<td nowrap="nowrap"><span class="title">{$view->name}</span></td>
 		<td nowrap="nowrap" align="right">
 			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$view_context}&context_id=0&view_id={$view->id}',null,false,'500');"><span class="cerb-sprite2 sprite-plus-circle-frame"></span></a>
-			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',this,false,'400');"><span class="cerb-sprite2 sprite-document-search-result"></span></a>
+			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',null,false,'400');"><span class="cerb-sprite2 sprite-document-search-result"></span></a>
 			<a href="javascript:;" title="{'common.customize'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('customize{$view->id}','c=internal&a=viewCustomize&id={$view->id}');toggleDiv('customize{$view->id}','block');"><span class="cerb-sprite2 sprite-gear"></span></a>
 			<a href="javascript:;" title="Subtotals" class="subtotals minimal"><span class="cerb-sprite2 sprite-application-sidebar-list"></span></a>
 			{*<a href="javascript:;" title="{$translate->_('common.import')|capitalize}" onclick="genericAjaxPopup('import','c=internal&a=showImportPopup&context={$view_context}&view_id={$view->id}',null,false,'500');"><span class="cerb-sprite2 sprite-application-import"></span></a>*}
@@ -1493,7 +1557,7 @@ $frm.bind('keyboard_shortcut',function(event) {
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_Profiles<?php echo $class_name; ?> extends Extension_PageSection {
@@ -1557,6 +1621,21 @@ class PageSection_Profiles<?php echo $class_name; ?> extends Extension_PageSecti
 
 		$properties_custom_fieldsets = Page_Profiles::getProfilePropertiesCustomFieldsets('<?php echo $ctx_ext_id; ?>', $<?php echo $table_name; ?>->id, $values);
 		$tpl->assign('properties_custom_fieldsets', $properties_custom_fieldsets);
+		
+		// Link counts
+		
+		$properties_links = array(
+			'<?php echo $ctx_ext_id; ?>' => array(
+				$<?php echo $table_name; ?>->id => 
+					DAO_ContextLink::getContextLinkCounts(
+						'<?php echo $ctx_ext_id; ?>',
+						$<?php echo $table_name; ?>->id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			),
+		);
+		
+		$tpl->assign('properties_links', $properties_links);
 		
 		// Properties
 		
@@ -1625,7 +1704,7 @@ class PageSection_Profiles<?php echo $class_name; ?> extends Extension_PageSecti
 
 			// If we're adding a comment
 			if(!empty($comment)) {
-				@$also_notify_worker_ids = DevblocksPlatform::importGPC($_REQUEST['notify_worker_ids'],'array',array());
+				$also_notify_worker_ids = array_keys(CerberusApplication::getWorkersByAtMentionsText($comment));
 				
 				$fields = array(
 					DAO_Comment::CREATED => time(),
@@ -1783,6 +1862,8 @@ class PageSection_Profiles<?php echo $class_name; ?> extends Extension_PageSecti
 </fieldset>
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/profile_fieldsets.tpl" properties=$properties_custom_fieldsets}
+
+{include file="devblocks:cerberusweb.core::internal/profiles/profile_record_links.tpl" properties=$properties_links}
 
 <div>
 {include file="devblocks:cerberusweb.core::internal/notifications/context_profile.tpl" context=$page_context context_id=$page_context_id}

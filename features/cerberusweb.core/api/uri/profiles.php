@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class Page_Profiles extends CerberusPageExtension {
@@ -125,6 +125,10 @@ class Page_Profiles extends CerberusPageExtension {
 					'type' => $cf_group_field->type,
 					'value' => isset($values[$cf_group_field->id]) ? $values[$cf_group_field->id] : null,
 				);
+				
+				// Include parameters for abstract handling
+				if(!empty($cf_group_field->params))
+					$cf_group_props['cf_' . $cf_group_field_id]['params'] = $cf_group_field->params;
 			}
 			
 			$properties[$custom_fieldset->id] = array(

@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_ProfilesVirtualAttendant extends Extension_PageSection {
@@ -88,6 +88,32 @@ class PageSection_ProfilesVirtualAttendant extends Extension_PageSection {
 
 		$properties_custom_fieldsets = Page_Profiles::getProfilePropertiesCustomFieldsets(CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT, $virtual_attendant->id, $values);
 		$tpl->assign('properties_custom_fieldsets', $properties_custom_fieldsets);
+		
+		// Link counts
+		
+		$properties_links = array(
+			CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT => array(
+				$virtual_attendant->id => 
+					DAO_ContextLink::getContextLinkCounts(
+						CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT,
+						$virtual_attendant->id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			),
+		);
+		
+		if(isset($virtual_attendant->owner_context)) {
+			$properties_links[$virtual_attendant->owner_context] = array(
+				$virtual_attendant->owner_context_id => 
+					DAO_ContextLink::getContextLinkCounts(
+						$virtual_attendant->owner_context,
+						$virtual_attendant->owner_context_id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			);
+		}
+		
+		$tpl->assign('properties_links', $properties_links);
 		
 		// Properties
 		
@@ -180,7 +206,9 @@ class PageSection_ProfilesVirtualAttendant extends Extension_PageSection {
 					DAO_VirtualAttendant::OWNER_CONTEXT_ID => $owner_ctx_id,
 					DAO_VirtualAttendant::PARAMS_JSON => json_encode($params),
 				);
-				$id = DAO_VirtualAttendant::create($fields);
+				
+				if(false == ($id = DAO_VirtualAttendant::create($fields)))
+					return false;
 				
 				// Context Link (if given)
 				@$link_context = DevblocksPlatform::importGPC($_REQUEST['link_context'],'string','');

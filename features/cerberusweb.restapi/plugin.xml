@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.devblocks.com/schema/plugin.xsd">
 	<id>cerberusweb.restapi</id>
-	<name>Web Services API (JSON/XML) *EXPERIMENTAL*</name>
+	<name>Web Services API (JSON/XML)</name>
 	<description>A RESTful JSON/XML interface for integrating Cerb with other applications and tools.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.7.0</version>
+	<version>6.9.0</version>
 	<link>http://wiki.cerbweb.com/Features:Web_Services_API</link>
 	<image>plugin.png</image>
 
 	<!-- Requirements -->
 
 	<requires>
-		<app_version min="6.7" max="6.7.99" />
+		<app_version min="6.9" max="6.9.99" />
 	</requires>
 
 	<!-- Plugin Dependencies -->
@@ -167,6 +167,18 @@
 			</class>
 			<params>
 				<param key="uri" value="groups" />
+			</params>
+		</extension>
+		
+		<extension point="cerberusweb.rest.controller">
+			<id>cerberusweb.rest.controller.mail_html_templates</id>
+			<name>Mail HTML Templates</name>
+			<class>
+				<file>api/rest/mail_html_templates.php</file>
+				<name>ChRest_MailHtmlTemplates</name>
+			</class>
+			<params>
+				<param key="uri" value="mail_html_templates" />
 			</params>
 		</extension>
 		

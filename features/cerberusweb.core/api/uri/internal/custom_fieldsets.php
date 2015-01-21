@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 if(class_exists('Extension_PageSection')):
@@ -284,6 +284,8 @@ class PageSection_InternalCustomFieldsets extends Extension_PageSection {
 	function getCustomFieldSetAction() {
 		@$id = DevblocksPlatform::importGPC($_REQUEST['id'], 'integer', 0);
 		@$bulk = DevblocksPlatform::importGPC($_REQUEST['bulk'], 'integer', 0);
+		@$field_wrapper = DevblocksPlatform::importGPC($_REQUEST['field_wrapper'], 'string', '');
+		@$trigger_id = DevblocksPlatform::importGPC($_REQUEST['trigger_id'], 'integer', 0);
 		
 		$active_worker = CerberusApplication::getActiveWorker();
 		$tpl = DevblocksPlatform::getTemplateService();
@@ -293,6 +295,9 @@ class PageSection_InternalCustomFieldsets extends Extension_PageSection {
 		if(empty($id))
 			return;
 		
+		if(!empty($field_wrapper))
+			$tpl->assign('field_wrapper', $field_wrapper);
+		
 		if(null == ($custom_fieldset = DAO_CustomFieldset::get($id)))
 			return;
 		
@@ -301,6 +306,15 @@ class PageSection_InternalCustomFieldsets extends Extension_PageSection {
 		
 		$tpl->assign('custom_fieldset', $custom_fieldset);
 		$tpl->assign('custom_fieldset_is_new', true);
+		
+		// If we're drawing the fieldset for a VA action, include behavior and event meta
+		if($trigger_id && false !== ($trigger = DAO_TriggerEvent::get($trigger_id))) {
+			$event = $trigger->getEvent();
+			$values_to_contexts = $event->getValuesContexts($trigger);
+			
+			$tpl->assign('trigger', $trigger);
+			$tpl->assign('values_to_contexts', $values_to_contexts);
+		}
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/custom_fieldsets/fieldset.tpl');
 	}

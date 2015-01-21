@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
@@ -24,6 +24,7 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 	const OWNER_CONTEXT = 'owner_context';
 	const OWNER_CONTEXT_ID = 'owner_context_id';
 	const CONTENT = 'content';
+	const SIGNATURE = 'signature';
 
 	static function create($fields) {
 		$db = DevblocksPlatform::getDatabaseService();
@@ -73,7 +74,7 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
 		
 		// SQL
-		$sql = "SELECT id, name, updated_at, owner_context, owner_context_id, content ".
+		$sql = "SELECT id, name, updated_at, owner_context, owner_context_id, content, signature ".
 			"FROM mail_html_template ".
 			$where_sql.
 			$sort_sql.
@@ -127,6 +128,7 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 			$object->owner_context = $row['owner_context'];
 			$object->owner_context_id = $row['owner_context_id'];
 			$object->content = $row['content'];
+			$object->signature = $row['signature'];
 			$objects[$object->id] = $object;
 		}
 		
@@ -167,7 +169,7 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 			new Model_DevblocksEvent(
 				'context.delete',
 				array(
-					'context' => 'cerberusweb.contexts.mail.html_template',
+					'context' => CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE,
 					'context_ids' => $ids
 				)
 			)
@@ -193,17 +195,19 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 			"mail_html_template.updated_at as %s, ".
 			"mail_html_template.owner_context as %s, ".
 			"mail_html_template.owner_context_id as %s, ".
-			"mail_html_template.content as %s ",
+			"mail_html_template.content as %s, ".
+			"mail_html_template.signature as %s ",
 				SearchFields_MailHtmlTemplate::ID,
 				SearchFields_MailHtmlTemplate::NAME,
 				SearchFields_MailHtmlTemplate::UPDATED_AT,
 				SearchFields_MailHtmlTemplate::OWNER_CONTEXT,
 				SearchFields_MailHtmlTemplate::OWNER_CONTEXT_ID,
-				SearchFields_MailHtmlTemplate::CONTENT
+				SearchFields_MailHtmlTemplate::CONTENT,
+				SearchFields_MailHtmlTemplate::SIGNATURE
 			);
 			
 		$join_sql = "FROM mail_html_template ".
-			(isset($tables['context_link']) ? "INNER JOIN context_link ON (context_link.to_context = 'cerberusweb.contexts.mail.html_template' AND context_link.to_context_id = mail_html_template.id) " : " ").
+			(isset($tables['context_link']) ? sprintf("INNER JOIN context_link ON (context_link.to_context = %s AND context_link.to_context_id = mail_html_template.id) ", Cerb_ORMHelper::qstr(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE)) : " ").
 			'';
 		
 		// Custom field joins
@@ -249,13 +253,46 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 		if(!is_a($param, 'DevblocksSearchCriteria'))
 			return;
 			
-		$from_context = 'cerberusweb.contexts.mail.html_template';
+		$from_context = CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE;
 		$from_index = 'mail_html_template.id';
 		
 		$param_key = $param->field;
 		settype($param_key, 'string');
 		
 		switch($param_key) {
+			case SearchFields_MailHtmlTemplate::FULLTEXT_COMMENT_CONTENT:
+				$search = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID);
+				$query = $search->getQueryFromParam($param);
+				
+				if(false === ($ids = $search->query($query, array('context_crc32' => sprintf("%u", crc32($from_context)))))) {
+					$args['where_sql'] .= 'AND 0 ';
+				
+				} elseif(is_array($ids)) {
+					$from_ids = DAO_Comment::getContextIdsByContextAndIds($from_context, $ids);
+					
+					$args['where_sql'] .= sprintf('AND %s IN (%s) ',
+						$from_index,
+						implode(', ', (!empty($from_ids) ? $from_ids : array(-1)))
+					);
+					
+				} elseif(is_string($ids)) {
+					$db = DevblocksPlatform::getDatabaseService();
+					$temp_table = sprintf("_tmp_%s", uniqid());
+					
+					$db->Execute(sprintf("CREATE TEMPORARY TABLE %s SELECT DISTINCT context_id AS id FROM comment INNER JOIN %s ON (%s.id=comment.id)",
+						$temp_table,
+						$ids,
+						$ids
+					));
+					
+					$args['join_sql'] .= sprintf("INNER JOIN %s ON (%s.id=%s) ",
+						$temp_table,
+						$temp_table,
+						$from_index
+					);
+				}
+				break;
+			
 			case SearchFields_MailHtmlTemplate::VIRTUAL_CONTEXT_LINK:
 				$args['has_multiple_values'] = true;
 				self::_searchComponentsVirtualContextLinks($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
@@ -313,12 +350,8 @@ class DAO_MailHtmlTemplate extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_MailHtmlTemplate::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -353,7 +386,11 @@ class SearchFields_MailHtmlTemplate implements IDevblocksSearchFields {
 	const OWNER_CONTEXT = 'm_owner_context';
 	const OWNER_CONTEXT_ID = 'm_owner_context_id';
 	const CONTENT = 'm_content';
+	const SIGNATURE = 'm_signature';
 
+	const FULLTEXT_COMMENT_CONTENT = 'ftcc_content';
+	
+	// [TODO] Virtual owner
 	const VIRTUAL_CONTEXT_LINK = '*_context_link';
 	const VIRTUAL_HAS_FIELDSET = '*_has_fieldset';
 	const VIRTUAL_WATCHERS = '*_workers';
@@ -371,10 +408,13 @@ class SearchFields_MailHtmlTemplate implements IDevblocksSearchFields {
 			self::ID => new DevblocksSearchField(self::ID, 'mail_html_template', 'id', $translate->_('common.id')),
 			self::NAME => new DevblocksSearchField(self::NAME, 'mail_html_template', 'name', $translate->_('common.name')),
 			self::UPDATED_AT => new DevblocksSearchField(self::UPDATED_AT, 'mail_html_template', 'updated_at', $translate->_('common.updated')),
-			self::OWNER_CONTEXT => new DevblocksSearchField(self::OWNER_CONTEXT, 'mail_html_template', 'owner_context', $translate->_('common.owner_context')),
-			self::OWNER_CONTEXT_ID => new DevblocksSearchField(self::OWNER_CONTEXT_ID, 'mail_html_template', 'owner_context_id', $translate->_('common.owner_context_id')),
+			self::OWNER_CONTEXT => new DevblocksSearchField(self::OWNER_CONTEXT, 'mail_html_template', 'owner_context', null),
+			self::OWNER_CONTEXT_ID => new DevblocksSearchField(self::OWNER_CONTEXT_ID, 'mail_html_template', 'owner_context_id', null),
 			self::CONTENT => new DevblocksSearchField(self::CONTENT, 'mail_html_template', 'content', $translate->_('common.content')),
+			self::SIGNATURE => new DevblocksSearchField(self::SIGNATURE, 'mail_html_template', 'signature', $translate->_('common.signature')),
 
+			self::FULLTEXT_COMMENT_CONTENT => new DevblocksSearchField(self::FULLTEXT_COMMENT_CONTENT, 'ftcc', 'content', $translate->_('comment.filters.content'), 'FT'),
+				
 			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null),
 			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null),
 			self::VIRTUAL_WATCHERS => new DevblocksSearchField(self::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS'),
@@ -383,9 +423,13 @@ class SearchFields_MailHtmlTemplate implements IDevblocksSearchFields {
 			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null),
 		);
 		
+		// Fulltext indexes
+		
+		$columns[self::FULLTEXT_COMMENT_CONTENT]->ft_schema = Search_CommentContent::ID;
+		
 		// Custom Fields
 		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array(
-			'cerberusweb.contexts.mail.html_template',
+			CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE,
 		));
 		
 		if(!empty($custom_columns))
@@ -405,37 +449,54 @@ class Model_MailHtmlTemplate {
 	public $owner_context;
 	public $owner_context_id;
 	public $content;
+	public $signature;
+	
+	function getSignature($worker=null) {
+		$signature = $this->signature;
+		
+		if(!empty($worker)) {
+			$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+			
+			$labels = array();
+			$values = array();
+			CerberusContexts::getContext(CerberusContexts::CONTEXT_WORKER, $worker, $labels, $values, null, true, true);
+			$dict = new DevblocksDictionaryDelegate($values);
+			
+			$signature = $tpl_builder->build($signature, $dict);
+		}
+		
+		return $signature;
+	}
+	
+	function getAttachments() {
+		return DAO_Attachment::getByContextIds(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $this->id);		
+	}
 };
 
-class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'mailhtmltemplate';
 
 	function __construct() {
 		$translate = DevblocksPlatform::getTranslationService();
 	
 		$this->id = self::DEFAULT_ID;
-		// [TODO] Name the worklist view
-		$this->name = $translate->_('MailHtmlTemplate');
+		$this->name = $translate->_('Mail HTML Templates');
 		$this->renderLimit = 25;
 		$this->renderSortBy = SearchFields_MailHtmlTemplate::ID;
 		$this->renderSortAsc = true;
 
 		$this->view_columns = array(
-			SearchFields_MailHtmlTemplate::ID,
 			SearchFields_MailHtmlTemplate::NAME,
 			SearchFields_MailHtmlTemplate::UPDATED_AT,
-			SearchFields_MailHtmlTemplate::OWNER_CONTEXT,
-			SearchFields_MailHtmlTemplate::OWNER_CONTEXT_ID,
-			SearchFields_MailHtmlTemplate::CONTENT,
 		);
-		// [TODO] Filter fields
+		
 		$this->addColumnsHidden(array(
+			SearchFields_MailHtmlTemplate::FULLTEXT_COMMENT_CONTENT,
 			SearchFields_MailHtmlTemplate::VIRTUAL_CONTEXT_LINK,
 			SearchFields_MailHtmlTemplate::VIRTUAL_HAS_FIELDSET,
 			SearchFields_MailHtmlTemplate::VIRTUAL_WATCHERS,
 		));
 		
-		// [TODO] Filter fields
 		$this->addParamsHidden(array(
 		));
 		
@@ -516,11 +577,11 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 //				break;
 				
 			case SearchFields_MailHtmlTemplate::VIRTUAL_CONTEXT_LINK:
-				$counts = $this->_getSubtotalCountForContextLinkColumn('DAO_MailHtmlTemplate', 'cerberusweb.contexts.mail.html_template', $column);
+				$counts = $this->_getSubtotalCountForContextLinkColumn('DAO_MailHtmlTemplate', CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $column);
 				break;
 
 			case SearchFields_MailHtmlTemplate::VIRTUAL_HAS_FIELDSET:
-				$counts = $this->_getSubtotalCountForHasFieldsetColumn('DAO_MailHtmlTemplate', 'cerberusweb.contexts.mail.html_template', $column);
+				$counts = $this->_getSubtotalCountForHasFieldsetColumn('DAO_MailHtmlTemplate', CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $column);
 				break;
 				
 			case SearchFields_MailHtmlTemplate::VIRTUAL_WATCHERS:
@@ -539,6 +600,79 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 		return $counts;
 	}
 	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'comments' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::FULLTEXT_COMMENT_CONTENT),
+				),
+			'content' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::CONTENT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::ID),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'signature' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::SIGNATURE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::UPDATED_AT),
+				),
+			'watchers' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_MailHtmlTemplate::VIRTUAL_WATCHERS),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
+	}
+	
 	function render() {
 		$this->_sanitize();
 		
@@ -547,7 +681,7 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 		$tpl->assign('view', $this);
 
 		// Custom fields
-		$custom_fields = DAO_CustomField::getByContext('cerberusweb.contexts.mail.html_template');
+		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE);
 		$tpl->assign('custom_fields', $custom_fields);
 
 		$tpl->assign('view_template', 'devblocks:cerberusweb.core::configuration/section/mail_html/view.tpl');
@@ -558,19 +692,16 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('id', $this->id);
 
-		// [TODO] Move the fields into the proper data type
 		switch($field) {
-			case SearchFields_MailHtmlTemplate::ID:
 			case SearchFields_MailHtmlTemplate::NAME:
-			case SearchFields_MailHtmlTemplate::UPDATED_AT:
 			case SearchFields_MailHtmlTemplate::OWNER_CONTEXT:
-			case SearchFields_MailHtmlTemplate::OWNER_CONTEXT_ID:
 			case SearchFields_MailHtmlTemplate::CONTENT:
-			case 'placeholder_string':
+			case SearchFields_MailHtmlTemplate::SIGNATURE:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__string.tpl');
 				break;
 				
-			case 'placeholder_number':
+			case SearchFields_MailHtmlTemplate::ID:
+			case SearchFields_MailHtmlTemplate::OWNER_CONTEXT_ID:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__number.tpl');
 				break;
 				
@@ -578,8 +709,12 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__bool.tpl');
 				break;
 				
-			case 'placeholder_date':
+			case SearchFields_MailHtmlTemplate::UPDATED_AT:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__date.tpl');
+				break;
+				
+			case SearchFields_MailHtmlTemplate::FULLTEXT_COMMENT_CONTENT:
+				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__fulltext.tpl');
 				break;
 				
 			case SearchFields_MailHtmlTemplate::VIRTUAL_CONTEXT_LINK:
@@ -589,7 +724,7 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 				break;
 				
 			case SearchFields_MailHtmlTemplate::VIRTUAL_HAS_FIELDSET:
-				$this->_renderCriteriaHasFieldset($tpl, 'cerberusweb.contexts.mail.html_template');
+				$this->_renderCriteriaHasFieldset($tpl, CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE);
 				break;
 				
 			case SearchFields_MailHtmlTemplate::VIRTUAL_WATCHERS:
@@ -645,29 +780,31 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 	function doSetCriteria($field, $oper, $value) {
 		$criteria = null;
 
-		// [TODO] Move fields into the right data type
 		switch($field) {
-			case SearchFields_MailHtmlTemplate::ID:
 			case SearchFields_MailHtmlTemplate::NAME:
-			case SearchFields_MailHtmlTemplate::UPDATED_AT:
 			case SearchFields_MailHtmlTemplate::OWNER_CONTEXT:
-			case SearchFields_MailHtmlTemplate::OWNER_CONTEXT_ID:
 			case SearchFields_MailHtmlTemplate::CONTENT:
-			case 'placeholder_string':
+			case SearchFields_MailHtmlTemplate::SIGNATURE:
 				$criteria = $this->_doSetCriteriaString($field, $oper, $value);
 				break;
 				
-			case 'placeholder_number':
+			case SearchFields_MailHtmlTemplate::ID:
+			case SearchFields_MailHtmlTemplate::OWNER_CONTEXT_ID:
 				$criteria = new DevblocksSearchCriteria($field,$oper,$value);
 				break;
 				
-			case 'placeholder_date':
+			case SearchFields_MailHtmlTemplate::UPDATED_AT:
 				$criteria = $this->_doSetCriteriaDate($field, $oper);
 				break;
 				
 			case 'placeholder_bool':
 				@$bool = DevblocksPlatform::importGPC($_REQUEST['bool'],'integer',1);
 				$criteria = new DevblocksSearchCriteria($field,$oper,$bool);
+				break;
+				
+			case SearchFields_MailHtmlTemplate::FULLTEXT_COMMENT_CONTENT:
+				@$scope = DevblocksPlatform::importGPC($_REQUEST['scope'],'string','expert');
+				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_FULLTEXT,array($value,$scope));
 				break;
 				
 			case SearchFields_MailHtmlTemplate::VIRTUAL_CONTEXT_LINK:
@@ -756,7 +893,7 @@ class View_MailHtmlTemplate extends C4_AbstractView implements IAbstractView_Sub
 			}
 
 			// Custom Fields
-			self::_doBulkSetCustomFields('cerberusweb.contexts.mail.html_template', $custom_fields, $batch_ids);
+			self::_doBulkSetCustomFields(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $custom_fields, $batch_ids);
 			
 			unset($batch_ids);
 		}
@@ -808,7 +945,7 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 			$prefix = 'HTML Template:';
 		
 		$translate = DevblocksPlatform::getTranslationService();
-		$fields = DAO_CustomField::getByContext('cerberusweb.contexts.mail.html_template');
+		$fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE);
 
 		// Polymorph
 		if(is_numeric($mail_html_template)) {
@@ -825,7 +962,9 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 		$token_labels = array(
 			'_label' => $prefix,
 			'id' => $prefix.$translate->_('common.id'),
+			'content' => $prefix.$translate->_('common.content'),
 			'name' => $prefix.$translate->_('common.name'),
+			'signature' => $prefix.$translate->_('common.signature'),
 			'updated_at' => $prefix.$translate->_('common.updated'),
 			'record_url' => $prefix.$translate->_('common.url.record'),
 		);
@@ -834,7 +973,9 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 		$token_types = array(
 			'_label' => 'context_url',
 			'id' => Model_CustomField::TYPE_NUMBER,
+			'content' => Model_CustomField::TYPE_SINGLE_LINE,
 			'name' => Model_CustomField::TYPE_SINGLE_LINE,
+			'signature' => Model_CustomField::TYPE_SINGLE_LINE,
 			'updated_at' => Model_CustomField::TYPE_DATE,
 			'record_url' => Model_CustomField::TYPE_URL,
 		);
@@ -850,14 +991,16 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 		// Token values
 		$token_values = array();
 		
-		$token_values['_context'] = 'cerberusweb.contexts.mail.html_template';
+		$token_values['_context'] = CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE;
 		$token_values['_types'] = $token_types;
 		
 		if($mail_html_template) {
 			$token_values['_loaded'] = true;
 			$token_values['_label'] = $mail_html_template->name;
+			$token_values['content'] = $mail_html_template->content;
 			$token_values['id'] = $mail_html_template->id;
 			$token_values['name'] = $mail_html_template->name;
+			$token_values['signature'] = $mail_html_template->signature;
 			$token_values['updated_at'] = $mail_html_template->updated_at;
 			
 			// Custom fields
@@ -875,7 +1018,7 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 		if(!isset($dictionary['id']))
 			return;
 		
-		$context = 'cerberusweb.contexts.mail.html_template';
+		$context = CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE;
 		$context_id = $dictionary['id'];
 		
 		@$is_loaded = $dictionary['_loaded'];
@@ -933,8 +1076,8 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;
@@ -971,15 +1114,16 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 			$mail_html_template = new Model_MailHtmlTemplate();
 			$mail_html_template->name = "New HTML Template";
 			$mail_html_template->content = null;
+			$mail_html_template->signature = null;
 			$tpl->assign('model', $mail_html_template);
 		}
 
 		/*
-		$custom_fields = DAO_CustomField::getByContext('cerberusweb.contexts.mail.html_template', false);
+		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, false);
 		$tpl->assign('custom_fields', $custom_fields);
 		
 		if(!empty($context_id)) {
-			$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds('cerberusweb.contexts.mail.html_template', $context_id);
+			$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $context_id);
 			if(isset($custom_field_values[$context_id]))
 				$tpl->assign('custom_field_values', $custom_field_values[$context_id]);
 		}
@@ -1008,6 +1152,15 @@ class Context_MailHtmlTemplate extends Extension_DevblocksContext implements IDe
 				$owner_roles[$k] = $v;
 		}
 		$tpl->assign('owner_roles', $owner_roles);
+		
+		// Tokens
+		
+		$worker_token_labels = array();
+		$worker_token_values = array();
+		CerberusContexts::getContext(CerberusContexts::CONTEXT_WORKER, null, $worker_token_labels, $worker_token_values);
+		$tpl->assign('worker_token_labels', $worker_token_labels);
+		
+		// Template
 		
 		$tpl->display('devblocks:cerberusweb.core::configuration/section/mail_html/peek.tpl');
 	}

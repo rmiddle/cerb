@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_AddressToWorker { // extends DevblocksORMHelper
@@ -27,17 +27,17 @@ class DAO_AddressToWorker { // extends DevblocksORMHelper
 	static function assign($address, $worker_id, $is_confirmed=false) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
+		// Force lowercase
+		$address = trim(strtolower($address));
+
 		if(empty($address) || empty($worker_id))
 			return NULL;
-
-		// Force lowercase
-		$address = strtolower($address);
 
 		$sql = sprintf("INSERT INTO address_to_worker (address, worker_id, is_confirmed, code, code_expire) ".
 			"VALUES (%s, %d, %d, '', 0)",
 			$db->qstr($address),
-			($is_confirmed ? 1 : 0),
-			$worker_id
+			$worker_id,
+			($is_confirmed ? 1 : 0)
 		);
 		$db->Execute($sql);
 
@@ -48,6 +48,8 @@ class DAO_AddressToWorker { // extends DevblocksORMHelper
 
 	static function unassign($address) {
 		$db = DevblocksPlatform::getDatabaseService();
+		
+		$address = trim(strtolower($address));
 		
 		if(empty($address))
 			return NULL;

@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -259,7 +259,7 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 							"%s %s\n".
 							"%s %d\n".
 							"%s %s\n".
-							(!empty($comment) ? sprintf("%s: %s\n", $translate->_('common.comment'), $comment) : '').
+							"%s".
 							"\n".
 							"%s\n",
 							$translate->_('timetracking.ui.timetracking'),
@@ -269,6 +269,7 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 							$time_actual_mins,
 							$translate->_('timetracking.ui.comment.activity'),
 							(!empty($activity) ? $activity->name : ''),
+							(!empty($comment) ? sprintf("%s: %s\n", $translate->_('common.comment'), $comment) : ''),
 							$url_writer->writeNoProxy(sprintf("c=profiles&type=time_tracking&id=%d", $id), true)
 						);
 						$fields = array(
@@ -349,7 +350,7 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 		
 		// Comments
 		if(!empty($comment)) {
-			@$also_notify_worker_ids = DevblocksPlatform::importGPC($_REQUEST['notify_worker_ids'],'array',array());
+			$also_notify_worker_ids = array_keys(CerberusApplication::getWorkersByAtMentionsText($comment));
 			
 			$fields = array(
 				DAO_Comment::OWNER_CONTEXT => CerberusContexts::CONTEXT_WORKER,
@@ -507,7 +508,7 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 		$view = C4_AbstractViewLoader::getView($view_id);
 		
 		// Time Tracking fields
-		@$activity = DevblocksPlatform::importGPC($_POST['activity_id'], 'string', '');
+		@$activity = DevblocksPlatform::importGPC($_POST['activity_id'],'string','');
 		@$is_closed = DevblocksPlatform::importGPC($_POST['is_closed'],'string','');
 
 		// Scheduled behavior
@@ -530,7 +531,8 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 			);
 		}
 		
-		$do['activity_id'] = $activity;
+		if(strlen($activity) > 0)
+			$do['activity_id'] = $activity;
 		
 		// Watchers
 		$watcher_params = array();

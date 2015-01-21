@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -188,6 +188,11 @@ class CerberusParserModel {
 		$this->_date = $timestamp;
 	}
 	
+	public function updateThreadHeaders() {
+		$this->_parseHeadersSubject();
+		return $this->_parseHeadersIsNew();
+	}
+	
 	/**
 	 * First we check the references and in-reply-to headers to find a
 	 * historical match in the database. If those don't match we check
@@ -237,13 +242,14 @@ class CerberusParserModel {
 					continue;
 				
 				// Only consider the watcher auth header to be a reply if it validates
+				
 				if($senderWorker instanceof Model_Worker
 						&& @preg_match('#\<([a-f0-9]+)\@cerb\d{0,1}\>#', $ref, $hits)
 						&& false != ($relay_message_id = $this->isValidAuthHeader($ref, $senderWorker))) {
-				
+					
 					if(null != ($ticket = DAO_Ticket::getTicketByMessageId($relay_message_id))) {
 						$this->_is_new = false;
-						$this->_ticket_id = $ticket_id;
+						$this->_ticket_id = $ticket->id;
 						$this->_ticket_model = $ticket;
 						$this->_message_id = $relay_message_id;
 						return;
@@ -251,7 +257,7 @@ class CerberusParserModel {
 				}
 				
 				// Otherwise, look up the normal header
-				if(null != ($ids = DAO_Ticket::getTicketByMessageId($ref))) {
+				if(null != ($ids = DAO_Ticket::getTicketByMessageIdHeader($ref))) {
 					$this->_is_new = false;
 					$this->_ticket_id = $ids['ticket_id'];
 					$this->_ticket_model = DAO_Ticket::get($this->_ticket_id);
@@ -263,6 +269,7 @@ class CerberusParserModel {
 		
 		// Try matching the subject line
 		// [TODO] This should only happen if the destination has subject masks enabled
+		
 		if(!is_array($aSubject))
 			$aSubject = array($aSubject);
 			
@@ -438,6 +445,9 @@ class CerberusParserModel {
 		if(!empty($this->_ticket_model))
 			return $this->_ticket_model;
 
+		if(empty($this->_ticket_id))
+			return null;
+		
 		// Lazy-load
 		if(!empty($this->_ticket_id)) {
 			$this->_ticket_model = DAO_Ticket::get($this->_ticket_id);
@@ -664,6 +674,10 @@ class CerberusParser {
 			
 			if(empty($content_filename)) {
 				switch(strtolower($content_type)) {
+					case 'text/calendar':
+						$content_filename = 'calendar.ics';
+						break;
+						
 					case 'text/plain':
 						$text = mailparse_msg_extract_part_file($section, $full_filename, NULL);
 						
@@ -756,6 +770,31 @@ class CerberusParser {
 						// Skip any nested parts in this message/rfc822 parent
 						$ignore_mime_prefixes[] = $st . '.';
 						break;
+						
+					case 'image/gif':
+					case 'image/jpg':
+					case 'image/jpeg':
+					case 'image/png':
+						if(isset($info['content-id'])) {
+							$content_filename = DevblocksPlatform::strToPermalink($info['content-id']);
+						} else {
+							$content_filename = 'untitled';
+						}
+						
+						switch(strtolower($content_type)) {
+							case 'image/gif':
+								$content_filename .= ".gif";
+								break;
+							case 'image/jpg':
+							case 'image/jpeg':
+								$content_filename .= ".jpg";
+								break;
+							case 'image/png':
+								$content_filename .= ".png";
+								break;
+						}
+						
+						break;
 				}
 			}
 
@@ -773,9 +812,9 @@ class CerberusParser {
 						@unlink($attach->tmpname);
 						break;
 					}
-
+					
 					// content-name is not necessarily unique...
-					if (isset($message->files[$content_filename])) {
+					if(isset($message->files[$content_filename])) {
 						$j=1;
 						while (isset($message->files[$content_filename . '(' . $j . ')'])) {
 							$j++;
@@ -881,6 +920,11 @@ class CerberusParser {
 			return NULL;
 		}
 		
+		// Rewrote threading headers?
+		if(isset($pre_actions['headers_dirty'])) {
+			$model->updateThreadHeaders();
+		}
+		
 		// Filter attachments?
 		// [TODO] Encapsulate this somewhere
 		if(isset($pre_actions['attachment_filters']) && !empty($message->files)) {
@@ -962,9 +1006,11 @@ class CerberusParser {
 			if($is_authenticated) {
 				$logger->info("[Worker Relay] Worker authentication successful. Proceeding.");
 
-				CerberusContexts::setActivityDefaultActor(CerberusContexts::CONTEXT_WORKER, $proxy_worker->id);
-
 				if(!empty($proxy_ticket)) {
+					
+					// Log activity as the worker
+					CerberusContexts::pushActivityDefaultActor(CerberusContexts::CONTEXT_WORKER, $proxy_worker->id);
+					
 					$parser_message = $model->getMessage();
 					$attachment_file_ids = array();
 					
@@ -1117,12 +1163,14 @@ class CerberusParser {
 					
 					$properties['content'] = ltrim($body);
 					
+					
 					CerberusMail::sendTicketMessage($properties);
+
+					// Stop logging activity as the worker
+					CerberusContexts::popActivityDefaultActor();
+					
 					return $proxy_ticket->id;
 				}
-
-				// Clear temporary worker session
-				CerberusContexts::setActivityDefaultActor(null);
 
 			} else { // failed worker auth
 				// [TODO] Bounce
@@ -1421,6 +1469,9 @@ class CerberusParser {
 		);
 		CerberusContexts::logActivity('ticket.message.inbound', CerberusContexts::CONTEXT_TICKET, $model->getTicketId(), $entry, CerberusContexts::CONTEXT_ADDRESS, $model->getSenderAddressModel()->id);
 
+		// Trigger Mail Received
+		Event_MailReceived::trigger($model->getMessageId());
+		
 		// Trigger Group Mail Received
 		Event_MailReceivedByGroup::trigger($model->getMessageId(), $model->getGroupId());
 		
@@ -1453,7 +1504,7 @@ class CerberusParser {
 		$charset = strtolower($charset);
 		
 		// Otherwise, fall back to mbstring's auto-detection
-		mb_detect_order('iso-2022-jp-ms, iso-2022-jp, utf-8, iso-8859-1, win-1252');
+		mb_detect_order('iso-2022-jp-ms, iso-2022-jp, utf-8, iso-8859-1, windows-1252');
 		
 		// Normalize charsets
 		switch($charset) {
@@ -1461,9 +1512,31 @@ class CerberusParser {
 				$charset = 'ascii';
 				break;
 				
+			case 'win-1252':
+				$charset = 'windows-1252';
+				break;
+				
+			case 'ks_c_5601-1987':
+			case 'ks_c_5601-1992':
+			case 'ks_c_5601-1998':
+			case 'ks_c_5601-2002':
+				$charset = 'cp949';
+				break;
+				
 			case NULL:
 				$charset = mb_detect_encoding($text);
 				break;
+		}
+		
+		// If we're starting with Windows-1252, convert some special characters
+		if(0 == strcasecmp($charset, 'windows-1252')) {
+		
+			// http://www.toao.net/48-replacing-smart-quotes-and-em-dashes-in-mysql
+			$text = str_replace(
+				array(chr(145), chr(146), chr(147), chr(148), chr(150), chr(151), chr(133)),
+				array("'", "'", '"', '"', '-', '--', '...'),
+				$text
+			);
 		}
 		
 		if($charset && @mb_check_encoding($text, $charset)) {
@@ -1474,9 +1547,8 @@ class CerberusParser {
 			$has_iconv = extension_loaded('iconv') ? true : false;
 			
 			// If we can use iconv, do so.
-			if($has_iconv && $charset && false !== ($out = iconv($charset, LANG_CHARSET_CODE . '//IGNORE//TRANSLIT', $text)))
+			if($has_iconv && $charset && false !== ($out = iconv($charset, LANG_CHARSET_CODE . '//TRANSLIT//IGNORE', $text)))
 				return $out;
-			
 			
 			if(false !== ($charset = mb_detect_encoding($text))) {
 				if(false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE, $charset)))

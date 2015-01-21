@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -52,8 +52,6 @@ class ChTranslators_SetupPageSection extends Extension_PageSection {
 	const ID = 'translators.setup.section.translations';
 	
 	function render() {
-		$settings = DevblocksPlatform::getPluginSettingsService();
-		
 		$tpl = DevblocksPlatform::getTemplateService();
 	
 		$defaults = new C4_AbstractViewModel();
@@ -114,16 +112,18 @@ class ChTranslators_SetupPageSection extends Extension_PageSection {
 		
 		// Find all en_US strings that aren't translated
 		if(is_array($strings_en) && is_array($lang_codes) && !empty($lang_codes))
-		foreach($strings_en as $key => $string) {
+		foreach($strings_en as $key => $model) { /* @var $model Model_Translation */
 			foreach($lang_codes as $idx => $lang_code) {
 				@$lang_action = $lang_actions[$idx];
+				
 				if(!isset($hash[$lang_code.'_'.$key])) {
 					$fields = array(
 						DAO_Translation::STRING_ID => $key,
 						DAO_Translation::LANG_CODE => $lang_code,
 						DAO_Translation::STRING_DEFAULT => '',
-						DAO_Translation::STRING_OVERRIDE => (('en_US'==$lang_action) ? $string : ''),
+						DAO_Translation::STRING_OVERRIDE => (('en_US'==$lang_action) ? $model->string_default : ''),
 					);
+					
 					DAO_Translation::create($fields);
 				}
 			}
@@ -291,18 +291,8 @@ class ChTranslators_SetupPageSection extends Extension_PageSection {
 			false
 		);
 		
-		// Build TMX outline
-		$xml = simplexml_load_string(
-			'<?xml version="1.0" encoding="' . LANG_CHARSET_CODE . '"?>'.
-			'<!DOCTYPE tmx>'.
-			'<tmx version="1.4">'.
-			'<body></body>'.
-			'</tmx>'
-		); /* @var $xml SimpleXMLElement */
-		
-		$namespaces = $xml->getNamespaces(true);
-		
 		$codes = array();
+		$strings = array();
 		
 		// Loop translated strings
 		if(is_array($results))
@@ -312,25 +302,53 @@ class ChTranslators_SetupPageSection extends Extension_PageSection {
 			$string_default = $result[SearchFields_Translation::STRING_DEFAULT];
 			$string_override = $result[SearchFields_Translation::STRING_OVERRIDE];
 			
-			$codes[$lang_code] = 1;
+			if(!isset($codes[$lang_code]))
+				$codes[$lang_code] = true;
 			
 			$string = (!empty($string_override))
 				? $string_override
 				: $string_default
 				;
-			
-			// [TODO] Nest multiple <tuv> in a single <tu> parent
-			$eTu =& $xml->body->addChild('tu'); /* @var $eTu SimpleXMLElement */
-			$eTu->addAttribute('tuid', $string_id);
-			$eTuv =& $eTu->addChild('tuv'); /* @var $eTuv SimpleXMLElement */
-			$eTuv->addAttribute('xml:lang', $lang_code, 'http://www.w3.org/XML/1998/namespace');
-			$eSeg =& $eTuv->addChild('seg', htmlspecialchars($string)); /* @var $eSeg SimpleXMLElement */
+				
+			if(!isset($strings[$string_id]))
+				$strings[$string_id] = array();
+				
+			$strings[$string_id][$lang_code] = $string;
 		}
 		
-		$imp = new DOMImplementation;
-//		$dtd = $imp->createDocumentType('tmx', '', 'tmx14.dtd');
-//		$doc = $imp->createDocument("", "", $dtd);
-		$doc = $imp->createDocument("", "");
+		// Build TMX outline
+		$xml = simplexml_load_string(
+			'<?xml version="1.0" encoding="' . LANG_CHARSET_CODE . '"?>'.
+			'<tmx version="1.4">'.
+			'<header creationtool="Cerb" creationtoolversion="' . APP_VERSION . '" srclang="en_US" adminlang="en" datatype="unknown" o-tmf="unknown" segtype="sentence" creationid="" creationdate=""></header>'.
+			'<body></body>'.
+			'</tmx>'
+		); /* @var $xml SimpleXMLElement */
+		
+		$namespaces = $xml->getNamespaces(true);
+		
+		// Loop translated strings
+		foreach($strings as $string_id => $langs) {
+			$eTu = $xml->body->addChild('tu'); /* @var $eTu SimpleXMLElement */
+			$eTu->addAttribute('tuid', $string_id);
+			
+			// Fill in blanks
+			foreach(array_diff(array_keys($codes), array_keys($langs)) as $lang_code) {
+				$langs[$lang_code] = '';
+			}
+			
+			// Create tuple nodes
+			foreach($langs as $lang_code => $string) {
+				$eTuv = $eTu->addChild('tuv'); /* @var $eTuv SimpleXMLElement */
+				$eTuv->addAttribute('xml:lang', $lang_code, 'http://www.w3.org/XML/1998/namespace');
+				$eSeg = $eTuv->addChild('seg', htmlspecialchars($string)); /* @var $eSeg SimpleXMLElement */
+			}
+		}
+		
+		$imp = new DOMImplementation();
+		$dtd = $imp->createDocumentType('tmx', '-//LISA OSCAR:1998//DTD for Translation Memory eXchange//EN', 'tmx14.dtd');
+
+		$doc = $imp->createDocument('', '', $dtd);
 		$doc->encoding = LANG_CHARSET_CODE;
 		$doc->formatOutput = true;
 		
@@ -338,9 +356,9 @@ class ChTranslators_SetupPageSection extends Extension_PageSection {
 		$simplexml = $doc->importNode($simplexml, true);
 		$simplexml = $doc->appendChild($simplexml);
 
-		$filename = "cerb5_lang_" . implode('_', array_keys($codes)) . ".xml";
+		$filename = "cerb_lang_" . implode('_', array_keys($codes)) . ".tmx";
 		
-		header("Content-type: text/xml");
+		header("Content-Type: text/xml");
 		header("Content-Disposition: attachment; filename=\"$filename\"");
 		
 		echo $doc->saveXML();
@@ -377,7 +395,7 @@ class ChTranslators_SetupPluginsMenuItem extends Extension_PageMenuItem {
 }
 endif;
 
-class View_Translation extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_Translation extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'translations';
 
 	function __construct() {
@@ -468,6 +486,86 @@ class View_Translation extends C4_AbstractView implements IAbstractView_Subtotal
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Translation::STRING_DEFAULT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Translation::STRING_ID, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'lang' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_VIRTUAL,
+					'options' => array('param_key' => SearchFields_Translation::LANG_CODE),
+				),
+			'myTranslation' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Translation::STRING_OVERRIDE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'text' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Translation::STRING_DEFAULT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+		);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				case 'lang':
+					$lang_codes = DAO_Translation::getDefinedLangCodes();
+					
+					$field_keys = array(
+						'lang' => SearchFields_Translation::LANG_CODE,
+					);
+					
+					@$field_key = $field_keys[$k];
+					$oper = DevblocksSearchCriteria::OPER_IN;
+					$patterns = DevblocksPlatform::parseCsvString($v);
+					
+					$values = array();
+					
+					foreach($patterns as $pattern) {
+						foreach($lang_codes as $lang_code => $lang_label) {
+							if(false !== stripos($lang_code . ' ' . $lang_label, $pattern))
+								$values[$lang_code] = true;
+						}
+					}
+
+					$param = new DevblocksSearchCriteria(
+						$field_key,
+						$oper,
+						array_keys($values)
+					);
+					$params[$field_key] = $param;
+					break;
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {

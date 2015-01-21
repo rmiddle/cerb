@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_SetupWorkers extends Extension_PageSection {
@@ -43,10 +43,18 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string','');
 		
 		$tpl = DevblocksPlatform::getTemplateService();
+		$date = DevblocksPlatform::getDateService();
 		
 		$tpl->assign('view_id', $view_id);
 		
-		$worker = DAO_Worker::get($id);
+		if(false == ($worker = DAO_Worker::get($id))) {
+			$worker = new Model_Worker();
+			$worker->id = 0;
+			$worker->timezone = $_SESSION['timezone'];
+			$worker->time_format = $_SESSION['time_format'];
+			$worker->language = $_SESSION['locale'];
+		}
+		
 		$tpl->assign('worker', $worker);
 		
 		$groups = DAO_Group::getAll();
@@ -64,6 +72,21 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 		$auth_extensions = Extension_LoginAuthenticator::getAll(false);
 		$tpl->assign('auth_extensions', $auth_extensions);
 		
+		// Calendars
+		$calendars = DAO_Calendar::getOwnedByWorker($worker);
+		$tpl->assign('calendars', $calendars);
+		
+		// Languages
+		$languages = DAO_Translation::getDefinedLangCodes();
+		$tpl->assign('languages', $languages);
+		
+		// Timezones
+		$timezones = $date->getTimezones();
+		$tpl->assign('timezones', $timezones);
+		
+		// Time Format
+		$tpl->assign('time_format', DevblocksPlatform::getDateTimeFormat());
+		
 		$tpl->display('devblocks:cerberusweb.core::configuration/section/workers/peek.tpl');
 	}
 	
@@ -80,8 +103,13 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 		@$first_name = DevblocksPlatform::importGPC($_POST['first_name'],'string');
 		@$last_name = DevblocksPlatform::importGPC($_POST['last_name'],'string');
 		@$title = DevblocksPlatform::importGPC($_POST['title'],'string');
-		@$email = DevblocksPlatform::importGPC($_POST['email'],'string');
+		@$email = trim(strtolower(DevblocksPlatform::importGPC($_POST['email'],'string')));
 		@$auth_extension_id = DevblocksPlatform::importGPC($_POST['auth_extension_id'],'string');
+		@$at_mention_name = DevblocksPlatform::strToPermalink(DevblocksPlatform::importGPC($_POST['at_mention_name'],'string'));
+		@$language = DevblocksPlatform::importGPC($_POST['lang_code'],'string');
+		@$timezone = DevblocksPlatform::importGPC($_POST['timezone'],'string');
+		@$time_format = DevblocksPlatform::importGPC($_POST['time_format'],'string');
+		@$calendar_id = DevblocksPlatform::importGPC($_POST['calendar_id'],'string');
 		@$password_new = DevblocksPlatform::importGPC($_POST['password_new'],'string');
 		@$password_verify = DevblocksPlatform::importGPC($_POST['password_verify'],'string');
 		@$is_superuser = DevblocksPlatform::importGPC($_POST['is_superuser'],'integer', 0);
@@ -101,6 +129,10 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 				DAO_Worker::delete($id);
 			
 		} else {
+			// Validate the email address
+			if(false == ($worker_address = DAO_Address::lookupAddress($email, true)))
+				return false;
+			
 			if(empty($id) && null == DAO_Worker::getByEmail($email)) {
 				if(empty($password_new)) {
 					// Creating new worker.  If password is empty, email it to them
@@ -158,9 +190,14 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 					DAO_Worker::IS_DISABLED => $disabled,
 					DAO_Worker::EMAIL => $email,
 					DAO_Worker::AUTH_EXTENSION_ID => $auth_extension_id,
+					DAO_Worker::AT_MENTION_NAME => $at_mention_name,
+					DAO_Worker::LANGUAGE => $language,
+					DAO_Worker::TIMEZONE => $timezone,
+					DAO_Worker::TIME_FORMAT => $time_format,
 				);
 				
-				$id = DAO_Worker::create($fields);
+				if(false == ($id = DAO_Worker::create($fields)))
+					return false;
 				
 				// View marquee
 				if(!empty($id) && !empty($view_id)) {
@@ -168,6 +205,36 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 				}
 				
 			} // end create worker
+			
+			// Calendar
+			
+			// Create a calendar for this worker
+			if('new' == $calendar_id) {
+				$fields = array(
+					DAO_Calendar::NAME => sprintf("%s%s's Calendar", $first_name, $last_name ? (' ' . $last_name) : ''),
+					DAO_Calendar::OWNER_CONTEXT => CerberusContexts::CONTEXT_WORKER,
+					DAO_Calendar::OWNER_CONTEXT_ID => $id,
+					DAO_Calendar::PARAMS_JSON => json_encode(array(
+						"manual_disabled" => "0",
+						"sync_enabled" => "0",
+						"start_on_mon" => "1",
+						"hide_start_time" => "0",
+						"color_available" => "#A0D95B",
+						"color_busy" => "#C8C8C8",
+						"series" => array(
+							array("datasource"=>""),
+							array("datasource"=>""),
+							array("datasource"=>""),
+						)
+					)),
+					DAO_Calendar::UPDATED_AT => time(),
+				);
+				$calendar_id = DAO_Calendar::create($fields);
+				
+			} else {
+				// [TODO] Validate calendar id
+				$calendar_id = intval($calendar_id);
+			}
 			
 			// Update
 			$fields = array(
@@ -177,7 +244,12 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 				DAO_Worker::EMAIL => $email,
 				DAO_Worker::IS_SUPERUSER => $is_superuser,
 				DAO_Worker::IS_DISABLED => $disabled,
-				DAO_Worker::AUTH_EXTENSION_ID => $auth_extension_id
+				DAO_Worker::AUTH_EXTENSION_ID => $auth_extension_id,
+				DAO_Worker::AT_MENTION_NAME => $at_mention_name,
+				DAO_Worker::LANGUAGE => $language,
+				DAO_Worker::TIMEZONE => $timezone,
+				DAO_Worker::TIME_FORMAT => $time_format,
+				DAO_Worker::CALENDAR_ID => $calendar_id,
 			);
 			
 			// Update worker
@@ -198,9 +270,20 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 				}
 			}
 
-			// Add the worker e-mail to the addresses table
-			if(!empty($email))
-				DAO_Address::lookupAddress($email, true);
+			// Set the name on the worker email address
+			
+			if($worker_address instanceof Model_Address) {
+				$addy_fields = array();
+				
+				if(empty($worker_address->first_name) && !empty($first_name))
+					$addy_fields[DAO_Address::FIRST_NAME] = $first_name;
+				
+				if(empty($worker_address->last_name) && !empty($last_name))
+					$addy_fields[DAO_Address::LAST_NAME] = $last_name;
+				
+				if(!empty($addy_fields))
+					DAO_Address::update($worker_address->id, $addy_fields);
+			}
 			
 			// Addresses
 			// [TODO] This can insert dupe rows under some conditions

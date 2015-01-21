@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 class DAO_KbArticle extends Cerb_ORMHelper {
@@ -356,15 +356,28 @@ class DAO_KbArticle extends Cerb_ORMHelper {
 			case SearchFields_KbArticle::FULLTEXT_ARTICLE_CONTENT:
 				$search = Extension_DevblocksSearchSchema::get(Search_KbArticle::ID);
 				$query = $search->getQueryFromParam($param);
-				$ids = $search->query($query, array());
 				
-				if(empty($ids))
-					$ids = array(-1);
+				if(false === ($ids = $search->query($query, array()))) {
+					$args['where_sql'] .= 'AND 0 ';
 				
-				$args['where_sql'] .= sprintf('AND %s IN (%s) ',
-					$from_index,
-					implode(', ', $ids)
-				);
+				} elseif(is_array($ids)) {
+					if(empty($ids))
+						$ids = array(-1);
+					
+					$args['where_sql'] .= sprintf('AND %s IN (%s) ',
+						$from_index,
+						implode(', ', $ids)
+					);
+					
+				} elseif(is_string($ids)) {
+					$db = DevblocksPlatform::getDatabaseService();
+					
+					$args['join_sql'] .= sprintf("INNER JOIN %s ON (%s.id=kb.id) ",
+						$ids,
+						$ids
+					);
+				}
+				
 				break;
 			
 			case SearchFields_KbArticle::VIRTUAL_CONTEXT_LINK:
@@ -407,12 +420,8 @@ class DAO_KbArticle extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$id = intval($row[SearchFields_KbArticle::ID]);
-			$results[$id] = $result;
+			$results[$id] = $row;
 		}
 
 		$total = count($results);
@@ -563,7 +572,7 @@ class Search_KbArticle extends Extension_DevblocksSearchSchema {
 		$done = false;
 
 		while(!$done && time() < $stop_time) {
-			$where = sprintf("%s >= %d AND %s > %d",
+			$where = sprintf('(%1$s = %2$d AND %3$s > %4$d) OR (%1$s > %2$d)',
 				DAO_KbArticle::UPDATED,
 				$ptr_time,
 				DAO_KbArticle::ID,
@@ -590,7 +599,13 @@ class Search_KbArticle extends Extension_DevblocksSearchSchema {
 					$id
 				));
 				
-				$engine->index($this, $id, $article->title . ' ' . strip_tags($article->content));
+				$doc = array(
+					'title' => $article->title,
+					'content' => strip_tags($article->content),
+				);
+				
+				if(false === ($engine->index($this, $id, $doc)))
+					return false;
 				
 				flush();
 			}
@@ -692,6 +707,34 @@ class Model_KbArticle {
 		unset($trails);
 		
 		return $breadcrumbs;
+	}
+	
+	function extractInternalURLsFromContent() {
+		$url_writer = DevblocksPlatform::getUrlService();
+		$img_baseurl = $url_writer->write('c=files', true, false);
+		$img_baseurl_parts = parse_url($img_baseurl);
+		
+		$results = array();
+		
+		// Extract URLs
+		$matches = array();
+			preg_match_all(
+				sprintf('#\"(https*://%s%s/(.*?))\"#i',
+				preg_quote($img_baseurl_parts['host']),
+				preg_quote($img_baseurl_parts['path'])
+			),
+			$this->content,
+			$matches
+		);
+
+		if(isset($matches[1]))
+		foreach($matches[1] as $idx => $replace_url) {
+			$results[$replace_url] = array(
+				'path' => $matches[2][$idx],
+			);
+		}
+		
+		return $results;
 	}
 };
 
@@ -908,8 +951,8 @@ class Context_KbArticle extends Extension_DevblocksContext implements IDevblocks
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;
@@ -947,7 +990,7 @@ class Context_KbArticle extends Extension_DevblocksContext implements IDevblocks
 	}
 };
 
-class View_KbArticle extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_KbArticle extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'kb_overview';
 	
 	function __construct() {
@@ -1085,6 +1128,72 @@ class View_KbArticle extends C4_AbstractView implements IAbstractView_Subtotals 
 		}
 		
 		return $counts;
+	}
+	
+	// [TODO] Fulltext: Comments
+	// [TODO] Virtual: Topic
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
+					'options' => array('param_key' => SearchFields_KbArticle::FULLTEXT_ARTICLE_CONTENT),
+				),
+			'content' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
+					'options' => array('param_key' => SearchFields_KbArticle::FULLTEXT_ARTICLE_CONTENT),
+				),
+			'title' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_KbArticle::TITLE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_KbArticle::UPDATED),
+				),
+			'views' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_KbArticle::VIEWS),
+				),
+			'watchers' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_KbArticle::VIRTUAL_WATCHERS),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_KB_ARTICLE, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {

@@ -97,7 +97,7 @@
 											{$event->name}
 										{/if}
 									</a>
-								</div
+								</div>
 							</li>
 							{/if}
 							{/foreach}
@@ -116,7 +116,7 @@
 					</ul>
 					{/if}
 					
-					<button id="btnInsertReplySig{$message->id}" type="button" {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+G)"{/if} onclick="genericAjaxGet('','c=tickets&a=getComposeSignature&group_id={$ticket->group_id}&bucket_id={$ticket->bucket_id}',function(txt) { $('#reply_{$message->id}').insertAtCursor(txt); } );"><span class="cerb-sprite sprite-document_edit"></span> {'display.reply.insert_sig'|devblocks_translate|capitalize}</button>
+					<button id="btnInsertReplySig{$message->id}" type="button" {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+G)"{/if} onclick="$('#reply_{$message->id}').insertAtCursor('#signature\n');"><span class="cerb-sprite sprite-document_edit"></span> {'display.reply.insert_sig'|devblocks_translate|capitalize}</button>
 					
 					{* Plugin Toolbar *}
 					{if !empty($reply_toolbaritems)}
@@ -178,7 +178,7 @@
 {if !empty($signature)}
 
 
-{$signature}
+#signature
 {/if}
 
 {'display.reply.forward.banner'|devblocks_translate}
@@ -193,10 +193,12 @@
 {else}
 <textarea name="content" id="reply_{$message->id}" class="reply" style="width:98%;height:{$mail_reply_textbox_size_px|default:300}px;border:1px solid rgb(180,180,180);padding:5px;">
 {if !empty($draft)}{$draft->body}{else}
-{if !empty($signature) && 1==$signature_pos}
+{if !empty($signature) && (1==$signature_pos || 3==$signature_pos)}
 
 
-{$signature}{if $is_quoted}{*Sig above*}
+#signature{if 1==$signature_pos}
+
+#cut{/if}{if $is_quoted}{*Sig above*}
 
 
 {/if}
@@ -205,10 +207,13 @@
 {/if}{if !empty($signature) && 2==$signature_pos}
 
 
-{$signature}
+#signature
+#cut
 {/if}{*Sig below*}{/if}
 </textarea>
 {/if}
+
+			<div class="cerb-form-hint" style="display:block;">(Use #commands to perform additional actions)</div>
 		</td>
 	</tr>
 	<tr>
@@ -330,7 +335,7 @@
 			--><button type="button" class="split-right" onclick="$(this).next('ul').toggle();"><span class="cerb-sprite sprite-arrow-down-white"></span></button>
 			<ul class="cerb-popupmenu cerb-float" style="margin-top:-5px;">
 				<li><a href="javascript:;" class="send">{if $is_forward}{'display.ui.forward'|devblocks_translate}{else}{'display.ui.send_message'|devblocks_translate}{/if}</a></li>
-				<li><a href="javascript:;" class="save">{'display.ui.save_nosend'|devblocks_translate}</a></li>
+				{if $active_worker->hasPriv('core.mail.save_without_sending')}<li><a href="javascript:;" class="save">{'display.ui.save_nosend'|devblocks_translate}</a></li>{/if}
 				<li><a href="javascript:;" class="draft">{'display.ui.continue_later'|devblocks_translate}</a></li>
 			</ul>
 			<button type="button" class="discard" onclick="window.onbeforeunload=null;if(confirm('Are you sure you want to discard this reply?')) { if(null != draftAutoSaveInterval) { clearTimeout(draftAutoSaveInterval); draftAutoSaveInterval = null; } $frm = $(this).closest('form'); genericAjaxGet('', 'c=mail&a=handleSectionAction&section=drafts&action=deleteDraft&draft_id='+escape($frm.find('input:hidden[name=draft_id]').val()), function(o) { $frm = $('#reply{$message->id}_part2'); $('#draft'+escape($frm.find('input:hidden[name=draft_id]').val())).remove(); $('#reply{$message->id}').html('');  } ); }"><span class="cerb-sprite2 sprite-cross-circle"></span> {'display.ui.discard'|devblocks_translate|capitalize}</button>
@@ -436,8 +441,29 @@
 		};
 		
 		markitupPlaintextSettings.markupSet.unshift(
-			{ name:'Switch to Markdown', openWith: markitupReplyFunctions.switchToMarkdown, key: 'H', className:'parsedown' }
+			{ name:'Switch to Markdown', openWith: markitupReplyFunctions.switchToMarkdown, key: 'H', className:'parsedown' },
+			{ separator:' ' },
+			{ name:'Preview', key: 'P', call:'preview', className:"preview" }
 		);
+		
+		markitupPlaintextSettings.previewParser = function(content) {
+			genericAjaxPost(
+				$frm2,
+				'',
+				'c=display&a=getReplyPreview',
+				function(o) {
+					content = o;
+				},
+				{
+					async: false
+				}
+			);
+			
+			return content;
+		};
+		
+		markitupPlaintextSettings.previewAutoRefresh = true;
+		markitupPlaintextSettings.previewInWindow = 'width=800, height=600, titlebar=no, location=no, menubar=no, status=no, toolbar=no, resizable=yes, scrollbars=yes';
 		
 		markitupParsedownSettings.previewParser = function(content) {
 			genericAjaxPost(
@@ -457,7 +483,7 @@
 		
 		markitupParsedownSettings.markupSet.unshift(
 			{ name:'Switch to Plaintext', openWith: markitupReplyFunctions.switchToPlaintext, key: 'H', className:'plaintext' },
-			{ separator:'---------------' }
+			{ separator:' ' }
 		);
 		
 		markitupParsedownSettings.markupSet.splice(
@@ -465,7 +491,7 @@
 			0,
 			{ name:'Upload an Image', openWith: 
 				function(markItUp) {
-					$chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=1',null,true,'750');
+					var $chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=1',null,true,'750');
 					
 					$chooser.one('chooser_save', function(event) {
 						if(!event.response || 0 == event.response)
@@ -477,7 +503,7 @@
 				key: 'U',
 				className:'image-inline'
 			}
-			//{ separator:'---------------' }
+			//{ separator:' ' }
 		);
 		
 		try {
@@ -492,6 +518,85 @@
 				console.log(e);
 		}
 		
+		// @who and #command
+		
+		var atwho_file_bundles = {CerberusApplication::getFileBundleDictionaryJson() nofilter};
+		var atwho_workers = {CerberusApplication::getAtMentionsWorkerDictionaryJson() nofilter};
+		
+		$content
+			.atwho({
+				at: '#attach ',
+				{literal}tpl: '<li data-value="#attach ${tag}\n">${name} <small style="margin-left:10px;">${tag}</small></li>',{/literal}
+				suffix: '',
+				data: atwho_file_bundles,
+				limit: 10
+			})
+			.atwho({
+				at: '#',
+				data: [
+					'attach',
+					'comment',
+					'comment @',
+					'cut\n',
+					'delete quote from here\n',
+					'signature\n',
+					'unwatch\n',
+					'watch\n'
+				],
+				limit: 10,
+				suffix: '',
+				hide_without_suffix: true,
+				callbacks: {
+					before_insert: function(value, $li) {
+						if(value.substr(-1) != '\n' && value.substr(-1) != '@')
+							value += ' ';
+						
+						return value;
+					}
+				}
+			})
+			.atwho({
+				at: '@',
+				{literal}tpl: '<li data-value="@${at_mention}">${name} <small style="margin-left:10px;">${title}</small></li>',{/literal}
+				data: atwho_workers,
+				limit: 10
+			})
+			;
+		
+		$content.on('delete_quote_from_cursor', function(e) {
+			var $this = $(this);
+			var pos = $this.caret('pos');
+			
+			var lines = $this.val().split("\n");
+			var txt = [];
+			var is_removing = false;
+			
+			for(idx in lines) {
+				var line = $.trim(lines[idx]);
+				
+				if(line == "#delete quote from here") {
+					is_removing = true;
+					continue;
+				}
+				
+				if(is_removing && !line.match(/^\>/) && !line.match(/^On .* wrote:/)) {
+					is_removing = false;
+				}
+				
+				if(!is_removing) {
+					txt.push(line);
+				}
+			}
+
+			$this.val(txt.join("\n"));
+			$this.caret('pos', pos - "#delete quote from here\n".length);
+		});
+		
+		$content.on('inserted.atwho', function(event, $li) {
+			if($li.text() == 'delete quote from here\n')
+				$(this).trigger('delete_quote_from_cursor');
+		});
+		
 		// Elastic
 
 		{if empty($mail_reply_textbox_size_inelastic)}
@@ -504,7 +609,7 @@
 					$('#reply{$message->id}_buttons a.send').click();
 				}
 			})
-		
+			
 		// Insert suggested on click
 		
 		$('#reply{$message->id}_suggested').find('a.suggested').click(function(e) {
@@ -638,11 +743,11 @@
 				$this = $(this);
 				$textarea = $('#reply_{$message->id}');
 				
-				$label = ui.item.label.replace("<","&lt;").replace(">","&gt;");
-				$value = ui.item.value;
+				var $label = ui.item.label.replace("<","&lt;").replace(">","&gt;");
+				var $value = ui.item.value;
 				
 				// Now we need to read in each snippet as either 'raw' or 'parsed' via Ajax
-				url = 'c=internal&a=snippetPaste&id=' + $value;
+				var url = 'c=internal&a=snippetPaste&id=' + $value;
 
 				// Context-dependent arguments
 				if('cerberusweb.contexts.ticket'==ui.item.context) {
@@ -651,10 +756,10 @@
 					url += "&context_id={$active_worker->id}";
 				}
 
-				genericAjaxGet('',url,function(txt) {
+				genericAjaxGet('',url,function(json) {
 					// If the content has placeholders, use that popup instead
-					if(txt.match(/\(__(.*?)__\)/)) {
-						var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&text=' + encodeURIComponent(txt),null,false,'600');
+					if(json.has_custom_placeholders) {
+						var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&id=' + encodeURIComponent(json.id) + '&context_id=' + encodeURIComponent(json.context_id),null,false,'600');
 					
 						$popup_paste.bind('snippet_paste', function(event) {
 							if(null == event.text)
@@ -664,7 +769,7 @@
 						});
 						
 					} else {
-						$textarea.insertAtCursor(txt).focus();
+						$textarea.insertAtCursor(json.text).focus();
 					}
 					
 				}, { async: false });

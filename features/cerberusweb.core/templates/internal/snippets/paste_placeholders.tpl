@@ -1,51 +1,59 @@
 <form action="#" method="POST" id="formSnippetsPaste" name="formSnippetsPaste" onsubmit="return false;">
+<input type="hidden" name="c" value="internal">
+<input type="hidden" name="a" value="snippetPlaceholdersPreview">
+<input type="hidden" name="id" value="{$snippet->id}">
+<input type="hidden" name="context_id" value="{$context_id}">
 
-<fieldset class="peek">
-<legend>Fill in the blanks:</legend>
-
-<div class="emailbody">{$text = $text|escape}
-{$text = $text|regex_replace:'#(\(\(____(.*?)____\)\))#':'<textarea rows="3" cols="45" class="placeholder placeholder-input" required="required" style="width:98%;" placeholder="\2"></textarea>'}
-{$text = $text|regex_replace:'#(\(\(___(.*?)___\)\))#':'<input type="text" class="placeholder placeholder-input" required="required" placeholder="\2" value="\2">'}
-{$text = $text|regex_replace:'#(\(\(__(.*?)__\)\))#':'<input type="text" class="placeholder placeholder-input" required="required" placeholder="\2">'}
-{$text nofilter}</div>
+<fieldset class="peek" style="margin-bottom:5px;">
+	<legend>Fill in the blanks:</legend>
+	
+	{foreach from=$snippet->custom_placeholders item=placeholder key=placeholder_key}
+		<b>{$placeholder.label}</b>
+		<div style="margin-left:10px;">
+			{if $placeholder.type == Model_CustomField::TYPE_CHECKBOX}
+				<label><input type="radio" name="placeholders[{$placeholder_key}]" class="placeholder" required="required" value="1" {if $placeholder.default}checked="checked"{/if}> {'common.yes'|devblocks_translate|capitalize}</label>
+				<label><input type="radio" name="placeholders[{$placeholder_key}]" class="placeholder" required="required" value="0" {if !$placeholder.default}checked="checked"{/if}> {'common.no'|devblocks_translate|capitalize}</label>
+			{elseif $placeholder.type == Model_CustomField::TYPE_SINGLE_LINE}
+				<input type="text" name="placeholders[{$placeholder_key}]" class="placeholder" required="required" value="{$placeholder.default}" style="width:98%;">
+			{elseif $placeholder.type == Model_CustomField::TYPE_MULTI_LINE}
+				<textarea name="placeholders[{$placeholder_key}]" class="placeholder" rows="3" cols="45" required="required" style="width:98%;">{$placeholder.default}</textarea>
+			{/if}
+		</div>
+	{/foreach}
 </fieldset>
 
 <div class="buttons">
 	<button type="button" class="paste"><span class="cerb-sprite2 sprite-tick-circle"></span> Insert</button>
+	<button type="button" class="preview">{'common.preview'|devblocks_translate|capitalize}</button>
 </div>
+
+<div class="preview"></div>
 
 </form>
 
 <script type="text/javascript">
-	$popup = genericAjaxPopupFetch('snippet_paste');
+$(function() {
+	var $popup = genericAjaxPopupFetch('snippet_paste');
+	
 	$popup.one('popup_open',function(event,ui) {
 		var $popup = $(this);
+		var $preview = $popup.find('div.preview');
 		
-		$popup.dialog('option','title', 'Snippet Placeholders');
+		$popup.dialog('option','title', 'Insert Snippet');
 		
-		var $template = $(this).find('div.emailbody');
-		
-		$template.find('input:text,textarea').first().focus();
-		
-		$template.find('textarea').elastic();
-		
-		$template.find('input:text').keyup(function() {
-			var $val = $(this).val();
-			
-			if($val.length == 0 && null != $(this).attr('placeholder'))
-				$val = $(this).attr('placeholder');
-			
-			var $span = $('<span style="visibility:hidden;">'+$val+'</span>').appendTo('body');
-			var px = Math.max(25, $span.width() + 10);
-			$(this).width(px);
-			$span.remove();
-		}).trigger('keyup');
+		$popup.find('input:text,textarea').first().focus();
 
-		$popup.find('div.buttons button.paste').click(function() {
-			var $form = $(this).closest('form');
+		$popup.find('textarea').elastic();
 		
-			$elements = $form.find('div.emailbody')
-				.find('input:text.placeholder-input,textarea.placeholder-input')
+		$popup.find('div.buttons button.preview').click(function() {
+			genericAjaxPost('formSnippetsPaste', '', null, function(html) {
+				$preview.html(html);
+			})
+		});
+		
+		$popup.find('div.buttons button.paste').click(function() {
+			var $elements = $popup
+				.find('input:text.placeholder,textarea.placeholder')
 				.filter(function() {
 					if($(this).val().length == 0)
 						return true;
@@ -61,23 +69,22 @@
 			}
 			
 			// Build the text template
-			var text = $form.find('div.emailbody').contents().map(function() {
-				var $this = $(this);
+			genericAjaxPost('formSnippetsPaste', '', null, function(html) {
+				$preview.hide().html(html);
 				
-				if(this.nodeType == Node.TEXT_NODE) {
-					return $this.text();
-				} else {
-					return $this.val();
-				}
-			}).get().join('');
+				var text = $preview.text();
+				
+				// Fire event
+				var event = jQuery.Event('snippet_paste');
+				event.text=text;
+				
+				$popup.trigger(event);
+				
+				genericAjaxPopupClose('snippet_paste');
+			});
 			
-			// Fire event
-			event=jQuery.Event('snippet_paste');
-			event.text=text;
-			
-			$popup.trigger(event);
-			
-			genericAjaxPopupClose('snippet_paste');
 		});
-	} );
+		
+	});
+});
 </script>

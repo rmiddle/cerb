@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
@@ -104,7 +104,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		
 		$merge_token_labels = array();
 		$merge_token_values = array();
-		CerberusContexts::getContext(CerberusContexts::CONTEXT_GROUP, $group_id, $merge_token_labels, $merge_token_values, null, true);
+		CerberusContexts::getContext(CerberusContexts::CONTEXT_GROUP, $group_id, $merge_token_labels, $merge_token_values, 'Ticket:Group:', true);
 				
 			// Merge
 			CerberusContexts::merge(
@@ -125,7 +125,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		if(get_class($this) == 'Event_CommentOnTicketInGroup') {
 			$merge_token_labels = array();
 			$merge_token_values = array();
-			CerberusContexts::getContext(CerberusContexts::CONTEXT_COMMENT, $comment_id, $merge_token_labels, $merge_token_values, null, true);
+			CerberusContexts::getContext(CerberusContexts::CONTEXT_COMMENT, $comment_id, $merge_token_labels, $merge_token_values, 'Ticket:Comment:', true);
 				
 				// Merge
 				CerberusContexts::merge(
@@ -161,14 +161,16 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			'ticket_watchers' => array(
 				'label' => 'Ticket watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 			'group_id' => array(
-				'label' => 'Group',
+				'label' => 'Ticket group',
 				'context' => CerberusContexts::CONTEXT_GROUP,
 			),
 			'group_watchers' => array(
-				'label' => 'Group watchers',
+				'label' => 'Ticket group watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 			/*
 			'bucket_id' => array(
@@ -203,13 +205,14 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			'ticket_org_watchers' => array(
 				'label' => 'Ticket org watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 		);
 		
 		$vars = parent::getValuesContexts($trigger);
 
 		$vals_to_ctx = array_merge($vals, $vars);
-		asort($vals_to_ctx);
+		DevblocksPlatform::sortObjects($vals_to_ctx, '[label]');
 		
 		return $vals_to_ctx;
 	}
@@ -222,10 +225,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		$labels['ticket_latest_incoming_activity'] = 'Ticket latest incoming activity';
 		$labels['ticket_latest_outgoing_activity'] = 'Ticket latest outgoing activity';
 		
-		$labels['group_id'] = 'Group';
-		$labels['group_and_bucket'] = 'Group and bucket';
+		$labels['group_id'] = 'Ticket group';
+		$labels['group_and_bucket'] = 'Ticket group and bucket';
 		
-		$labels['group_link'] = 'Group is linked';
+		$labels['group_link'] = 'Ticket group is linked';
 		$labels['owner_link'] = 'Ticket owner is linked';
 		$labels['ticket_initial_message_sender_link'] = 'Ticket initial message sender is linked';
 		$labels['ticket_initial_message_sender_org_link'] = 'Ticket initial message sender org is linked';
@@ -233,7 +236,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		$labels['ticket_latest_message_sender_org_link'] = 'Ticket latest message sender org is linked';
 		$labels['ticket_link'] = 'Ticket is linked';
 		
-		$labels['group_watcher_count'] = 'Group watcher count';
+		$labels['group_watcher_count'] = 'Ticket group watcher count';
 		$labels['ticket_org_watcher_count'] = 'Ticket org watcher count';
 		$labels['ticket_watcher_count'] = 'Ticket watcher count';
 		
@@ -262,14 +265,14 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		return $conditions;
 	}
 	
-	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
+	function renderConditionExtension($token, $as_token, $trigger, $params=array(), $seq=null) {
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('params', $params);
 
 		if(!is_null($seq))
 			$tpl->assign('namePrefix','condition'.$seq);
 		
-		switch($token) {
+		switch($as_token) {
 			case 'ticket_spam_score':
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_group/condition_spam_score.tpl');
 				break;
@@ -333,10 +336,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		$tpl->clearAssign('params');
 	}
 	
-	function runConditionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
+	function runConditionExtension($token, $as_token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
 		$pass = true;
 		
-		switch($token) {
+		switch($as_token) {
 			case 'ticket_has_owner':
 				$bool = $params['bool'];
 				@$value = $dict->ticket_owner_id;
@@ -347,11 +350,11 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
 				
-				if(!is_numeric($dict->token)) {
-					@$dict->token = intval($dict->$token);
+				if(!is_numeric($dict->$token)) {
+					@$dict->$token = intval($dict->$token);
 				}
 				
-				$value = $dict->token * 100;
+				$value = $dict->$token * 100;
 
 				switch($oper) {
 					case 'is':
@@ -482,7 +485,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				$from_context = null;
 				$from_context_id = null;
 
-				switch($token) {
+				switch($as_token) {
 					case 'group_link':
 						$from_context = CerberusContexts::CONTEXT_GROUP;
 						@$from_context_id = $dict->ticket_group_id;
@@ -547,7 +550,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
 
-				switch($token) {
+				switch($as_token) {
 					case 'group_watcher_count':
 						$value = count($dict->group_watchers);
 						break;

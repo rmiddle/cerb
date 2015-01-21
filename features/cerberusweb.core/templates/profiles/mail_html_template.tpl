@@ -1,4 +1,4 @@
-{$page_context = 'cerberusweb.contexts.mail.html_template'}
+{$page_context = CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE}
 {$page_context_id = $mail_html_template->id}
 
 <div style="float:left">
@@ -65,6 +65,8 @@
 </fieldset>
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/profile_fieldsets.tpl" properties=$properties_custom_fieldsets}
+
+{include file="devblocks:cerberusweb.core::internal/profiles/profile_record_links.tpl" properties=$properties_links}
 
 <div>
 {include file="devblocks:cerberusweb.core::internal/notifications/context_profile.tpl" context=$page_context context_id=$page_context_id}

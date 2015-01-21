@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_Notification extends DevblocksORMHelper {
@@ -181,21 +181,23 @@ class DAO_Notification extends DevblocksORMHelper {
 	 */
 	static private function _getObjectsFromResult($rs) {
 		$objects = array();
-		
-		while($row = mysqli_fetch_assoc($rs)) {
-			$object = new Model_Notification();
-			$object->id = $row['id'];
-			$object->context = $row['context'];
-			$object->context_id = $row['context_id'];
-			$object->created_date = $row['created_date'];
-			$object->worker_id = $row['worker_id'];
-			$object->message = $row['message'];
-			$object->url = $row['url'];
-			$object->is_read = $row['is_read'];
-			$objects[$object->id] = $object;
+
+		if($rs instanceof mysqli_result) {
+			while($row = mysqli_fetch_assoc($rs)) {
+				$object = new Model_Notification();
+				$object->id = $row['id'];
+				$object->context = $row['context'];
+				$object->context_id = $row['context_id'];
+				$object->created_date = $row['created_date'];
+				$object->worker_id = $row['worker_id'];
+				$object->message = $row['message'];
+				$object->url = $row['url'];
+				$object->is_read = $row['is_read'];
+				$objects[$object->id] = $object;
+			}
+			
+			mysqli_free_result($rs);
 		}
-		
-		mysqli_free_result($rs);
 		
 		return $objects;
 	}
@@ -361,12 +363,8 @@ class DAO_Notification extends DevblocksORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
-			$ticket_id = intval($row[SearchFields_Notification::ID]);
-			$results[$ticket_id] = $result;
+			$object_id = intval($row[SearchFields_Notification::ID]);
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -407,10 +405,10 @@ class SearchFields_Notification implements IDevblocksSearchFields {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
-			self::ID => new DevblocksSearchField(self::ID, 'we', 'id', $translate->_('notification.id')),
+			self::ID => new DevblocksSearchField(self::ID, 'we', 'id', $translate->_('common.id')),
 			self::CONTEXT => new DevblocksSearchField(self::CONTEXT, 'we', 'context', null),
 			self::CONTEXT_ID => new DevblocksSearchField(self::CONTEXT_ID, 'we', 'context_id', null),
-			self::CREATED_DATE => new DevblocksSearchField(self::CREATED_DATE, 'we', 'created_date', $translate->_('notification.created_date'), Model_CustomField::TYPE_DATE),
+			self::CREATED_DATE => new DevblocksSearchField(self::CREATED_DATE, 'we', 'created_date', $translate->_('common.created'), Model_CustomField::TYPE_DATE),
 			self::WORKER_ID => new DevblocksSearchField(self::WORKER_ID, 'we', 'worker_id', $translate->_('notification.worker_id'), Model_CustomField::TYPE_WORKER),
 			self::MESSAGE => new DevblocksSearchField(self::MESSAGE, 'we', 'message', $translate->_('notification.message'), Model_CustomField::TYPE_SINGLE_LINE),
 			self::IS_READ => new DevblocksSearchField(self::IS_READ, 'we', 'is_read', $translate->_('notification.is_read'), Model_CustomField::TYPE_CHECKBOX),
@@ -472,7 +470,7 @@ class Model_Notification {
 	}
 };
 
-class View_Notification extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_Notification extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'notifications';
 
 	function __construct() {
@@ -592,6 +590,74 @@ class View_Notification extends C4_AbstractView implements IAbstractView_Subtota
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Notification::MESSAGE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'created' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Notification::CREATED_DATE),
+				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_Notification::ID),
+				),
+			'isRead' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_BOOL,
+					'options' => array('param_key' => SearchFields_Notification::IS_READ),
+				),
+			'message' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Notification::MESSAGE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'url' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Notification::URL, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'worker' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_Notification::WORKER_ID),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_NOTIFICATION, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {
@@ -924,7 +990,7 @@ class Context_Notification extends Extension_DevblocksContext {
 
 		CerberusContexts::merge(
 			'assignee_',
-			'Assignee:',
+			$prefix.'Assignee:',
 			$merge_token_labels,
 			$merge_token_values,
 			$token_labels,
@@ -1003,8 +1069,8 @@ class Context_Notification extends Extension_DevblocksContext {
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;

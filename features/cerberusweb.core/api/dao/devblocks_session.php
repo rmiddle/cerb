@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -164,6 +164,10 @@ class DAO_DevblocksSession extends Cerb_ORMHelper {
 
 		DevblocksPlatform::sanitizeArray($ids, 'integer');
 		
+		array_walk($ids, function(&$id) use ($db) {
+			$id = $db->qstr($id);
+		});
+		
 		$ids_list = implode(',', $ids);
 		
 		$db->Execute(sprintf("DELETE FROM devblocks_session WHERE session_key IN (%s)", $ids_list));
@@ -301,12 +305,8 @@ class DAO_DevblocksSession extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = $row[SearchFields_DevblocksSession::SESSION_KEY];
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -371,7 +371,7 @@ class SearchFields_DevblocksSession implements IDevblocksSearchFields {
 	}
 };
 
-class View_DevblocksSession extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_DevblocksSession extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'devblocks_sessions';
 
 	function __construct() {
@@ -469,6 +469,65 @@ class View_DevblocksSession extends C4_AbstractView implements IAbstractView_Sub
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_DevblocksSession::USER_AGENT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'created' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_DevblocksSession::CREATED),
+				),
+			'ip' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_DevblocksSession::USER_IP, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_DevblocksSession::UPDATED),
+				),
+			'userAgent' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_DevblocksSession::USER_AGENT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'worker' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_DevblocksSession::USER_ID),
+				),
+		);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {

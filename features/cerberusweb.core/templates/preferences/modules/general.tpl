@@ -48,7 +48,7 @@
 			<option value="">- always unavailable -</option>
 			{foreach from=$calendars item=calendar}
 			{if $calendar->owner_context == CerberusContexts::CONTEXT_WORKER && $calendar->owner_context_id == $active_worker->id}
-			<option value="{$calendar->id}" {if $calendar->id==$prefs.availability_calendar_id}selected="selected"{/if}>{$calendar->name}</option>
+			<option value="{$calendar->id}" {if $calendar->id==$active_worker->calendar_id}selected="selected"{/if}>{$calendar->name}</option>
 			{/if}
 			{/foreach}
 		</select>
@@ -83,7 +83,8 @@
 	<b>{'preferences.account.mail.signature'|devblocks_translate}</b>
 	<div style="margin:0px 0px 10px 10px;">
 		<label><input type="radio" name="mail_signature_pos" value="0" {if empty($prefs.mail_signature_pos)}checked="checked"{/if}> {'preferences.account.mail.signature.none'|devblocks_translate}</label><br>
-		<label><input type="radio" name="mail_signature_pos" value="1" {if 1==$prefs.mail_signature_pos}checked="checked"{/if}> {'preferences.account.mail.signature.above'|devblocks_translate}</label><br>
+		<label><input type="radio" name="mail_signature_pos" value="3" {if 3==$prefs.mail_signature_pos}checked="checked"{/if}> {'preferences.account.mail.signature.above'|devblocks_translate}</label><br>
+		<label><input type="radio" name="mail_signature_pos" value="1" {if 1==$prefs.mail_signature_pos}checked="checked"{/if}> {'preferences.account.mail.signature.above.cut'|devblocks_translate}</label><br>
 		<label><input type="radio" name="mail_signature_pos" value="2" {if 2==$prefs.mail_signature_pos}checked="checked"{/if}> {'preferences.account.mail.signature.below'|devblocks_translate}</label><br>
 	</div>
 
@@ -112,7 +113,7 @@
 		<li style="padding-bottom:10px;">
 			<input type="hidden" name="worker_emails[]" value="{$address->address}">
 
-			{if $address->address==$active_worker->email}
+			{if 0 == strcasecmp($address->address, $active_worker->email)}
 			<button type="button"><span class="cerb-sprite2 sprite-tick-circle-gray"></span></button>
 			{else}
 			<button type="button" onclick="if(confirm('Are you sure you want to delete this email address?')) { $(this).closest('li').remove(); }" class="delete"><span class="cerb-sprite2 sprite-minus-circle"></span></button>
@@ -121,7 +122,7 @@
 			<b>{$address->address}</b>
 
 			{if $address->is_confirmed}
-				{if $address->address==$active_worker->email}
+				{if 0 == strcasecmp($address->address, $active_worker->email)}
 				(Primary)
 				{/if}
 			{else}

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.devblocks.com/schema/plugin.xsd">
 	<id>cerberusweb.core</id>
-	<name>Cerb6 Core</name>
-	<description>The core functionality of Cerb6.</description>
+	<name>Cerb Core</name>
+	<description>The core functionality of Cerb.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.7.0</version>
-	<link>http://wiki.cerb4.com/wiki/New_Changes</link>
+	<version>6.9.0</version>
+	<link>http://www.cerbweb.com/</link>
 	
 	<!-- Plugin Dependencies -->
 	
 	<dependencies>
-		<require plugin_id="devblocks.core" version="2.0.0" />
+		<require plugin_id="devblocks.core" version="2.3.0" />
 	</dependencies>
 
 	<!-- Patches -->
@@ -52,7 +52,9 @@
 		<patch version="6.4.0" revision="1046" file="patches/6.x/6.4.0.php" />
 		<patch version="6.5.0" revision="1059" file="patches/6.x/6.5.0.php" />
 		<patch version="6.6.0" revision="1082" file="patches/6.x/6.6.0.php" />
-		<patch version="6.7.0" revision="1090" file="patches/6.x/6.7.0.php" />
+		<patch version="6.7.0" revision="1097" file="patches/6.x/6.7.0.php" />
+		<patch version="6.8.0" revision="1108" file="patches/6.x/6.8.0.php" />
+		<patch version="6.9.0" revision="1114" file="patches/6.x/6.9.0.php" />
 	</patches>
 
 	<!-- Controller Routing -->
@@ -88,6 +90,7 @@
 			<class name="Context_Address" />
 			<class name="DAO_Address" />
 			<class name="Model_Address" />
+			<class name="Search_Address" />
 			<class name="SearchFields_Address" />
 			<class name="View_Address" />
 		</file>
@@ -184,6 +187,7 @@
 			<class name="Context_ContactPerson" />
 			<class name="DAO_ContactPerson" />
 			<class name="Model_ContactPerson" />
+			<class name="Search_Contact" />
 			<class name="SearchFields_ContactPerson" />
 			<class name="View_ContactPerson" />
 		</file>
@@ -191,6 +195,7 @@
 		<file path="api/dao/contact_org.php">
 			<class name="DAO_ContactOrg" />
 			<class name="Model_ContactOrg" />
+			<class name="Search_Org" />
 			<class name="SearchFields_ContactOrg" />
 			<class name="View_ContactOrg" />
 		</file>
@@ -253,6 +258,14 @@
 			<class name="Model_ExplorerSet" />
 		</file>
 		
+		<file path="api/dao/file_bundle.php">
+			<class name="Context_FileBundle" />
+			<class name="DAO_FileBundle" />
+			<class name="Model_FileBundle" />
+			<class name="SearchFields_FileBundle" />
+			<class name="View_FileBundle" />
+		</file>
+		
 		<file path="api/dao/group.php">
 			<class name="DAO_Group" />
 			<class name="DAO_GroupSettings" />
@@ -301,6 +314,7 @@
 		<file path="api/dao/plugin_library.php">
 			<class name="DAO_PluginLibrary" />
 			<class name="Model_PluginLibrary" />
+			<class name="Search_PluginLibrary" />
 			<class name="SearchFields_PluginLibrary" />
 			<class name="View_PluginLibrary" />
 		</file>
@@ -313,6 +327,7 @@
 		<file path="api/dao/snippet.php">
 			<class name="DAO_Snippet" />
 			<class name="Model_Snippet" />
+			<class name="Search_Snippet" />
 			<class name="SearchFields_Snippet" />
 			<class name="View_Snippet" />
 		</file>
@@ -365,6 +380,7 @@
 			<class name="DAO_Worker" />
 			<class name="DAO_WorkerPref" />
 			<class name="Model_Worker" />
+			<class name="Search_Worker" />
 			<class name="SearchFields_Worker" />
 			<class name="View_Worker" />
 			<class name="WorkerPrefs" />
@@ -503,6 +519,10 @@
 		
 		<file path="api/events/group/mail_moved_to_group.php">
 			<class name="Event_MailMovedToGroup" />
+		</file>
+		
+		<file path="api/events/group/mail_received.php">
+			<class name="Event_MailReceived" />
 		</file>
 		
 		<file path="api/events/group/mail_received_by_group.php">
@@ -678,6 +698,16 @@
 			<param key="string_key" value="activities.ticket.unassigned" />
 			<param key="options" value="" />
 		</activity>
+		<activity point="ticket.split">
+			<param key="label_key" value="Ticket Split" />
+			<param key="string_key" value="activities.ticket.split" />
+			<param key="options" value="" />
+		</activity>
+		<activity point="ticket.split.from">
+			<param key="label_key" value="Ticket Split From" />
+			<param key="string_key" value="activities.ticket.split.from" />
+			<param key="options" value="" />
+		</activity>
 		<activity point="ticket.status.closed">
 			<param key="label_key" value="Ticket Closed" />
 			<param key="string_key" value="activities.ticket.status" />
@@ -820,6 +850,7 @@
 		<priv id="core.display.message.actions.delete" label="acl.core.display.message.actions.delete" />
 
 		<!-- Mail page -->
+		<priv id="core.mail.save_without_sending" label="acl.core.mail.save_without_sending" />
 		<priv id="core.mail.send" label="acl.core.mail.send" />
 		<priv id="core.mail.draft.delete_all" label="acl.core.mail.draft.delete_all" />
 
@@ -883,6 +914,54 @@
 		</extension>
 		
 		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.attachment</id>
+			<name>Attachment</name>
+			<class>
+				<file>api/dao/attachment.php</file>
+				<name>Context_Attachment</name>
+			</class>
+			<params>
+				<param key="alias" value="attachment" />
+				<param key="dao_class" value="DAO_Attachment" />
+				<param key="view_class" value="" />
+				<param key="options">
+					<!--
+					<value>
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="workspace" />
+					</value>
+					-->
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.attachment_link</id>
+			<name>Attachment Link</name>
+			<class>
+				<file>api/dao/attachment_link.php</file>
+				<name>Context_AttachmentLink</name>
+			</class>
+			<params>
+				<param key="alias" value="attachment_link" />
+				<param key="dao_class" value="DAO_AttachmentLink" />
+				<param key="view_class" value="View_AttachmentLink" />
+				<param key="options">
+					<!--
+					<value>
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="workspace" />
+					</value>
+					-->
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.contact_person</id>
 			<name>Contact Person</name>
 			<class>
@@ -896,9 +975,10 @@
 				<param key="options">
 					<value>
 						<data key="custom_fields" />
-						<!--<data key="create" />-->
-						<!--<data key="find" />-->
-						<!--<data key="snippets" />-->
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
@@ -1143,6 +1223,30 @@
 		</extension>
 		
 		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.file_bundle</id>
+			<name>File Bundle</name>
+			<class>
+				<file>api/dao/file_bundle.php</file>
+				<name>Context_FileBundle</name>
+			</class>
+			<params>
+				<param key="alias" value="file_bundle" />
+				<param key="dao_class" value="DAO_FileBundle" />
+				<param key="view_class" value="View_FileBundle" />
+				<param key="options">
+					<value>
+						<data key="create" />
+						<data key="custom_fields" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="va_variable" />
+						<data key="workspace" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
 			<id>cerberusweb.contexts.mail.html_template</id>
 			<name>HTML Template</name>
 			<class>
@@ -1205,6 +1309,7 @@
 				<param key="options">
 					<value>
 						<data key="snippets" />
+						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
@@ -1555,8 +1660,24 @@
 		</extension>
 		
 		<extension point="devblocks.event">
+			<id>event.mail.received</id>
+			<name>Message added to a conversation</name>
+			<class>
+				<file>api/events/group/mail_received.php</file>
+				<name>Event_MailReceived</name>
+			</class>
+			<params>
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
 			<id>event.mail.received.group</id>
-			<name>New message on a group conversation</name>
+			<name>Message added to a group conversation</name>
 			<class>
 				<file>api/events/group/mail_received_by_group.php</file>
 				<name>Event_MailReceivedByGroup</name>
@@ -1782,6 +1903,26 @@
 		</extension>
 		
 		<extension point="devblocks.event">
+			<id>event.macro.message</id>
+			<name>Custom message behavior</name>
+			<class>
+				<file>api/events/macro/message_macro.php</file>
+				<name>Event_MessageMacro</name>
+			</class>
+			<params>
+				<param key="macro_context" value="cerberusweb.contexts.message" />
+				<param key="contexts">
+					<value>
+						<data key="cerberusweb.contexts.app" />
+						<data key="cerberusweb.contexts.group" />
+						<data key="cerberusweb.contexts.role" />
+						<data key="cerberusweb.contexts.worker" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.event">
 			<id>event.macro.org</id>
 			<name>Custom organization behavior</name>
 			<class>
@@ -1883,7 +2024,7 @@
 		
 		<extension point="devblocks.event">
 			<id>event.mail.received.watcher</id>
-			<name>New message on a watched conversation</name>
+			<name>Message added to a watched conversation</name>
 			<class>
 				<file>api/events/worker/mail_received_by_watcher.php</file>
 				<name>Event_MailReceivedByWatcher</name>
@@ -2254,6 +2395,17 @@
 		<!-- Search Schemas -->
 		
 		<extension point="devblocks.search.schema">
+			<id>cerb.search.schema.address</id>
+			<name>Email Addresses</name>
+			<class>
+				<file>api/dao/address.php</file>
+				<name>Search_Address</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.search.schema">
 			<id>cerberusweb.search.schema.comment_content</id>
 			<name>Comment Content</name>
 			<class>
@@ -2265,11 +2417,66 @@
 		</extension>
 		
 		<extension point="devblocks.search.schema">
+			<id>cerb.search.schema.contact</id>
+			<name>Contacts</name>
+			<class>
+				<file>api/dao/contact_person.php</file>
+				<name>Search_Contact</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.search.schema">
 			<id>cerberusweb.search.schema.message_content</id>
 			<name>Message Content</name>
 			<class>
 				<file>api/dao/message.php</file>
 				<name>Search_MessageContent</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.search.schema">
+			<id>cerb.search.schema.org</id>
+			<name>Organizations</name>
+			<class>
+				<file>api/dao/contact_org.php</file>
+				<name>Search_Org</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.search.schema">
+			<id>cerb.search.schema.plugin_library</id>
+			<name>Plugin Library</name>
+			<class>
+				<file>api/dao/plugin_library.php</file>
+				<name>Search_PluginLibrary</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.search.schema">
+			<id>cerb.search.schema.snippet</id>
+			<name>Snippets</name>
+			<class>
+				<file>api/dao/snippet.php</file>
+				<name>Search_Snippet</name>
+			</class>
+			<params>
+			</params>
+		</extension>
+	
+		<extension point="devblocks.search.schema">
+			<id>cerb.search.schema.worker</id>
+			<name>Workers</name>
+			<class>
+				<file>api/dao/worker.php</file>
+				<name>Search_Worker</name>
 			</class>
 			<params>
 			</params>
@@ -2972,6 +3179,19 @@
 					<param key="uri" value="contact_person" />
 				</params>
 			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.file_bundle</id>
+				<name>File Bundle Section</name>
+				<class>
+					<file>api/uri/profiles/file_bundle.php</file>
+					<name>PageSection_ProfilesFileBundle</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="file_bundle" />
+				</params>
+			</extension>
 		
 			<extension point="cerberusweb.ui.page.section">
 				<id>core.page.profiles.group</id>
@@ -3100,7 +3320,7 @@
 				<name>WorkspaceTab_Dashboards</name>
 			</class>
 			<params>
-				<param key="label" value="core.workspace.dashboard" />
+				<param key="label" value="dashboard" />
 			</params>
 		</extension>
 		

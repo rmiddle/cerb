@@ -10,7 +10,7 @@
 
 	<table cellpadding="2" cellspacing="0" border="0">
 	<tr>
-		<td><b>Match</b></td>
+		<td><b><abbr title="Checking fields here will match the imported fields against existing records rather than setting new values.  Any existing records that match all the checked fields will have the other field values set on them.">Match</abbr></b></td>
 		<td style="padding-left:10px;"><b>Field</b></td>
 		<td style="padding-left:10px;"><b>Set value from file column</b></td>
 	</tr>
@@ -59,19 +59,21 @@
 </form>
 
 <script type="text/javascript">
-	$popup = genericAjaxPopupFind('#frmImport');
-	$frm = $popup.find('FORM#frmImport');
+$(function() {
+	var $popup = genericAjaxPopupFind('#frmImport');
+	var $frm = $popup.find('FORM#frmImport');
 	
  	$frm.find('button.submit').click(function(event) {
- 		$frm = $(this).closest('form');
+ 		var $frm = $(this).closest('form');
  		if(!$frm.validate().form())
  			return;
 
  		$('#divImportPreview').html('Importing... please wait');
 
- 		$div = $(this).closest('div');
+ 		var $div = $(this).closest('div');
  		$div.fadeOut();
  		
+ 		// [TODO] This should allow error reporting via JSON
  		genericAjaxPost('frmImport', '', null, function(o) {
  			genericAjaxGet('view{$view_id}','c=internal&a=viewRefresh&id={$view_id}');
  			genericAjaxPopupDestroy('{$layer}');
@@ -79,7 +81,7 @@
  	});
  	
  	$frm.find('button.preview').click(function() {
- 		$frm = $(this).closest('form');
+ 		var $frm = $(this).closest('form');
  		if(!$frm.validate().form())
 			return;
  		
@@ -107,4 +109,6 @@
 		event.stopPropagation();
 		genericAjaxPopupDestroy('{$layer}');
 	});
+	
+});
 </script>

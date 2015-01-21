@@ -10,7 +10,7 @@
 		<td nowrap="nowrap"><span class="title">{$view->name}</span></td>
 		<td nowrap="nowrap" align="right">
 			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek','c=pages&a=showEditWorkspacePage&id=0&view_id={$view->id}',null,true,'500');"><span class="cerb-sprite2 sprite-plus-circle-frame"></span></a>
-			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',this,false,'400');"><span class="cerb-sprite2 sprite-document-search-result"></span></a>
+			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',null,false,'400');"><span class="cerb-sprite2 sprite-document-search-result"></span></a>
 			<a href="javascript:;" title="{'common.customize'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('customize{$view->id}','c=internal&a=viewCustomize&id={$view->id}');toggleDiv('customize{$view->id}','block');"><span class="cerb-sprite2 sprite-gear"></span></a>
 			{*<a href="javascript:;" title="Subtotals" class="subtotals minimal"><span class="cerb-sprite2 sprite-application-sidebar-list"></span></a>*}
 			<a href="javascript:;" title="{'common.copy'|devblocks_translate|capitalize}" onclick="genericAjaxGet('{$view->id}_tips','c=internal&a=viewShowCopy&view_id={$view->id}');toggleDiv('{$view->id}_tips','block');"><span class="cerb-sprite2 sprite-applications"></span></a>
@@ -79,7 +79,9 @@
 			{elseif $column=="w_name"}
 			<td>
 				<a href="{devblocks_url}c=pages&page={$result.w_id}-{$result.w_name|devblocks_permalink}{/devblocks_url}" class="subject">{if !empty($result.w_name)}{$result.w_name}{else}New Page{/if}</a>
-				{*<button type="button" class="peek" style="visibility:hidden;padding:1px;margin:0px 5px;" onclick="$popup = genericAjaxPopup('peek','c=pages&a=showEditWorkspacePage&id={$result.w_id}',null,true,'550');"><span class="cerb-sprite2 sprite-document-search-result" style="margin-left:2px" title="{'views.peek'|devblocks_translate}"></span></button>*}
+				{if CerberusContexts::isWriteableByActor($result.w_owner_context, $result.w_owner_context_id, $active_worker)}
+				<button type="button" class="peek" style="visibility:hidden;padding:1px;margin:0px 5px;" onclick="genericAjaxPopup('peek','c=pages&a=showEditWorkspacePage&id={$result.w_id}&view_id={$view->id}',null,true,'550');"><span class="cerb-sprite2 sprite-document-search-result" style="margin-left:2px" title="{'views.peek'|devblocks_translate}"></span></button>
+				{/if}
 			</td>
 			{elseif $column=="*_owner"}
 				{$owner_context = $result.w_owner_context}
@@ -138,10 +140,10 @@
 
 <script type="text/javascript">
 $('#viewForm{$view->id}').find('button.add').click(function(e) {
-	$this = $(this);
+	var $this = $(this);
 
-	$menu = $('BODY UL.navmenu:first');
-	$item = $menu.find('li.drag[page_id="'+$this.attr('page_id')+'"]');
+	var $menu = $('BODY UL.navmenu:first');
+	var $item = $menu.find('li.drag[page_id="'+$this.attr('page_id')+'"]');
 	
 	// Remove
 	if($item.length > 0) {
@@ -164,7 +166,7 @@ $('#viewForm{$view->id}').find('button.add').click(function(e) {
 		$li.append($('<a href="'+$this.attr('page_url')+'">'+$this.attr('page_label')+'</a>'));
 		$li.css('visibility','hidden');
 		
-		$marker = $menu.find('li.add');
+		var $marker = $menu.find('li.add');
 
 		if(0 == $marker.length) {
 			$li.prependTo($menu);
@@ -194,9 +196,9 @@ $frm = $('#viewForm{$view->id}');
 $frm.bind('keyboard_shortcut',function(event) {
 	//console.log("{$view->id} received " + (indirect ? 'indirect' : 'direct') + " keyboard event for: " + event.keypress_event.which);
 	
-	$view_actions = $('#{$view->id}_actions');
+	var $view_actions = $('#{$view->id}_actions');
 	
-	hotkey_activated = true;
+	var hotkey_activated = true;
 
 	switch(event.keypress_event.which) {
 		default:

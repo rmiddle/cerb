@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_Comment extends Cerb_ORMHelper {
@@ -459,12 +459,8 @@ class DAO_Comment extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_Comment::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -488,7 +484,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 	static function maint() {
 		$db = DevblocksPlatform::getDatabaseService();
 		$logger = DevblocksPlatform::getConsoleLog();
-		$tables = $db->metaTables();
+		$tables = DevblocksPlatform::getDatabaseTables();
 
 		// Search indexes
 		if(isset($tables['fulltext_comment_content'])) {
@@ -645,7 +641,13 @@ class Search_CommentContent extends Extension_DevblocksSearchSchema {
 				
 				if(!empty($content)) {
 					$content = $engine->truncateOnWhitespace($content, 10000);
-					$engine->index($this, $id, $content, array('context_crc32' => sprintf("%u", crc32($comment->context))));
+					
+					$doc = array(
+						'content' => $content,
+					);
+					
+					if(false === ($engine->index($this, $id, $doc, array('context_crc32' => sprintf("%u", crc32($comment->context))))))
+						return false;
 				}
 
 				// Record our progress every 25th index
@@ -1272,8 +1274,8 @@ class Context_Comment extends Extension_DevblocksContext {
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;

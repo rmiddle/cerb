@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_SetupMailFailed extends Extension_PageSection {
@@ -69,29 +69,36 @@ class PageSection_SetupMailFailed extends Extension_PageSection {
 		
 		// Resolve any symbolic links
 		
-		if(false == ($full_path = realpath(APP_MAIL_PATH . 'fail' . DIRECTORY_SEPARATOR . $file)))
-			return false;
+		try {
 
-		// Make sure our requested file is in the same directory
-		
-		if(false == (dirname(APP_MAIL_PATH . 'fail' . DIRECTORY_SEPARATOR . 'test.msg') == dirname($full_path)))
-			return false;
-		
-		// If the extension isn't .msg, abort.
-		if(false == ($pathinfo = pathinfo($file)) || !isset($pathinfo['extension']) && $pathinfo['extension'] != 'msg')
-			return false;
-		
-		if(null != ($mime = mailparse_msg_parse_file($full_path))) {
-			$struct = mailparse_msg_get_structure($mime);
-			$msginfo = mailparse_msg_get_part_data($mime);
-	
-			$message_encoding = strtolower($msginfo['charset']);
+			if(false == ($full_path = realpath(APP_MAIL_PATH . 'fail' . DIRECTORY_SEPARATOR . $file)))
+				throw new Exception("Path not found.");
 			
-			header('Content-Type: text/plain; charset=' . $message_encoding);
+			// Make sure our requested file is in the same directory
 			
-			@$message_source = file_get_contents($full_path);
-			echo $message_source;
+			if(false == (dirname(APP_MAIL_PATH . 'fail' . DIRECTORY_SEPARATOR . 'test.msg') == dirname($full_path)))
+				throw new Exception("File not found.");
+			
+			// If the extension isn't .msg, abort.
+			if(false == ($pathinfo = pathinfo($file)) || !isset($pathinfo['extension']) && $pathinfo['extension'] != 'msg')
+				throw new Exception("File not valid.");
+			
+			if(null != ($mime = mailparse_msg_parse_file($full_path))) {
+				$struct = mailparse_msg_get_structure($mime);
+				$msginfo = mailparse_msg_get_part_data($mime);
+		
+				$message_encoding = strtolower($msginfo['charset']);
+
+				header('Content-Type: text/plain; charset=' . $message_encoding);
+
+				$message_source = file_get_contents($full_path);
+				echo $message_source;
+			}
+			
+		} catch (Exception $e) {
 		}
+		
+		exit;
 	}
 	
 	function parseMessageJsonAction() {
@@ -237,7 +244,7 @@ class SearchFields_MailParseFail {
 	}
 };
 
-class View_MailParseFail extends C4_AbstractView {
+class View_MailParseFail extends C4_AbstractView implements IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'setup_mail_failed';
 
 	function __construct() {
@@ -399,6 +406,60 @@ class View_MailParseFail extends C4_AbstractView {
 		//return $this->_getDataAsObjects('DAO_CallEntry', $ids);
 	}
 	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_MailParseFail::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'created' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_MailParseFail::CTIME),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_MailParseFail::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'size' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_MailParseFail::SIZE),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_MailParseFail::MTIME),
+				),
+		);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
+	}
+	
 	function render() {
 		$this->_sanitize();
 		
@@ -419,7 +480,7 @@ class View_MailParseFail extends C4_AbstractView {
 		$key = $param->field;
 		
 		switch($key) {
-			//case SearchFields_CallEntry::VIRTUAL_CONTEXT_LINK:
+			//case SearchFields_MailParseFail::VIRTUAL_CONTEXT_LINK:
 			//	$this->_renderVirtualContextLinks($param);
 			//	break;
 		}
@@ -546,7 +607,7 @@ class View_MailParseFail extends C4_AbstractView {
 				$this->getParams(),
 				100,
 				$pg++,
-				SearchFields_CallEntry::ID,
+				SearchFields_MailParseFail::ID,
 				true,
 				false
 			);

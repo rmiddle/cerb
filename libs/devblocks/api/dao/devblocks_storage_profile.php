@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -48,7 +48,7 @@
  */
 
 if(class_exists('C4_AbstractView')):
-class View_DevblocksStorageProfile extends C4_AbstractView {
+class View_DevblocksStorageProfile extends C4_AbstractView implements IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'devblocksstorageprofile';
 
 	function __construct() {
@@ -78,6 +78,7 @@ class View_DevblocksStorageProfile extends C4_AbstractView {
 
 	function getData() {
 		$objects = DAO_DevblocksStorageProfile::search(
+			$this->view_columns,
 			$this->getParams(),
 			$this->renderLimit,
 			$this->renderPage,
@@ -86,6 +87,39 @@ class View_DevblocksStorageProfile extends C4_AbstractView {
 			$this->renderTotal
 		);
 		return $objects;
+	}
+	
+	function getQuickSearchFields() {
+		return array(
+		);
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$params = array();
+
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			
+			switch($k) {
+				// Texts (fuzzy)
+				
+				case '_fulltext':
+					$field_keys = array(
+						'_fulltext' => SearchFields_DevblocksStorageProfile::NAME,
+					);
+					
+					@$field_key = $field_keys[$k];
+					
+					if($field_key && false != ($param = DevblocksSearchCriteria::getTextParamFromQuery($field_key, $v, DevblocksSearchCriteria::OPTION_TEXT_PARTIAL)))
+						$params[$field_key] = $param;
+					break;
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 
 	function render() {

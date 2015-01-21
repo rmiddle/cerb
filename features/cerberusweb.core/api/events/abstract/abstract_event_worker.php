@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 abstract class AbstractEvent_Worker extends Extension_DevblocksEvent {
@@ -95,7 +95,7 @@ abstract class AbstractEvent_Worker extends Extension_DevblocksEvent {
 		$vars = parent::getValuesContexts($trigger);
 		
 		$vals_to_ctx = array_merge($vals, $vars);
-		asort($vals_to_ctx);
+		DevblocksPlatform::sortObjects($vals_to_ctx, '[label]');
 		
 		return $vals_to_ctx;
 	}
@@ -113,14 +113,14 @@ abstract class AbstractEvent_Worker extends Extension_DevblocksEvent {
 		return $conditions;
 	}
 	
-	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
+	function renderConditionExtension($token, $as_token, $trigger, $params=array(), $seq=null) {
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('params', $params);
 
 		if(!is_null($seq))
 			$tpl->assign('namePrefix','condition'.$seq);
 		
-		switch($token) {
+		switch($as_token) {
 			case 'worker_calendar':
 				$tpl->display('devblocks:cerberusweb.core::events/model/worker/condition_worker_calendar.tpl');
 				break;
@@ -130,23 +130,24 @@ abstract class AbstractEvent_Worker extends Extension_DevblocksEvent {
 		$tpl->clearAssign('params');
 	}
 	
-	function runConditionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
+	function runConditionExtension($token, $as_token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
 		$pass = true;
 		
-		switch($token) {
+		switch($as_token) {
 			case 'worker_calendar':
 				@$worker_id = $dict->worker_id;
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 
 				if(empty($worker_id)) {
 					$pass = false;
 					break;
 				}
 				
-				@$from = $params['from'];
-				@$to = $params['to'];
+				@$from = $tpl_builder->build($params['from'], $dict);
+				@$to = $tpl_builder->build($params['to'], $dict);
 				$is_available = !empty($params['is_available']) ? 1 : 0;
 				
-				@$availability_calendar_id = DAO_WorkerPref::get($worker_id, 'availability_calendar_id', 0);
+				@$availability_calendar_id = $dict->worker_calendar_id;
 				
 				if(empty($availability_calendar_id)) {
 					$pass = ($is_available) ? false : true;

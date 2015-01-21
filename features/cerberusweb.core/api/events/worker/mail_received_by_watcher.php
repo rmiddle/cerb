@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 // [TODO] Can we extend a generic message event instead of being redundant?
@@ -188,6 +188,7 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 			'sender_watchers' => array(
 				'label' => 'Sender watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 			'sender_org_id' => array(
 				'label' => 'Sender org',
@@ -196,6 +197,7 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 			'sender_org_watchers' => array(
 				'label' => 'Sender org_watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 			'ticket_id' => array(
 				'label' => 'Ticket',
@@ -208,6 +210,7 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 			'ticket_org_watchers' => array(
 				'label' => 'Ticket org watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 			'ticket_owner_id' => array(
 				'label' => 'Ticket owner',
@@ -216,13 +219,14 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 			'ticket_watchers' => array(
 				'label' => 'Ticket watchers',
 				'context' => CerberusContexts::CONTEXT_WORKER,
+				'is_multiple' => true,
 			),
 		);
 		
 		$vars = parent::getValuesContexts($trigger);
 		
 		$vals_to_ctx = array_merge($vals, $vars);
-		asort($vals_to_ctx);
+		DevblocksPlatform::sortObjects($vals_to_ctx, '[label]');
 		
 		return $vals_to_ctx;
 	}
@@ -264,14 +268,14 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 		return $conditions;
 	}
 
-	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
+	function renderConditionExtension($token, $as_token, $trigger, $params=array(), $seq=null) {
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('params', $params);
 
 		if(!is_null($seq))
 			$tpl->assign('namePrefix','condition'.$seq);
 		
-		switch($token) {
+		switch($as_token) {
 			case 'group_id':
 				$groups = DAO_Group::getAll();
 				$tpl->assign('groups', $groups);
@@ -307,10 +311,10 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 		return;
 	}
 
-	function runConditionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
+	function runConditionExtension($token, $as_token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
 		$pass = true;
 		
-		switch($token) {
+		switch($as_token) {
 			case 'ticket_has_owner':
 				$bool = $params['bool'];
 				@$value = $dict->ticket_owner_id;
@@ -385,7 +389,7 @@ class Event_MailReceivedByWatcher extends Extension_DevblocksEvent {
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
 				
-				switch($token) {
+				switch($as_token) {
 					case 'sender_org_watcher_count':
 						$value = count($dict->sender_org_watchers);
 						break;

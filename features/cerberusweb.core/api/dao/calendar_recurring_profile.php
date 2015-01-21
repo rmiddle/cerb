@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 class DAO_CalendarRecurringProfile extends Cerb_ORMHelper {
@@ -368,12 +368,8 @@ class DAO_CalendarRecurringProfile extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_CalendarRecurringProfile::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -720,57 +716,151 @@ class View_CalendarRecurringProfile extends C4_AbstractView implements IAbstract
 		return $counts;
 	}
 	
-	function isQuickSearchField($token) {
-		switch($token) {
-			case SearchFields_CalendarRecurringProfile::CALENDAR_ID:
-				return true;
-			break;
-		}
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::EVENT_NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'calendar' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_VIRTUAL,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::CALENDAR_ID),
+				),
+			'endAt' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::EVENT_END, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'id' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::ID),
+				),
+			'on' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::PATTERNS, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'recurFrom' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::RECUR_START),
+				),
+			'recurTo' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::RECUR_END),
+				),
+			'startAt' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::EVENT_START, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'status' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_VIRTUAL,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::IS_AVAILABLE),
+					'examples' => array(
+						'available',
+						'busy',
+					),
+				),
+			'timezone' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::TZ, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'watchers' =>
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_CalendarRecurringProfile::VIRTUAL_WATCHERS),
+				),
+		);
+
+		// Add searchable custom fields
 		
-		return false;
-	}
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_CALENDAR_EVENT_RECURRING, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
 	
-	function quickSearch($token, $query, &$oper, &$value) {
-		switch($token) {
-			case SearchFields_CalendarRecurringProfile::CALENDAR_ID:
-				$search_ids = array();
-				$oper = DevblocksSearchCriteria::OPER_IN;
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// Virtuals
 				
-				if(preg_match('#([\!\=]+)(.*)#', $query, $matches)) {
-					$oper_hint = trim($matches[1]);
-					$query = trim($matches[2]);
+				case 'status':
+					$field_keys = array(
+						'status' => SearchFields_CalendarRecurringProfile::IS_AVAILABLE,
+					);
 					
-					switch($oper_hint) {
-						case '!':
-						case '!=':
-							$oper = DevblocksSearchCriteria::OPER_NIN;
+					$oper = DevblocksSearchCriteria::OPER_EQ;
+					
+					@$field_key = $field_keys[$k];
+					$value = 0;
+					
+					// Normalize status labels
+					switch(substr(strtolower($v), 0, 1)) {
+						case 'a':
+						case 'y':
+							$value = 1;
 							break;
 					}
-				}
+					
+					$params[$field_key] = new DevblocksSearchCriteria(
+						$field_key,
+						$oper,
+						$value
+					);
+					break;
 				
-				$calendars = DAO_Calendar::getAll();
-				$inputs = DevblocksPlatform::parseCsvString($query);
-
-				if(is_array($inputs))
-				foreach($inputs as $input) {
-					foreach($calendars as $calendar_id => $calendar) {
-						if(0 == strcasecmp($input, substr($calendar->name,0,strlen($input))))
-							$search_ids[$calendar_id] = true;
+				case 'calendar':
+					$field_keys = array(
+						'calendar' => SearchFields_CalendarRecurringProfile::CALENDAR_ID,
+					);
+					
+					@$field_key = $field_keys[$k];
+					
+					$oper = DevblocksSearchCriteria::OPER_IN;
+					
+					$calendars = DAO_Calendar::getAll();
+					$patterns = DevblocksPlatform::parseCsvString($v);
+					$values = array();
+					
+					if(is_array($values))
+					foreach($patterns as $pattern) {
+						foreach($calendars as $calendar_id => $calendar) {
+							if(false !== stripos($calendar->name, $pattern))
+								$values[$calendar_id] = true;
+						}
 					}
-				}
-				
-				if(!empty($search_ids)) {
-					$value = array_keys($search_ids);
-				} else {
-					$value = null;
-				}
-				
-				return true;
-				break;
-				
+					
+					if(!empty($values)) {
+						$params[$field_key] = new DevblocksSearchCriteria(
+							$field_key,
+							$oper,
+							array_keys($values)
+						);
+					}
+					break;				
+			}
 		}
 		
-		return false;
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {
@@ -1175,7 +1265,7 @@ class Context_CalendarRecurringProfile extends Extension_DevblocksContext implem
 	
 			CerberusContexts::merge(
 				'calendar_',
-				'Calendar:',
+				$prefix.'Calendar:',
 				$merge_token_labels,
 				$merge_token_values,
 				$token_labels,
@@ -1247,8 +1337,8 @@ class Context_CalendarRecurringProfile extends Extension_DevblocksContext implem
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;

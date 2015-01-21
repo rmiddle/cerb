@@ -16,6 +16,7 @@
 <br>
 
 <script type="text/javascript">
+$(function() {
 	var $popup = genericAjaxPopupFetch('{$layer}');
 	
 	$popup.find('UL.buffer').sortable({ placeholder: 'ui-state-highlight' });
@@ -109,10 +110,16 @@
 			
 			genericAjaxPopupDestroy('{$layer}');
 		});
+		
+		// CSS overrides
+		$popup.closest('.ui-dialog').css('overflow', 'visible');
+		$popup.css('overflow', 'inherit');
 	});
 	
 	$popup.one('dialogclose', function(event) {
 		event.stopPropagation();
 		genericAjaxPopupDestroy('{$layer}');
 	});
+	
+});
 </script>

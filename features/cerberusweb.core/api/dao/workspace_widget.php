@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 class DAO_WorkspaceWidget extends Cerb_ORMHelper {
@@ -300,12 +300,8 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_WorkspaceWidget::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -371,6 +367,31 @@ class Model_WorkspaceWidget {
 	public $pos = '0000';
 	public $cache_ttl = 60;
 	public $params = array();
+	
+	function getWorkspaceTab() {
+		return DAO_WorkspaceTab::get($this->workspace_tab_id);
+	}
+	
+	function getWorkspacePage() {
+		if(false == ($tab = $this->getWorkspaceTab()))
+			return;
+		
+		return $tab->getWorkspacePage();
+	}
+	
+	function isReadableByWorker(Model_Worker $worker) {
+		if(false == ($page = $this->getWorkspacePage()))
+			return false;
+		
+		return $page->isReadableByWorker($worker);
+	}
+	
+	function isWriteableByWorker(Model_Worker $worker) {
+		if(false == ($page = $this->getWorkspacePage()))
+			return false;
+		
+		return $page->isWriteableByWorker($worker);
+	}
 };
 
 class Context_WorkspaceWidget extends Extension_DevblocksContext {
@@ -532,8 +553,8 @@ class Context_WorkspaceWidget extends Extension_DevblocksContext {
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;

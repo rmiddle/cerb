@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_SetupGroups extends Extension_PageSection {
@@ -122,7 +122,9 @@ class PageSection_SetupGroups extends Extension_PageSection {
 			$fields = array(
 				DAO_Group::NAME => $name,
 			);
-			$id = DAO_Group::create($fields);
+			
+			if(false == ($id = DAO_Group::create($fields)))
+				return false;
 		}
 		
 		// Members

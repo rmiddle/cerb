@@ -413,12 +413,8 @@ class DAO_CustomFieldset extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_CustomFieldset::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -601,7 +597,7 @@ class Model_CustomFieldset {
 	}
 };
 
-class View_CustomFieldset extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_CustomFieldset extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'custom_fieldsets';
 
 	function __construct() {
@@ -725,6 +721,50 @@ class View_CustomFieldset extends C4_AbstractView implements IAbstractView_Subto
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CustomFieldset::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'context' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CustomFieldset::CONTEXT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CustomFieldset::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+		);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {
@@ -1067,6 +1107,23 @@ class Context_CustomFieldset extends Extension_DevblocksContext {
 		}
 		
 		switch($token) {
+			case 'custom_fields':
+				$custom_fieldset = DAO_CustomFieldset::get($context_id);
+				$custom_fields = $custom_fieldset->getCustomFields();
+				$cfield_values = array(
+					'custom_fields' => array(),
+				);
+				
+				foreach($custom_fields as $cfield) {
+					CerberusContexts::getContext(CerberusContexts::CONTEXT_CUSTOM_FIELD, $cfield, $merge_labels, $merge_values, null, true, true);
+					$cfield_values['custom_fields'][] = $merge_values;
+				}
+				
+				if(!empty($cfield_values['custom_fields']))
+					$values = array_merge($values, $cfield_values);
+				
+				break;
+				
 			default:
 				/*
 				if(substr($token,0,7) == 'custom_') {
@@ -1115,8 +1172,8 @@ class Context_CustomFieldset extends Extension_DevblocksContext {
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;

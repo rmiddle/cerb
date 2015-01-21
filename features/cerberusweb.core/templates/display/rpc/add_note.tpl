@@ -14,18 +14,9 @@
 	</tr>
 	<tr>
 		<td>
+			<div class="cerb-form-hint">{'comment.notify.at_mention'|devblocks_translate}</div>
 			<textarea name="content" rows="8" cols="80" id="note_content" class="reply" style="width:98%;border:1px solid rgb(180,180,180);padding:5px;"></textarea>
-			<div>
-				<button type="button" onclick="ajax.chooserSnippet('snippets',$('#note_content'), { '{CerberusContexts::CONTEXT_TICKET}':'{$message->ticket_id}', '{CerberusContexts::CONTEXT_MESSAGE}':'{$message->id}', '{CerberusContexts::CONTEXT_WORKER}':'{$active_worker->id}' });">{'common.snippets'|devblocks_translate|capitalize}</button>
-			</div>
-		</td>
-	</tr>
-	<tr>
-		<td style="padding-top:5px;">
-			<b>{'common.notify_watchers_and'|devblocks_translate}</b>:<br>
-			<div style="margin-left:20px;margin-bottom:1em;">
-				<button type="button" class="chooser_worker"><span class="cerb-sprite sprite-view"></span></button>
-			</div>
+			<button type="button" onclick="ajax.chooserSnippet('snippets',$('#note_content'), { '{CerberusContexts::CONTEXT_TICKET}':'{$message->ticket_id}', '{CerberusContexts::CONTEXT_MESSAGE}':'{$message->id}', '{CerberusContexts::CONTEXT_WORKER}':'{$active_worker->id}' });">{'common.snippets'|devblocks_translate|capitalize}</button>
 		</td>
 	</tr>
 	<tr>
@@ -39,7 +30,30 @@
 </form>
 
 <script type="text/javascript">
-	$('#reply{$message->id}_form button.chooser_worker').each(function() {
-		ajax.chooser(this,'cerberusweb.contexts.worker','notify_worker_ids', { autocomplete:true });
+$(function() {
+	var $frm = $('#reply{$message->id}_form');
+	var $textarea = $frm.find('textarea[name=content]');
+	
+	// Form hints
+	
+	$textarea
+		.focusin(function() {
+			$(this).siblings('div.cerb-form-hint').fadeIn();
+		})
+		.focusout(function() {
+			$(this).siblings('div.cerb-form-hint').fadeOut();
+		})
+		;
+	
+	// @mentions
+	
+	var atwho_workers = {CerberusApplication::getAtMentionsWorkerDictionaryJson() nofilter};
+
+	$textarea.atwho({
+		at: '@',
+		{literal}tpl: '<li data-value="@${at_mention}">${name} <small style="margin-left:10px;">${title}</small></li>',{/literal}
+		data: atwho_workers,
+		limit: 10
 	});
+});
 </script>

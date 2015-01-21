@@ -110,33 +110,29 @@
 </fieldset>
 
 <script type="text/javascript">
-var $frm = $('#frmConfigFieldSource');
-
-$frm.find('input:checkbox.check-all').click(function() {
-	var checked = $(this).is(':checked');
+$(function() {
+	var $frm = $('#frmConfigFieldSource');
 	
-	var $checkboxes = $(this).closest('form').find('input:checkbox[name="selected[]"]');
+	$frm.find('input:checkbox.check-all').click(function() {
+		var checked = $(this).is(':checked');
+		
+		var $checkboxes = $frm.find('input:checkbox[name="selected[]"]');
+		$checkboxes.prop('checked', checked);
+	});
 	
-	if(checked) {
-		$checkboxes.attr('checked', 'checked');
-	} else {
-		$checkboxes.removeAttr('checked');
-	}
+	$frm.find('table').sortable({ 
+		items:'TBODY.sortable',
+		helper: 'original',
+		forceHelperSize: true,
+		handle: 'span.ui-icon-arrowthick-2-n-s'
+	});
+	
+	$frm.find('button#frmConfigFieldSourceDelete').click(function() {
+		$(this).closest('.toolbar').fadeOut().siblings('fieldset.delete').fadeIn();
+	});
+	
+	$frm.find('button#frmConfigFieldSourceMove').click(function() {
+		$(this).closest('.toolbar').fadeOut().siblings('fieldset.move').fadeIn();
+	});
 });
-
-$frm.find('table').sortable({ 
-	items:'TBODY.sortable',
-	helper: 'original',
-	forceHelperSize: true,
-	handle: 'span.ui-icon-arrowthick-2-n-s'
-});
-
-$frm.find('button#frmConfigFieldSourceDelete').click(function() {
-	$(this).closest('.toolbar').fadeOut().siblings('fieldset.delete').fadeIn();
-});
-
-$frm.find('button#frmConfigFieldSourceMove').click(function() {
-	$(this).closest('.toolbar').fadeOut().siblings('fieldset.move').fadeIn();
-});
-
 </script>

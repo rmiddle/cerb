@@ -125,6 +125,7 @@ class DAO_Calendar extends Cerb_ORMHelper {
 	static function getReadableByActor($actor) {
 		$calendars = DAO_Calendar::getAll();
 		
+		if(is_array($calendars))
 		foreach($calendars as $calendar_id => $calendar) { /* @var $calendar Model_Calendar */
 			if(!CerberusContexts::isReadableByActor($calendar->owner_context, $calendar->owner_context_id, $actor)) {
 				unset($calendars[$calendar_id]);
@@ -138,6 +139,7 @@ class DAO_Calendar extends Cerb_ORMHelper {
 	static function getWriteableByActor($actor) {
 		$calendars = DAO_Calendar::getAll();
 		
+		if(is_array($calendars))
 		foreach($calendars as $calendar_id => $calendar) { /* @var $calendar Model_Calendar */
 			@$manual_disabled = $calendar->params['manual_disabled'];
 			
@@ -153,6 +155,7 @@ class DAO_Calendar extends Cerb_ORMHelper {
 	static function getOwnedByWorker($worker) {
 		$calendars = DAO_Calendar::getAll();
 
+		if(is_array($calendars))
 		foreach($calendars as $calendar_id => $calendar) { /* @var $calendar Model_Calendar */
 			if($calendar->owner_context == CerberusContexts::CONTEXT_WORKER && $calendar->owner_context_id == $worker->id)
 				continue;
@@ -199,6 +202,9 @@ class DAO_Calendar extends Cerb_ORMHelper {
 		
 		$db = DevblocksPlatform::getDatabaseService();
 		
+		// Sanitize
+		$ids = DevblocksPlatform::sanitizeArray($ids, 'int', array('unique','nonzero'));
+		
 		if(empty($ids))
 			return;
 		
@@ -211,7 +217,7 @@ class DAO_Calendar extends Cerb_ORMHelper {
 		DAO_CalendarRecurringProfile::deleteByCalendarIds($ids);
 		
 		// Delete worker prefs
-		DAO_WorkerPref::deleteByKeyValues('availability_calendar_id', $ids);
+		DAO_Worker::updateWhere(array(DAO_Worker::CALENDAR_ID => 0), sprintf("%s IN (%s)", DAO_Worker::CALENDAR_ID, $ids_list));
 		
 		// Fire event
 		$eventMgr = DevblocksPlatform::getEventService();
@@ -396,12 +402,8 @@ class DAO_Calendar extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_Calendar::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 		
 		$total = count($results);
@@ -658,11 +660,13 @@ class Model_Calendar {
 		
 		$mins_bits = str_pad('', $mins_len, '*', STR_PAD_LEFT);
 
+		if(is_array($events))
 		foreach($events as $ts => $schedule) {
+			if(is_array($schedule))
 			foreach($schedule as $event) {
 				$start = $event['ts'];
 				$end = @$event['ts_end'] ?: $start;
-
+				
 				$start_mins = intval(ceil(($start - $date_from)/60));
 				$end_mins = intval(ceil(($end - $date_from)/60));
 				
@@ -715,8 +719,8 @@ class Model_CalendarAvailability {
 	function scheduleInRelativeTime($starting_at, $for) {
 		$at = ceil(($starting_at - $this->_start)/60);
 		$for = ceil((strtotime($for) - time())/60);
-		$left = $for;
-		$offset = $at;
+		$left = intval($for);
+		$offset = intval($at);
 		
 		while($left) {
 			$bit = $this->_mins[$offset];
@@ -816,14 +820,15 @@ class Model_CalendarAvailability {
 	}
 	
 	function occludeCalendarEvents(&$calendar_events) {
+		if(is_array($calendar_events))
 		foreach($calendar_events as $ts => $day_schedule) {
+			if(is_array($day_schedule))
 			foreach($day_schedule as $idx => $event) {
 				if(empty($event['is_available']))
 					continue;
 				
-				//var_dump($event['label']);
 				$at = ceil(($event['ts'] - $this->_start)/60);
-				$for = ceil(($event['ts_end'] - $event['ts'])/60);
+				$for = max(1, ceil(($event['ts_end'] - $event['ts'])/60));
 				$mins = substr($this->_mins, $at, $for);
 				
 				if(false === strpos($mins, '1'))
@@ -835,7 +840,7 @@ class Model_CalendarAvailability {
 	// [TODO] Find 5 mins between two dates
 };
 
-class View_Calendar extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_Calendar extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'view_calendars';
 
 	function __construct() {
@@ -971,6 +976,64 @@ class View_Calendar extends C4_AbstractView implements IAbstractView_Subtotals {
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Calendar::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_Calendar::ID),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Calendar::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Calendar::UPDATED_AT),
+				),
+			'watchers' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_Calendar::VIRTUAL_WATCHERS),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_CALENDAR, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {
@@ -1327,7 +1390,7 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 			$token_values['updated_at'] = $calendar->updated_at;
 			
 			// Custom fields
-			$token_values = $this->_mergeModelCustomFields($calendar, $token_values);
+			$token_values = $this->_importModelCustomFieldsAsValues($calendar, $token_values);
 			
 			// URL
 			$url_writer = DevblocksPlatform::getUrlService();
@@ -1364,21 +1427,35 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 				$values = array_merge($values, $watchers);
 				break;
 			
-			case 'calendar_scope':
-				// This can be preset in scope to select a specific month/year
-				$calendar_scope = DevblocksCalendarHelper::getCalendar(null, null);
+			case 'scope':
+				$month = null;
+				$year = null;
+				
+				// Overload month from dictionary?
+				if(isset($dictionary['__scope_month'])) {
+					$month = intval($dictionary['__scope_month']);
+				}
+				
+				// Overload year from dictionary?
+				if(isset($dictionary['__scope_year'])) {
+					$year = intval($dictionary['__scope_year']);
+				}
+				
+				$calendar_scope = DevblocksCalendarHelper::getCalendar($month, $year);
 				$values['scope'] = $calendar_scope;
 				break;
 				
 			case 'weeks':
-				if(!isset($dictionary['calendar_scope'])) {
-					$values = self::lazyLoadContextValues('calendar_scope', $dictionary);
+				if(!isset($dictionary['scope'])) {
+					$values = self::lazyLoadContextValues('scope', $dictionary);
 					@$month = $values['scope']['month'];
 					@$year = $values['scope']['year'];
+
+					unset($values['scope']['calendar_weeks']);
 					
 				} else {
-					@$month = $dictionary['calendar_scope']['month'];
-					@$year = $dictionary['calendar_scope']['year'];
+					@$month = $dictionary['scope']['month'];
+					@$year = $dictionary['scope']['year'];
 				}
 				
 				$calendar_scope = DevblocksCalendarHelper::getCalendar($month, $year);
@@ -1388,13 +1465,13 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 				break;
 			
 			case 'events':
-				if(!isset($dictionary['calendar_scope'])) {
-					$values = self::lazyLoadContextValues('calendar_scope', $dictionary);
-					unset($values['scope']['calendar_weeks']);
+			case 'events_occluded':
+				if(!isset($dictionary['scope'])) {
+					$values = self::lazyLoadContextValues('scope', $dictionary);
 					@$calendar_scope = $values['scope'];
 					
 				} else {
-					@$calendar_scope = $dictionary['calendar_scope'];
+					@$calendar_scope = $dictionary['scope'];
 				}
 
 				$calendar = DAO_Calendar::get($context_id);
@@ -1402,6 +1479,12 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 				$calendar_events = $calendar->getEvents($calendar_scope['date_range_from'], $calendar_scope['date_range_to']);
 				$events = array();
 				
+				if("events_occluded" == $token) {
+					$availability = $calendar->computeAvailability($calendar_scope['date_range_from'], $calendar_scope['date_range_to'], $calendar_events);
+					$availability->occludeCalendarEvents($calendar_events);
+				}
+				
+				if(is_array($calendar_events))
 				foreach($calendar_events as $day_ts => $day_events) {
 					foreach($day_events as $event) {
 						if(isset($event['context'])) {
@@ -1420,14 +1503,14 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 				break;
 				
 			case 'weeks_events':
+			case 'weeks_events_occluded':
 				if(!isset($dictionary['weeks'])) {
 					$values = self::lazyLoadContextValues('weeks', $dictionary);
-					@$calendar_scope = $values['scope'];
+					$calendar_scope = $values['scope'];
 					
 				} else {
-					@$calendar_scope = $dictionary['calendar_scope'];
 					$values['weeks'] = $dictionary['weeks'];
-					
+					$calendar_scope = $dictionary['scope'];
 				}
 				
 				@$month = $calendar_scope['month'];
@@ -1437,8 +1520,15 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 				
 				$calendar_events = $calendar->getEvents($calendar_scope['date_range_from'], $calendar_scope['date_range_to']);
 				
+				if("weeks_events_occluded" == $token) {
+					$availability = $calendar->computeAvailability($calendar_scope['date_range_from'], $calendar_scope['date_range_to'], $calendar_events);
+					$availability->occludeCalendarEvents($calendar_events);
+				}
+				
 				foreach($values['weeks'] as $week_idx => $week) {
 					foreach($week as $day_ts => $day) {
+						$values['weeks'][$week_idx][$day_ts]['events'] = array();
+						
 						if(isset($calendar_events[$day_ts])) {
 							$events = $calendar_events[$day_ts];
 							
@@ -1493,8 +1583,8 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;

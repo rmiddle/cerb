@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_SetupPortal extends Extension_PageSection {
@@ -121,11 +121,15 @@ class PageSection_SetupPortal extends Extension_PageSection {
 		$defaults->id = 'portal_templates';
 		$defaults->class_name = 'View_DevblocksTemplate';
 		
-		$view = C4_AbstractViewLoader::getView($defaults->id, $defaults);
-
-		$view->name = 'Custom Templates';
-		$view->addParam(new DevblocksSearchCriteria(SearchFields_DevblocksTemplate::TAG,'=','portal_'.$tool->code));
-		C4_AbstractViewLoader::setView($view->id, $view);
+		if(false != ($view = C4_AbstractViewLoader::getView($defaults->id, $defaults))) {
+			$view->name = 'Custom Templates';
+			
+			$view->addParamsRequired(array(
+				new DevblocksSearchCriteria(SearchFields_DevblocksTemplate::TAG,'=','portal_'.$tool->code),
+			), true);
+			
+			C4_AbstractViewLoader::setView($view->id, $view);
+		}
 		
 		$tpl->assign('view', $view);
 			
@@ -352,10 +356,10 @@ class PageSection_SetupPortal extends Extension_PageSection {
 		// Build XML file
 		$xml = simplexml_load_string(
 			'<?xml version="1.0" encoding="' . LANG_CHARSET_CODE . '"?>'.
-			'<cerb5>'.
+			'<cerb>'.
 			'<templates>'.
 			'</templates>'.
-			'</cerb5>'
+			'</cerb>'
 		); /* @var $xml SimpleXMLElement */
 		
 		// Author
@@ -415,7 +419,7 @@ class PageSection_SetupPortal extends Extension_PageSection {
 		$url_parts = parse_url($url);
 		
 		$host = $url_parts['host'];
-		@$port = $_SERVER['SERVER_PORT'];
+		$port = isset($url_parts['port']) ? $url_parts['port'] : ($url_writer->isSSL() ? 443 : 80);
 		$base = substr(DEVBLOCKS_WEBPATH,0,-1); // consume trailing
 		$path = substr($url_parts['path'],strlen(DEVBLOCKS_WEBPATH)-1); // consume trailing slash
 

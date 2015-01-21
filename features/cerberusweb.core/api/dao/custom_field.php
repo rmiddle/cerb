@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 class DAO_CustomField extends DevblocksORMHelper {
@@ -69,8 +69,9 @@ class DAO_CustomField extends DevblocksORMHelper {
 	* @return array
 	*/
 	
-	static function getByContext($context, $with_fieldsets=true) {
+	static function getByContext($context, $with_fieldsets=true, $with_fieldset_names=false) {
 		$fields = self::getAll();
+		$fieldsets = DAO_CustomFieldset::getAll();
 		$results = array();
 
 		// [TODO] Filter to the fieldsets the active worker is allowed to see
@@ -83,6 +84,11 @@ class DAO_CustomField extends DevblocksORMHelper {
 			
 			if(!$with_fieldsets && !empty($field->custom_fieldset_id))
 				continue;
+			
+			if($with_fieldset_names && !empty($field->custom_fieldset_id)) {
+				if(isset($fieldsets[$field->custom_fieldset_id]))
+					$field->name = $fieldsets[$field->custom_fieldset_id]->name . ' ' . $field->name;
+			}
 			
 			$results[$idx] = $field;
 		}
@@ -941,20 +947,29 @@ class Model_CustomField {
 	static function getTypes() {
 		// [TODO] Extension provided custom field types
 		
-		return array(
+		$fields = array(
 			self::TYPE_CHECKBOX => 'Checkbox',
 			self::TYPE_DATE => 'Date',
 			self::TYPE_DROPDOWN => 'Picklist',
 			self::TYPE_FILE => 'File',
 			self::TYPE_FILES => 'Files: Multiple',
-			self::TYPE_MULTI_CHECKBOX => 'Multi-Checkbox',
-			self::TYPE_MULTI_LINE => 'Text: Multi-Line',
+			self::TYPE_MULTI_CHECKBOX => 'Multiple Checkboxes',
+			self::TYPE_MULTI_LINE => 'Text: Multiple Lines',
 			self::TYPE_LINK => 'Record Link',
 			self::TYPE_NUMBER => 'Number',
 			self::TYPE_SINGLE_LINE => 'Text: Single Line',
 			self::TYPE_URL => 'URL',
 			self::TYPE_WORKER => 'Worker',
 		);
+		
+		asort($fields);
+		
+		return $fields;
+	}
+	
+	static function hasMultipleValues($type) {
+		$multiple_types = array(Model_CustomField::TYPE_MULTI_CHECKBOX, Model_CustomField::TYPE_FILES);
+		return in_array($type, $multiple_types);					
 	}
 };
 
@@ -996,7 +1011,6 @@ class Context_CustomField extends Extension_DevblocksContext {
 			$prefix = 'Custom Field:';
 			
 		$translate = DevblocksPlatform::getTranslationService();
-		//$fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_CUSTOM_FIELD);
 		
 		// Polymorph
 		if(is_numeric($cfield)) {
@@ -1014,7 +1028,6 @@ class Context_CustomField extends Extension_DevblocksContext {
 			'_label' => $prefix,
 			'id' => $prefix.$translate->_('common.id'),
 			'name' => $prefix.$translate->_('common.name'),
-			//'record_url' => $prefix.$translate->_('common.url.record'),
 		);
 		
 		// Token types
@@ -1024,10 +1037,6 @@ class Context_CustomField extends Extension_DevblocksContext {
 			'name' => Model_CustomField::TYPE_SINGLE_LINE,
 		);
 		
-		// Custom field/fieldset token labels
-		//if(false !== ($custom_field_labels = $this->_getTokenLabelsFromCustomFields($fields, $prefix)) && is_array($custom_field_labels))
-		//	$token_labels = array_merge($token_labels, $custom_field_labels);
-		
 		// Token values
 		$token_values = array();
 		
@@ -1035,7 +1044,7 @@ class Context_CustomField extends Extension_DevblocksContext {
 		$token_values['_types'] = $token_types;
 		
 		// Worker token values
-		if(null != $role) {
+		if(null != $cfield) {
 			$token_values['_loaded'] = true;
 			$token_values['_label'] = $cfield->name;
 			$token_values['context'] = $cfield->context;
@@ -1043,10 +1052,10 @@ class Context_CustomField extends Extension_DevblocksContext {
 			$token_values['id'] = $cfield->id;
 			$token_values['name'] = $cfield->name;
 			$token_values['type'] = $cfield->type;
+			$token_values['pos'] = $cfield->pos;
 			
-			// URL
-// 			$url_writer = DevblocksPlatform::getUrlService();
-// 			$token_values['record_url'] = $url_writer->writeNoProxy(sprintf("c=profiles&type=worker&id=%d-%s",$worker->id, DevblocksPlatform::strToPermalink($worker->getName())), true);
+			if(!empty($cfield->params))
+				$token_values['params'] = $cfield->params;
 		}
 		
 		return true;
@@ -1083,7 +1092,7 @@ class Context_CustomField extends Extension_DevblocksContext {
 		return null;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
 		return null;
 	}
 };

@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_ProfilesTicket extends Extension_PageSection {
@@ -30,16 +30,30 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		@$id_string = array_shift($stack);
 		
 		// Translate masks to IDs
-		if(null == ($ticket = DAO_Ticket::getTicketByMask($id_string))) {
-			$ticket = DAO_Ticket::get(intval($id_string));
+		if(null == ($ticket_id = DAO_Ticket::getTicketIdByMask($id_string))) {
+			$ticket_id = intval($id_string);
 		}
 		
-		if(empty($ticket)) {
+		// Trigger ticket view event (before we load it, in case we change it)
+		Event_TicketViewedByWorker::trigger($ticket_id, $active_worker->id);
+		
+		// Load the record
+		if(false == ($ticket = DAO_Ticket::get($ticket_id))) {
 			DevblocksPlatform::redirect(new DevblocksHttpRequest());
 			return;
 		}
 		
 		$tpl->assign('ticket', $ticket);
+		
+		// Permissions
+		
+		$active_worker_memberships = $active_worker->getMemberships();
+		
+		// Check group membership ACL
+		if(!isset($active_worker_memberships[$ticket->group_id])) {
+			DevblocksPlatform::redirect(new DevblocksHttpRequest());
+			exit;
+		}
 		
 		// Remember the last tab/URL
 		@$selected_tab = array_shift($stack);
@@ -91,9 +105,6 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		}
 		
 		$tpl->assign('selected_tab', $selected_tab);
-		
-		// Trigger ticket view event
-		Event_TicketViewedByWorker::trigger($ticket->id, $active_worker->id);
 		
 		// Properties
 		
@@ -193,15 +204,31 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
                     $tpl->assign('total_time_minutes', $total_time_minutes);
                 }
         
-		// Permissions
 		
-		$active_worker_memberships = $active_worker->getMemberships();
+		// Link counts
+		$properties_links = array(
+			CerberusContexts::CONTEXT_TICKET => array(
+				$ticket->id => 
+					DAO_ContextLink::getContextLinkCounts(
+						CerberusContexts::CONTEXT_TICKET,
+						$ticket->id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			),
+		);
 		
-		// Check group membership ACL
-		if(!isset($active_worker_memberships[$ticket->group_id])) {
-			DevblocksPlatform::redirect(new DevblocksHttpRequest());
-			exit;
+		if(isset($ticket->org_id)) {
+			$properties_links[CerberusContexts::CONTEXT_ORG] = array(
+				$ticket->org_id => 
+					DAO_ContextLink::getContextLinkCounts(
+						CerberusContexts::CONTEXT_ORG,
+						$ticket->org_id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			);
 		}
+		
+		$tpl->assign('properties_links', $properties_links);
 		
 		// Groups
 		$groups = DAO_Group::getAll();
@@ -255,6 +282,15 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 			)),
 			true
 		);
+		
+		// If deleted, check for a new merge parent URL
+		if($ticket->is_deleted) {
+			if(false !== ($new_mask = DAO_Ticket::getMergeParentByMask($ticket->mask))) {
+				if(false !== ($merge_parent = DAO_Ticket::getTicketByMask($new_mask)))
+					if(!empty($merge_parent->mask))
+						$tpl->assign('merge_parent', $merge_parent);
+			}
+		}
 		
 		// Tabs
 		$tab_manifests = Extension_ContextProfileTab::getExtensions(false, CerberusContexts::CONTEXT_TICKET);

@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_Task extends Cerb_ORMHelper {
@@ -376,14 +376,34 @@ class DAO_Task extends Cerb_ORMHelper {
 			case SearchFields_Task::FULLTEXT_COMMENT_CONTENT:
 				$search = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID);
 				$query = $search->getQueryFromParam($param);
-				$ids = $search->query($query, array('context_crc32' => sprintf("%u", crc32($from_context))));
 				
-				$from_ids = DAO_Comment::getContextIdsByContextAndIds($from_context, $ids);
+				if(false === ($ids = $search->query($query, array('context_crc32' => sprintf("%u", crc32($from_context)))))) {
+					$args['where_sql'] .= 'AND 0 ';
 				
-				$args['where_sql'] .= sprintf('AND %s IN (%s) ',
-					$from_index,
-					implode(', ', (!empty($from_ids) ? $from_ids : array(-1)))
-				);
+				} elseif(is_array($ids)) {
+					$from_ids = DAO_Comment::getContextIdsByContextAndIds($from_context, $ids);
+					
+					$args['where_sql'] .= sprintf('AND %s IN (%s) ',
+						$from_index,
+						implode(', ', (!empty($from_ids) ? $from_ids : array(-1)))
+					);
+					
+				} elseif(is_string($ids)) {
+					$db = DevblocksPlatform::getDatabaseService();
+					$temp_table = sprintf("_tmp_%s", uniqid());
+					
+					$db->Execute(sprintf("CREATE TEMPORARY TABLE %s SELECT DISTINCT context_id AS id FROM comment INNER JOIN %s ON (%s.id=comment.id)",
+						$temp_table,
+						$ids,
+						$ids
+					));
+					
+					$args['join_sql'] .= sprintf("INNER JOIN %s ON (%s.id=t.id) ",
+						$temp_table,
+						$temp_table
+					);
+				}
+				
 				break;
 			
 			case SearchFields_Task::VIRTUAL_CONTEXT_LINK:
@@ -438,12 +458,8 @@ class DAO_Task extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
-			$id = intval($row[SearchFields_Task::ID]);
-			$results[$id] = $result;
+			$object_id = intval($row[SearchFields_Task::ID]);
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -541,7 +557,7 @@ class Model_Task {
 	public $updated_date;
 };
 
-class View_Task extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'tasks';
 	const DEFAULT_TITLE = 'Tasks';
 
@@ -670,6 +686,84 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals {
 		}
 		
 		return $counts;
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Task::TITLE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'comments' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
+					'options' => array('param_key' => SearchFields_Task::FULLTEXT_COMMENT_CONTENT),
+				),
+			'completed' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Task::COMPLETED_DATE),
+				),
+			'created' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Task::CREATED_AT),
+				),
+			'due' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Task::DUE_DATE),
+				),
+			'isCompleted' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_BOOL,
+					'options' => array('param_key' => SearchFields_Task::IS_COMPLETED),
+				),
+			'title' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Task::TITLE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'updated' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Task::UPDATED_DATE),
+				),
+			'watchers' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_WORKER,
+					'options' => array('param_key' => SearchFields_Task::VIRTUAL_WATCHERS),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_TASK, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 	
 	function render() {
@@ -1174,8 +1268,8 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;
@@ -1219,10 +1313,10 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 		$tpl->assign('types', $types);
 
 		// Comments
+		
 		$comments = DAO_Comment::getByContext(CerberusContexts::CONTEXT_TASK, $context_id);
-		$last_comment = array_shift($comments);
-		unset($comments);
-		$tpl->assign('last_comment', $last_comment);
+		$comments = array_reverse($comments, true);
+		$tpl->assign('comments', $comments);
 
 		// View
 		$tpl->assign('id', $context_id);

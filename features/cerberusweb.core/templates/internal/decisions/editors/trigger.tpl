@@ -70,7 +70,7 @@
 		<li><a href="javascript:;" field_type="D">Picklist</a></li>
 		<li><a href="javascript:;" field_type="N">Number</a></li>
 		<li><a href="javascript:;" field_type="E">Date</a></li>
-		<li><a href="javascript:;" field_type="C">True/False</a></li>
+		<li><a href="javascript:;" field_type="C">Yes/No</a></li>
 		<li><a href="javascript:;" field_type="W">Worker</a></li>
 		{foreach from=$list_contexts item=list_context key=list_context_id}
 		<li><a href="javascript:;" field_type="ctx_{$list_context_id}">(List) {$list_context->name}</a></li>
@@ -125,6 +125,8 @@
 		
 		<div class="config"></div>
 		
+		<div class="status"></div>
+		
 		<div style="margin-top:10px;">
 			<button type="button" class="submit"><span class="cerb-sprite2 sprite-tick-circle"></span> {'common.continue'|devblocks_translate|capitalize}</button>
 		</div>
@@ -136,7 +138,9 @@
 {/if}
 
 <script type="text/javascript">
+$(function() {
 	var $popup = genericAjaxPopupFetch('node_trigger{$trigger->id}');
+	
 	$popup.one('popup_open', function(event,ui) {
 		var $this = $(this);
 		
@@ -165,16 +169,16 @@
 		
 		$this.find('BUTTON.add-variable').click(function() {
 			var $button = $(this);
-			$button.next('ul.cerb-popupmenu').toggle();
+			$button.next('ul.add-variable-menu').toggle();
 		});
 		
 		$this.find('UL.add-variable-menu LI').click(function(e) {
-			var $menu = $(this).closest('ul.cerb-popupmenu');
+			var $menu = $(this).closest('ul.add-variable-menu');
 			var field_type = $(this).find('a').attr('field_type');
 			
 			genericAjaxGet('', 'c=internal&a=addTriggerVariable&type=' +  encodeURIComponent(field_type), function(o) {
 				var $container = $('#divBehaviorVariables{$trigger->id}');
-				$container.html(o);
+				var $html = $(o).appendTo($container);
 			});
 			
 			$menu.hide();
@@ -187,15 +191,19 @@
 			
 			$frm_import.find('button.submit').click(function() {
 				genericAjaxPost('frmBehaviorImport','','c=internal&a=saveBehaviorImportJson', function(json) {
+					var $status = $frm_import.find('div.status');
 					
-					$popup = genericAjaxPopupFetch('node_trigger');
-					
-					if(json.config_html) {
-						var $frm_import = $('#frmBehaviorImport');
+					if(json.error) {
+						Devblocks.showError($status, json.error);
+						
+					} else if(json.config_html) {
+						$status.html('').hide();
 						$frm_import.find('div.import').hide();
 						$frm_import.find('div.config').hide().html(json.config_html).fadeIn();
 						
 					} else {
+						$status.html('').hide();
+						
 						event = jQuery.Event('trigger_create');
 						event.trigger_id = json.trigger_id;
 						event.event_point = json.event_point;
@@ -208,4 +216,6 @@
 			});
 		{/if}
 	});
+	
+});
 </script>

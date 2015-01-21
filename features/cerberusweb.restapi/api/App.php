@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -290,16 +290,31 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 		if(!$permitted) {
 			Plugin_RestAPI::render(array('__status'=>'error', 'message'=>"Access denied! (You are not authorized to make this request)"));
 		}
+
+		// Controller
 		
 		@$controller_uri = array_shift($stack); // e.g. tickets
 		
-		// Look up the subcontroller for this URI
 		$controllers = $this->_getRestControllers();
 
 		if(isset($controllers[$controller_uri])
 			&& null != ($controller = DevblocksPlatform::getExtension($controllers[$controller_uri]->id, true, true))) {
 			/* @var $controller Extension_RestController */
+			
+			// Set the active worker
 			CerberusApplication::setActiveWorker($worker);
+			
+			// Set worker language
+			DevblocksPlatform::setLocale(!empty($worker->language) ? $worker->language : 'en_US');
+			
+			// Set worker timezone
+			if(!empty($worker->timezone)) @date_default_timezone_set($worker->timezone);
+			
+			// Set worker time format
+			$default_time_format = DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::TIME_FORMAT, CerberusSettingsDefaults::TIME_FORMAT);
+			DevblocksPlatform::setDateTimeFormat(!empty($worker->time_format) ? $worker->time_format : $default_time_format);
+			
+			// Handle the request
 			$controller->setPayload($this->_payload);
 			array_unshift($stack, $verb);
 			$controller->handleRequest(new DevblocksHttpRequest($stack));
@@ -439,7 +454,12 @@ abstract class Extension_RestController extends DevblocksExtension {
 			return false;
 
 		@$expand = DevblocksPlatform::parseCsvString(DevblocksPlatform::importGPC($_REQUEST['expand'],'string',null));
-
+		
+		@$show_meta = DevblocksPlatform::importGPC($_REQUEST['show_meta'],'string','');
+		$show_meta = (0 == strlen($show_meta) || !empty($show_meta)) ? true : false;
+		
+		// [TODO] Bulk load expands (e.g. ticket->org, ticket->sender->org)
+		
 		// Do we need to lazy load some fields to be helpful?
 		if(is_array($expand) && !empty($expand)) {
 			if(isset($array['results'])) {
@@ -455,14 +475,66 @@ abstract class Extension_RestController extends DevblocksExtension {
 			}
 		}
 		
+		// Results meta
+		
+		if(isset($array['results']) && is_array($array['results'])) {
+			$_labels = null;
+			$_types = null;
+
+			// Scrub nested lazy-loaded labels and types
+			array_walk($array['results'], function(&$result) use (&$_labels, &$_types) {
+				if(null == $_labels && isset($result['_labels']))
+					$_labels = $result['_labels'];
+				
+				if(null == $_types && isset($result['_types']))
+					$_types = $result['_types'];
+				
+				unset($result['_labels']);
+				unset($result['_types']);
+				
+				$scrubs = array('_loaded', '__labels', '__types');
+				
+				foreach($result as $k => $v) {
+					foreach($scrubs as $scrub)
+						if(substr($k, -strlen($scrub)) == $scrub)
+							unset($result[$k]);
+				}
+			});
+			
+			// If the client wants to see the meta on resultsets
+			if($show_meta) {
+				$array['results_meta'] = array();
+				
+				if(!empty($_labels))
+					$array['results_meta']['labels'] = $_labels;
+				
+				if(!empty($_types))
+					$array['results_meta']['types'] = $_types;
+				
+				if(empty($array['results_meta']))
+					unset($array['results_meta']);
+			}
+		
+		// Scrub lazy-loaded labels and types on a single object
+		} else if(is_array($array)) {
+			$scrubs = array('_loaded', '__labels', '__types');
+			
+			if(!$show_meta) {
+				array_push($scrubs, '_labels', '_types');
+			}
+			
+			foreach($array as $k => $v) {
+				foreach($scrubs as $scrub)
+					if(substr($k, -strlen($scrub)) == $scrub)
+						unset($array[$k]);
+			}
+		}
+		
 		$out = array(
 			'__status' => 'success',
 			'__version' => APP_VERSION,
 			'__build' => APP_BUILD,
 		) + $array;
-		
-		// These keys aren't needed
-		unset($out['_loaded']);
 		
 		// Sort by key
 		ksort($out);
@@ -537,7 +609,7 @@ abstract class Extension_RestController extends DevblocksExtension {
 		$this->error('DELETE not implemented.');
 	}
 	
-//	protected function _search($filters, $sortToken, $sortAsc, $page, $limit) {
+//	protected function _search($filters, $sortToken, $sortAsc, $page, $limit, $options) {
 // [TODO] Overload
 //	}
 
@@ -618,10 +690,15 @@ abstract class Extension_RestController extends DevblocksExtension {
 
 		@$page = DevblocksPlatform::importGPC($_REQUEST['page'],'integer',1);
 		@$limit = DevblocksPlatform::importGPC($_REQUEST['limit'],'integer',10);
+
+		@$show_results = DevblocksPlatform::importGPC($_REQUEST['show_results'],'string','');
+		$show_results = (0 == strlen($show_results) || !empty($show_results)) ? true: false;
+		
+		@$subtotals = DevblocksPlatform::importGPC($_REQUEST['subtotals'],'array',array());
 		
 		@$sortToken = DevblocksPlatform::importGPC($_REQUEST['sortBy'],'string',null);
 		@$sortAsc = DevblocksPlatform::importGPC($_REQUEST['sortAsc'],'integer',1);
-
+		
 		if(count($criteria) != count($opers) || count($criteria) != count($values))
 			$this->error(self::ERRNO_SEARCH_FILTERS_INVALID);
 		
@@ -638,34 +715,12 @@ abstract class Extension_RestController extends DevblocksExtension {
 				$filters[$field] = array($field, $oper, $value);
 		}
 		
-		$results = $this->search($filters, $sortToken, $sortAsc, $page, $limit);
+		$options = array(
+			'show_results' => $show_results,
+			'subtotals' => $subtotals,
+		);
 		
-		if(isset($results['results']) && is_array($results['results']) && !empty($results)) {
-			$_labels = null;
-			$_types = null;
-			
-			array_walk($results['results'], function(&$result) use (&$_labels, &$_types) {
-				if(null == $_labels && isset($result['_labels']))
-					$_labels = $result['_labels'];
-				
-				if(null == $_types && isset($result['_types']))
-					$_types = $result['_types'];
-				
-				unset($result['_labels']);
-				unset($result['_types']);
-			});
-			
-			$results['results_meta'] = array();
-			
-			if(!empty($_labels))
-				$results['results_meta']['labels'] = $_labels;
-			
-			if(!empty($_types))
-				$results['results_meta']['types'] = $_types;
-			
-			if(empty($results['results_meta']))
-				unset($results['results_meta']);
-		}
+		$results = $this->search($filters, $sortToken, $sortAsc, $page, $limit, $options);
 		
 		return $results;
 	}
@@ -691,10 +746,107 @@ abstract class Extension_RestController extends DevblocksExtension {
 		
 		return $fields;
 	}
+	
+	protected function _handleSearchTokensCustomFields($context) {
+		$tokens = array();
+		$cfields = DAO_CustomField::getByContext($context, true);
+		
+		if(is_array($cfields))
+		foreach($cfields as $cfield) {
+			switch($cfield->type) {
+				case Model_CustomField::TYPE_CHECKBOX:
+				case Model_CustomField::TYPE_DROPDOWN:
+				case Model_CustomField::TYPE_MULTI_CHECKBOX:
+				case Model_CustomField::TYPE_NUMBER:
+				case Model_CustomField::TYPE_SINGLE_LINE:
+				case Model_CustomField::TYPE_WORKER:
+					$tokens['custom_' . $cfield->id] = 'cf_' . $cfield->id;
+					break;
+					
+				default:
+					break;
+			}
+		}
+		
+		return $tokens;
+	}
+	
+	protected function _handleSearchSubtotals($view, $subtotals) {
+		$subtotal_data = array();
+		
+		if(is_array($subtotals) && !empty($subtotals)) {
+			foreach($subtotals as $subtotal) {
+				if(null === ($field = $this->translateToken($subtotal, 'subtotal')))
+					$this->error(self::ERRNO_SEARCH_FILTERS_INVALID, sprintf("'%s' is not a valid subtotal token.", $subtotal));
+				
+				// [TODO] Can we nest this with arbitrary subtotals?  (worker replies -> group)
+				$counts = $view->getSubtotalCounts($field);
+				
+				$subtotal_data[$subtotal] = array();
+				
+				foreach($counts as $key => $count) {
+					$data = array(
+						'label' => $count['label'],
+						'hits' => intval($count['hits']),
+					);
+					
+					if(0 != strcasecmp($count['label'], $key))
+						$data['key'] = $key;
+					
+					if(isset($count['children']) && !empty($count['children'])) {
+						$data['distribution'] = array();
+						
+						foreach($count['children'] as $child_key => $child) {
+							$child_data = array(
+								'label' => $child['label'],
+								'hits' => intval($child['hits']),
+							);
+							
+							if(0 != strcasecmp($child['label'], $child_key))
+								$child_data['key'] = $child_key;
+							
+							$data['distribution'][] = $child_data;
+						}
+					}
+					
+					$subtotal_data[$subtotal][] = $data;
+				}
+			}
+		}
+		
+		return $subtotal_data;
+	}
+	
+	protected function _getSearchView($context, $params=array(), $limit=10, $page=0, $sort_by=null, $sort_asc=null) {
+		$context_ext = Extension_DevblocksContext::get($context);
+		$view = $context_ext->getSearchView(DevblocksPlatform::strAlphaNum('api_search_'.$context, '_', '_')); /* @var $view C4_AbstractView */
+		
+		$view->is_ephemeral = true;
+		$view->addParams($params, true);
+		$view->renderLimit = $limit;
+		$view->renderPage = max(0,$page-1);
+		$view->renderSortBy = $sort_by;
+		$view->renderSortAsc = $sort_asc;
+		$view->renderTotal = true;
+		
+		if(!empty($sort_by) && !in_array($sort_by, $view->view_columns))
+			$view->view_columns[] = $sort_by;
+		
+		if(is_array($params))
+		foreach(array_keys($params) as $k) {
+			if(!in_array($k, $view->view_columns))
+				$view->view_columns[] = $k;
+		}
+		
+		// [TODO] Cursors? (ephemeral view id, paging, sort, etc)
+		C4_AbstractViewLoader::setView($view->id, $view);
+		
+		return $view;
+	}
 };
 
 interface IExtensionRestController {
-	function getContext($id);
-	function search($filters=array(), $sortToken='', $sortAsc=1, $page=1, $limit=10);
+	function getContext($model);
+	function search($filters=array(), $sortToken='', $sortAsc=1, $page=1, $limit=10, $options=array());
 	function translateToken($token, $type='dao');
 };

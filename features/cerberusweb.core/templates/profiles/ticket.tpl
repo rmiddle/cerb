@@ -1,6 +1,16 @@
 {$page_context = CerberusContexts::CONTEXT_TICKET}
 {$page_context_id = $ticket->id}
 
+{if !empty($merge_parent)}
+	<div class="help-box">
+	<h1>This ticket was merged</h1>
+	
+	<p>
+	You can find the new ticket here: <a href="{devblocks_url}c=profiles&w=ticket&mask={$merge_parent->mask}{/devblocks_url}"><b>[#{$merge_parent->mask}] {$merge_parent->subject}</b></a>
+	</p>
+	</div>
+{/if}
+
 <div style="float:left">
 	<h1>{$ticket->subject}</h1>
 </div>
@@ -162,6 +172,8 @@
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/profile_fieldsets.tpl" properties=$properties_custom_fieldsets}
 
+{include file="devblocks:cerberusweb.core::internal/profiles/profile_record_links.tpl" properties=$properties_links}
+
 <div>
 {include file="devblocks:cerberusweb.core::internal/notifications/context_profile.tpl" context=$page_context context_id=$page_context_id}
 </div>
@@ -194,6 +206,8 @@
 
 <script type="text/javascript">
 	$(function() {
+		// Tabs
+		
 		var tabOptions = Devblocks.getDefaultjQueryUiTabOptions();
 		tabOptions.active = {$selected_tab_idx};
 		
@@ -207,6 +221,11 @@
 			});
 		})
 	});
+	
+	// Page title
+	document.title = "[#{$ticket->mask|escape:'javascript' nofilter}] {$ticket->subject|escape:'javascript' nofilter} - {$settings->get('cerberusweb.core','helpdesk_title')|escape:'javascript' nofilter}";
+	
+	// Menu
 
 	{include file="devblocks:cerberusweb.core::internal/macros/display/menu_script.tpl" selector_button=null selector_menu=null}
 </script>

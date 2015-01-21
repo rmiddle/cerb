@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 /*
@@ -781,7 +781,7 @@ class ImportCron extends CerberusCronPageExtension {
 				}
 	
 				// Create attachments
-				if(!is_null($eMessage->attachments))
+				if(!is_null($eMessage->attachments) && is_array($eMessage->attachments))
 				foreach($eMessage->attachments->attachment as $eAttachment) { /* @var $eAttachment SimpleXMLElement */
 					$sFileName = (string) $eAttachment->name;
 					$sMimeType = (string) $eAttachment->mimetype;
@@ -843,7 +843,7 @@ class ImportCron extends CerberusCronPageExtension {
 		}
 		
 		// Create comments
-		if(!is_null($xml->comments))
+		if(!is_null($xml->comments) && is_array($xml->comments))
 		foreach($xml->comments->comment as $eComment) { /* @var $eMessage SimpleXMLElement */
 			$iCommentDate = (integer) $eComment->created_date;
 			$sCommentAuthor = (string) $eComment->author; // [TODO] Address Hash Lookup
@@ -906,6 +906,7 @@ class ImportCron extends CerberusCronPageExtension {
 		$sFirstName = (string) $xml->first_name;
 		$sLastName = (string) $xml->last_name;
 		$sEmail = (string) $xml->email;
+		$sPassword = (string) $xml->password;
 		$isSuperuser = (integer) $xml->is_superuser;
 		
 		// Dupe check worker email
@@ -913,8 +914,6 @@ class ImportCron extends CerberusCronPageExtension {
 			$logger->info('[Importer] Avoiding creating duplicate worker #'.$worker->id.' ('.$sEmail.')');
 			return true;
 		}
-		
-		// Don't import passwords, just require workers to authenticate again
 		
 		$fields = array(
 			DAO_Worker::EMAIL => $sEmail,
@@ -924,6 +923,10 @@ class ImportCron extends CerberusCronPageExtension {
 			DAO_Worker::AUTH_EXTENSION_ID => 'login.password',
 		);
 		$worker_id = DAO_Worker::create($fields);
+		
+		// Set pasword auth, if exists
+		if(!empty($sPassword))
+			DAO_Worker::setAuth($worker_id, $sPassword, true);
 		
 		// Address to Worker
 		DAO_AddressToWorker::assign($sEmail, $worker_id, true);
@@ -1119,12 +1122,6 @@ class Pop3Cron extends CerberusCronPageExtension {
 			return;
 		}
 
-		imap_timeout(IMAP_OPENTIMEOUT, 30);
-		imap_timeout(IMAP_READTIMEOUT, 30);
-		imap_timeout(IMAP_CLOSETIMEOUT, 30);
-		
-		$imap_timeout_read_ms = imap_timeout(IMAP_READTIMEOUT) * 1000; // ms
-		
 		$runtime = microtime(true);
 		$mailboxes_checked = 0;
 		
@@ -1138,44 +1135,24 @@ class Pop3Cron extends CerberusCronPageExtension {
 				continue;
 			}
 			
+			// Per-account IMAP timeouts
+			$imap_timeout = !empty($account->timeout_secs) ? $account->timeout_secs : 30;
+			
+			imap_timeout(IMAP_OPENTIMEOUT, $imap_timeout);
+			imap_timeout(IMAP_READTIMEOUT, $imap_timeout);
+			imap_timeout(IMAP_CLOSETIMEOUT, $imap_timeout);
+			
+			$imap_timeout_read_ms = imap_timeout(IMAP_READTIMEOUT) * 1000; // ms
+			
 			$mailboxes_checked++;
 
 			$logger->info('[POP3] Account being parsed is '. $account->nickname);
 			 
-			switch($account->protocol) {
-				default:
-				case 'pop3': // 110
-					$connect = sprintf("{%s:%d/pop3/notls}INBOX",
-					$account->host,
-					$account->port
-					);
-					break;
-					 
-				case 'pop3-ssl': // 995
-					$connect = sprintf("{%s:%d/pop3/ssl/novalidate-cert}INBOX",
-					$account->host,
-					$account->port
-					);
-					break;
-					 
-				case 'imap': // 143
-					$connect = sprintf("{%s:%d/notls}INBOX",
-					$account->host,
-					$account->port
-					);
-					break;
-
-				case 'imap-ssl': // 993
-					$connect = sprintf("{%s:%d/imap/ssl/novalidate-cert}INBOX",
-					$account->host,
-					$account->port
-					);
-					break;
-			}
+			$imap_connect = $account->getImapConnectString();
 
 			$mailbox_runtime = microtime(true);
 			 
-			if(false === ($mailbox = @imap_open($connect,
+			if(false === ($mailbox = @imap_open($imap_connect,
 				!empty($account->username)?$account->username:"",
 				!empty($account->password)?$account->password:"",
 				null,
@@ -1228,16 +1205,18 @@ class Pop3Cron extends CerberusCronPageExtension {
 			}
 			 
 			$messages = array();
-			$check = imap_check($mailbox);
+			$mailbox_stats = imap_check($mailbox);
 			 
 			// [TODO] Make this an account setting?
-			$total = min($max_downloads, $check->Nmsgs);
+			$total = min($max_downloads, $mailbox_stats->Nmsgs);
 			 
 			$logger->info("[POP3] Connected to mailbox '".$account->nickname."' (".number_format((microtime(true)-$mailbox_runtime)*1000,2)." ms)");
 
 			$mailbox_runtime = microtime(true);
-
-			for($msgno=1; $msgno <= $total; $msgno++) {
+			
+			$msgs_stats = imap_fetch_overview($mailbox, sprintf("1:%d", $total));
+			
+			foreach($msgs_stats as &$msg_stats) {
 				$time = microtime(true);
 
 				do {
@@ -1253,10 +1232,48 @@ class Pop3Cron extends CerberusCronPageExtension {
 				if($fp) {
 					$mailbox_xheader = "X-Cerberus-Mailbox: " . $account->nickname . "\r\n";
 					fwrite($fp, $mailbox_xheader);
-					$result = imap_savebody($mailbox, $fp, $msgno); // Write the message directly to the file handle
+
+					// If the message is too big, save a message stating as much
+					if($account->max_msg_size_kb && $msg_stats->size >= $account->max_msg_size_kb * 1000) {
+						$logger->warn(sprintf("[POP3] This message is %s which exceeds the mailbox limit of %s",
+							DevblocksPlatform::strPrettyBytes($msg_stats->size),
+							DevblocksPlatform::strPrettyBytes($account->max_msg_size_kb*1000)
+						));
+						
+						$error_msg = sprintf("This %s message exceeded the mailbox limit of %s",
+							DevblocksPlatform::strPrettyBytes($msg_stats->size),
+							DevblocksPlatform::strPrettyBytes($account->max_msg_size_kb*1000)
+						);
+						
+						$truncated_message = sprintf(
+							"X-Cerb-Parser-Error: message-size-limit-exceeded\r\n".
+							"X-Cerb-Parser-ErrorMsg: %s\r\n".
+							"From: %s\r\n".
+							"To: %s\r\n".
+							"Subject: %s\r\n".
+							"Date: %s\r\n".
+							"Message-Id: %s\r\n".
+							"\r\n".
+							"(%s)\r\n",
+							$error_msg,
+							$msg_stats->from,
+							$msg_stats->to,
+							$msg_stats->subject,
+							$msg_stats->date,
+							$msg_stats->message_id,
+							$error_msg
+						);
+						
+						fwrite($fp, $truncated_message);
+						
+					// Otherwise, save the message like normal
+					} else {
+						$result = imap_savebody($mailbox, $fp, $msg_stats->msgno); // Write the message directly to the file handle
+					}
+
 					@fclose($fp);
 				}
-
+				
 				$time = microtime(true) - $time;
 				
 				// If this message took a really long time to download, skip it and retry later
@@ -1274,9 +1291,9 @@ class Pop3Cron extends CerberusCronPageExtension {
 				 */
 				rename($filename, dirname($filename) . DIRECTORY_SEPARATOR . basename($filename) . '.msg');
 
-				$logger->info("[POP3] Downloaded message ".$msgno." (".sprintf("%d",($time*1000))." ms)");
+				$logger->info("[POP3] Downloaded message ".$msg_stats->msgno." (".sprintf("%d",($time*1000))." ms)");
 				
-				imap_delete($mailbox, $msgno);
+				imap_delete($mailbox, $msg_stats->msgno);
 			}
 			
 			// Clear the fail count if we had past fails
@@ -1543,8 +1560,10 @@ class SearchCron extends CerberusCronPageExtension {
 		$stop_time = time() + 30; // [TODO] Make configurable
 		
 		foreach($schemas as $schema) {
-			if($stop_time > time())
-				$schema->index($stop_time);
+			if($stop_time > time()) {
+				if($schema instanceof Extension_DevblocksSearchSchema)
+					$schema->index($stop_time);
+			}
 		}
 		
 		$logger->info("[Search] Total Runtime: ".number_format((microtime(true)-$runtime)*1000,2)." ms");

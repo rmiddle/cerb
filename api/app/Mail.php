@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -223,8 +223,6 @@ class CerberusMail {
 		@$closed = $properties['closed'];
 		@$ticket_reopen = $properties['ticket_reopen'];
 		
-		@$dont_send = $properties['dont_send'];
-		
 		$from_replyto = $group->getReplyTo($bucket_id);
 		$personal = $group->getReplyPersonal($bucket_id, $worker);
 		
@@ -302,6 +300,19 @@ class CerberusMail {
 			
 			$headers->addTextHeader('X-Mailer','Cerb ' . APP_VERSION . ' (Build '.APP_BUILD.')');
 			
+			// Custom headers
+			
+			if(isset($properties['headers']) && is_array($properties['headers']))
+			foreach($properties['headers'] as $header_key => $header_val) {
+				if(!empty($header_key) && is_string($header_key) && is_string($header_val)) {
+					if(NULL == ($header = $headers->get($header_key))) {
+						$headers->addTextHeader($header_key, $header_val);
+					} else {
+						$header->setValue($header_val);
+					}
+				}
+			}
+			
 			// Body
 			
 			switch($content_format) {
@@ -327,13 +338,14 @@ class CerberusMail {
 			// Forward Attachments
 			if(!empty($forward_files) && is_array($forward_files)) {
 				foreach($forward_files as $file_id) {
-					$attachment = DAO_Attachment::get($file_id);
-					if(false !== ($fp = DevblocksPlatform::getTempFile())) {
-						if(false !== $attachment->getFileContents($fp)) {
-							$attach = Swift_Attachment::fromPath(DevblocksPlatform::getTempFileInfo($fp), $attachment->mime_type);
-							$attach->setFilename($attachment->display_name);
-							$email->attach($attach);
-							fclose($fp);
+					if(false != ($attachment = DAO_Attachment::get($file_id))) {
+						if(false !== ($fp = DevblocksPlatform::getTempFile())) {
+							if(false !== $attachment->getFileContents($fp)) {
+								$attach = Swift_Attachment::fromPath(DevblocksPlatform::getTempFileInfo($fp), $attachment->mime_type);
+								$attach->setFilename($attachment->display_name);
+								$email->attach($attach);
+								fclose($fp);
+							}
 						}
 					}
 				}
@@ -347,7 +359,7 @@ class CerberusMail {
 				}
 			}
 			
-			if(!empty($toList) && empty($dont_send)) {
+			if(!empty($toList) && (!isset($properties['dont_send']) || empty($properties['dont_send']))) {
 				if(!@$mailer->send($email)) {
 					throw new Exception('Mail failed to send: unknown reason');
 				}
@@ -432,6 +444,7 @@ class CerberusMail {
 			DAO_Message::IS_OUTGOING => 1,
 			DAO_Message::WORKER_ID => intval($worker_id),
 			DAO_Message::IS_BROADCAST => $is_broadcast ? 1 : 0,
+			DAO_Message::IS_NOT_SENT => @$properties['dont_send'] ? 1 : 0,
 		);
 		$message_id = DAO_Message::create($fields);
 		
@@ -483,13 +496,13 @@ class CerberusMail {
 		if(isset($properties['link_forward_files']) && !empty($properties['link_forward_files'])) {
 			// Attachments
 			if(is_array($forward_files) && !empty($forward_files)) {
-				DAO_AttachmentLink::setLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $forward_files);
+				DAO_AttachmentLink::addLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $forward_files);
 			}
 		}
 		
 		// Link embedded files
 		if(isset($embedded_files) && is_array($embedded_files) && !empty($embedded_files)) {
-			DAO_AttachmentLink::setLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $embedded_files);
+			DAO_AttachmentLink::addLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $embedded_files);
 		}
 		
 		// Finalize ticket
@@ -529,11 +542,14 @@ class CerberusMail {
 			// After message sent in group
 			Event_MailAfterSentByGroup::trigger($message_id, $group_id);
 
+			// Mail received
+			Event_MailReceived::trigger($message_id);
+			
 			// Mail received by group
 			Event_MailReceivedByGroup::trigger($message_id, $group_id);
 		}
 		
-		return $ticket_id;
+		return intval($ticket_id);
 	}
 	
 	static function sendTicketMessage($properties=array()) {
@@ -553,6 +569,8 @@ class CerberusMail {
 		'html_template_id'
 		'headers'
 		'files'
+		'forward_files'
+		'link_forward_files'
 		'closed'
 		'ticket_reopen'
 		'group_id'
@@ -784,13 +802,14 @@ class CerberusMail {
 			if(!empty($forward_files) && is_array($forward_files)) {
 				foreach($forward_files as $file_id) {
 					// Attach the file
-					$attachment = DAO_Attachment::get($file_id);
-					if(false !== ($fp = DevblocksPlatform::getTempFile())) {
-						if(false !== $attachment->getFileContents($fp)) {
-							$attach = Swift_Attachment::fromPath(DevblocksPlatform::getTempFileInfo($fp), $attachment->mime_type);
-							$attach->setFilename($attachment->display_name);
-							$mail->attach($attach);
-							fclose($fp);
+					if(false != ($attachment = DAO_Attachment::get($file_id))) {
+						if(false !== ($fp = DevblocksPlatform::getTempFile())) {
+							if(false !== $attachment->getFileContents($fp)) {
+								$attach = Swift_Attachment::fromPath(DevblocksPlatform::getTempFileInfo($fp), $attachment->mime_type);
+								$attach->setFilename($attachment->display_name);
+								$mail->attach($attach);
+								fclose($fp);
+							}
 						}
 					}
 				}
@@ -896,6 +915,7 @@ class CerberusMail {
 				DAO_Message::WORKER_ID => (!empty($worker_id) ? $worker_id : 0),
 				DAO_Message::RESPONSE_TIME => $response_time,
 				DAO_Message::IS_BROADCAST => $is_broadcast ? 1 : 0,
+				DAO_Message::IS_NOT_SENT => @$properties['dont_send'] ? 1 : 0,
 			);
 			$message_id = DAO_Message::create($fields);
 			
@@ -953,13 +973,13 @@ class CerberusMail {
 			if(isset($properties['link_forward_files']) && !empty($properties['link_forward_files'])) {
 				// Attachments
 				if(is_array($forward_files) && !empty($forward_files)) {
-					DAO_AttachmentLink::setLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $forward_files);
+					DAO_AttachmentLink::addLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $forward_files);
 				}
 			}
 			
 			// Link embedded files
 			if(isset($embedded_files) && is_array($embedded_files) && !empty($embedded_files)) {
-				DAO_AttachmentLink::setLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $embedded_files);
+				DAO_AttachmentLink::addLinks(CerberusContexts::CONTEXT_MESSAGE, $message_id, $embedded_files);
 			}
 		}
 		
@@ -1041,6 +1061,9 @@ class CerberusMail {
 			// After message sent in group
 			Event_MailAfterSentByGroup::trigger($message_id, $group->id);
 			
+			// Mail received
+			Event_MailReceived::trigger($message_id);
+			
 			// New message for group
 			Event_MailReceivedByGroup::trigger($message_id, $group->id);
 
@@ -1079,8 +1102,10 @@ class CerberusMail {
 	static function relay($message_id, $emails, $include_attachments = false, $content = null, $actor_context = null, $actor_context_id = null) {
 		$mail_service = DevblocksPlatform::getMailService();
 		$mailer = $mail_service->getMailer(CerberusMail::getMailerDefaults());
+		$settings = DevblocksPlatform::getPluginSettingsService();
 
 		$workers = DAO_Worker::getAll();
+		$relay_spoof_from = $settings->get('cerberusweb.core', CerberusSettings::RELAY_SPOOF_FROM, CerberusSettingsDefaults::RELAY_SPOOF_FROM);
 		
 		if(false == ($message = DAO_Message::get($message_id)))
 			return;
@@ -1094,25 +1119,36 @@ class CerberusMail {
 		if(false == ($sender = $message->getSender()))
 			return;
 
+		$sender_name = $sender->getName();
+		
 		$url_writer = DevblocksPlatform::getUrlService();
 		$ticket_url = $url_writer->write(sprintf('c=profiles&w=ticket&mask=%s', $ticket->mask), true);
-		
-		$replyto = $group->getReplyTo($ticket->bucket_id);
+
+		if($relay_spoof_from) {
+			$replyto = $group->getReplyTo($ticket->bucket_id);
+		} else {
+			// Use the default so our 'From:' is always consistent
+			$replyto = DAO_AddressOutgoing::getDefault();
+		}
 		
 		$attachment_data = ($include_attachments)
 			? DAO_AttachmentLink::getLinksAndAttachments(CerberusContexts::CONTEXT_MESSAGE, $message->id)
 			: array()
 			;
 		
-		if(empty($content))
+		if(empty($content)) {
 			$content = sprintf("## Relayed from %s\r\n".
 				"## Your reply to this message will be sent to the requesters.\r\n".
 				"## Instructions: http://wiki.cerbweb.com/Email_Relay\r\n".
 				"##\r\n".
+				"## %s%s wrote:\r\n".
 				"%s",
 				$ticket_url,
+				(!empty($sender_name) ? ($sender_name . ' ') : ''),
+				$sender->email,
 				$message->getContent()
 			);
+		}
 		
 		if(is_array($emails))
 		foreach($emails as $to) {
@@ -1129,19 +1165,21 @@ class CerberusMail {
 	
 				$headers = $mail->getHeaders(); /* @var $headers Swift_Mime_Header */
 	
-				$sender_name = $sender->getName();
-				
-				if(!empty($sender_name)) {
-					$mail->setFrom($sender->email, $sender_name);
-				} else {
-					$mail->setFrom($sender->email);
-				}
-			
-				$replyto_personal = $replyto->getReplyPersonal($worker);
-				if(!empty($replyto_personal)) {
-					$mail->setReplyTo($replyto->email, $replyto_personal);
-				} else {
+				if($relay_spoof_from) {
+					$mail->setFrom($sender->email, !empty($sender_name) ? $sender_name : null);
 					$mail->setReplyTo($replyto->email);
+					
+				} else {
+					$replyto_personal = $replyto->getReplyPersonal($worker);
+					
+					if(!empty($replyto_personal)) {
+						$mail->setFrom($replyto->email, !empty($replyto_personal) ? $replyto_personal : null);
+						$mail->setReplyTo($replyto->email, !empty($replyto_personal) ? $replyto_personal : null);
+						
+					} else {
+						$mail->setFrom($replyto->email);
+						$mail->setReplyTo($replyto->email);
+					}
 				}
 
 				// Subject
@@ -1152,7 +1190,7 @@ class CerberusMail {
 
 				// Sign the message so we can verify that a future relay reply is genuine
 				$sign = sha1($message->id . $worker->id . APP_DB_PASS);
-				$headers->addTextHeader('Message-Id', sprintf("<%s%s%s@cerb>", dechex(mt_rand(255,65535)), $sign, dechex($message->id)));
+				$headers->addTextHeader('Message-Id', sprintf("<%s%s%s@cerb>", mt_rand(1000,9999), $sign, dechex($message->id)));
 				
 				$headers->addTextHeader('X-CerberusRedirect','1');
 	
@@ -1238,7 +1276,7 @@ class CerberusMail {
 			if(isset($message->headers['from'])) {
 				$sender_addy = $model->getSenderAddressModel(); /* @var $sender_addy Model_Address */
 				$sender_name = $sender_addy->getName();
-				$mail->setFrom($sender_addy->email, empty($sender_name) ? null : $sender_name);
+				$mail->setFrom($sender_addy->email, !empty($sender_name) ? $sender_name : null);
 			}
 			if(isset($message->headers['return-path'])) {
 				$return_path = is_array($message->headers['return-path'])
@@ -1273,21 +1311,33 @@ class CerberusMail {
 	
 	static private function _generateBodyMarkdown(&$mail, &$content, $group_id=0, $bucket_id=0, $html_template_id=0) {
 		$embedded_files = array();
+		$exclude_files = array();
 		
 		$url_writer = DevblocksPlatform::getUrlService();
 		$base_url = $url_writer->write('c=files', true) . '/';
 		
 		// Generate an HTML part using Parsedown
-		if(false !== ($html_body = DevblocksPlatform::parseMarkdown($content, true))) {
+		if(false !== ($html_body = DevblocksPlatform::parseMarkdown($content))) {
 			
-			// Use an HTML template if we have one (or can discern it)
-			if(
-				($html_template_id && null != ($html_template = DAO_MailHtmlTemplate::get($html_template_id)))
-				|| (false != ($group = DAO_Group::get($group_id)) && null != ($html_template = $group->getReplyHtmlTemplate($bucket_id)))
-				) {
+			// Determine if we have an HTML template
+			if(!$html_template_id || false == ($html_template = DAO_MailHtmlTemplate::get($html_template_id))) {
+				if(false == ($group = DAO_Group::get($group_id)) || false == ($html_template = $group->getReplyHtmlTemplate($bucket_id)))
+					$html_template = null;
+			}
+			
+			// Use an HTML template wrapper if we have one
+			if($html_template instanceof Model_MailHtmlTemplate) {
+				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 				
-					$tpl_builder = DevblocksPlatform::getTemplateBuilder();
-					$html_body = $tpl_builder->build($html_template->content, array('message_body' => $html_body));
+				$html_body = $tpl_builder->build(
+					$html_template->content,
+					array(
+						'message_body' => $html_body
+					)
+				);
+				
+				// Load the attachment links from the HTML template
+				$exclude_files = array_keys($html_template->getAttachments());
 			}
 			
 			// Purify the HTML and inline the CSS
@@ -1297,14 +1347,17 @@ class CerberusMail {
 			try {
 				$html_body = preg_replace_callback(
 					sprintf('|(\"%s(.*?)\")|', preg_quote($base_url)),
-					function($matches) use ($base_url, $mail, &$embedded_files) {
+					function($matches) use ($base_url, $mail, &$embedded_files, $exclude_files) {
 						if(3 == count($matches)) {
 							$file_parts = explode('/', $matches[2]);
 							@list($file_hash, $file_name) = explode('/', $matches[2], 2);
 							if($file_hash && $file_name) {
 								if($file_id = DAO_Attachment::getBySha1Hash($file_hash, urldecode($file_name))) {
 									if($file = DAO_Attachment::get($file_id)) {
-										$embedded_files[] = $file_id;
+										
+										if(!in_array($file_id, $exclude_files))
+											$embedded_files[] = $file_id;
+										
 										$cid = $mail->embed(Swift_Image::newInstance($file->getFileContents(), $file->display_name, $file->mime_type));
 										return sprintf('"%s"', $cid);
 									}
@@ -1346,7 +1399,24 @@ class CerberusMail {
 		}
 		
 		try {
-			$content = DevblocksPlatform::parseMarkdown($content, true);
+			$content = preg_replace_callback(
+				sprintf('|(\!\[Image\]\((.*?)\))|'),
+				function($matches) {
+					if(3 == count($matches)) {
+						return sprintf("%s", $matches[2]);
+					}
+					
+					return $matches[0];
+				},
+				$content
+			);
+			
+		} catch (Exception $e) {
+			error_log($e->getMessage());
+		}
+		
+		try {
+			$content = DevblocksPlatform::parseMarkdown($content);
 			$content = DevblocksPlatform::stripHTML($content);
 			
 		} catch (Exception $e) {

@@ -14,21 +14,18 @@ var markitupMarkdownDefaults = {
 		{name:'Heading 1', key:'1', openWith:'# ', placeHolder:'Your title here...', className:'h1' },
 		{name:'Heading 2', key:'2', openWith:'## ', placeHolder:'Your title here...', className:'h2' },
 		{name:'Heading 3', key:'3', openWith:'### ', placeHolder:'Your title here...', className:'h3' },
-		{name:'Heading 4', key:'4', openWith:'#### ', placeHolder:'Your title here...', className:'h4' },
-		{name:'Heading 5', key:'5', openWith:'##### ', placeHolder:'Your title here...', className:'h5' },
-		{name:'Heading 6', key:'6', openWith:'###### ', placeHolder:'Your title here...', className:'h6' },
-		{separator:'---------------', className:'sep' },		
+		{separator:' ', className:'sep' },		
 		{name:'Bold', key:'B', openWith:'**', closeWith:'**', className:'b'},
 		{name:'Italic', key:'I', openWith:'_', closeWith:'_', className:'i'},
-		{separator:'---------------', className:'sep' },
+		{separator:' ', className:'sep' },
 		{name:'Bulleted List', openWith:'- ', className:'ul' },
 		{name:'Numeric List', className:'ol', openWith:function(markItUp) {
 			return markItUp.line+'. ';
 		}},
-		{separator:'---------------', className:'sep' },
-		{name:'Link to an External Image', key:'E', replaceWith:'![[![Alternative text]!]]([![Url:!:http://]!] "[![Title]!]")', className:'img'},
+		{separator:' ', className:'sep' },
+		{name:'Link to an External Image', replaceWith:'![[![Alternative text]!]]([![Url:!:http://]!] "[![Title]!]")', className:'img'},
 		{name:'Link', key:'L', openWith:'[', closeWith:']([![Url:!:http://]!] "[![Title]!]")', placeHolder:'Your text to link here...', className:'a' },
-		{separator:'---------------', className:'sep'},	
+		{separator:' ', className:'sep'},	
 		{name:'Quotes', openWith:'> ', className:'blockquote'},
 		{
 			name:'Code Format', 
@@ -45,7 +42,7 @@ var markitupMarkdownDefaults = {
 			placeHolder:'code',
 			className:'code'
 		},
-		{separator:'---------------'},
+		{separator:' '},
 		{name:'Preview', key: 'P', call:'preview', className:"preview"}
 	]
 }
@@ -59,12 +56,12 @@ var markitupParsedownDefaults = {
 	onShiftEnter:		{keepDefault:false, openWith:'\n\n'},
 	markupSet: [
 		{name:'Bold', key:'B', openWith:'**', closeWith:'**', className:'b'},
-		{name:'Italic', key:'I', openWith:'_', closeWith:'_', className:'i'},
+		{name:'Italic', openWith:'_', closeWith:'_', className:'i'},
 		{name:'Bulleted List', openWith:'- ', className:'ul' },
 		{name:'Numeric List', className:'ol', openWith:function(markItUp) {
 			return markItUp.line+'. ';
 		}},
-		{name:'Link to an External Image', key:'E', openWith:'![Image](', closeWith:')', placeHolder:'http://www.example.com/path/to/image.png', className:'img'},
+		{name:'Link to an External Image', openWith:'![Image](', closeWith:')', placeHolder:'http://www.example.com/path/to/image.png', className:'img'},
 		{name:'Link', key:'L', openWith:'[', closeWith:'](http://www.example.com/)', placeHolder:'link text', className:'a' },
 		{name:'Quotes', openWith:'> ', className:'blockquote'},
 		{
@@ -82,7 +79,7 @@ var markitupParsedownDefaults = {
 			placeHolder:'code',
 			className:'code'
 		},
-		{separator:'---------------'},
+		{separator:' '},
 		{name:'Preview', key: 'P', call:'preview', className:"preview"}
 	]
 }
@@ -97,26 +94,70 @@ var markitupHTMLDefaults = {
 		{name:'Heading 1', key:'1', openWith:'<h1(!( class="[![Class]!]")!)>', closeWith:'</h1>', placeHolder:'Your title here...', className:'h1' },
 		{name:'Heading 2', key:'2', openWith:'<h2(!( class="[![Class]!]")!)>', closeWith:'</h2>', placeHolder:'Your title here...', className:'h2' },
 		{name:'Heading 3', key:'3', openWith:'<h3(!( class="[![Class]!]")!)>', closeWith:'</h3>', placeHolder:'Your title here...', className:'h3' },
-		{name:'Heading 4', key:'4', openWith:'<h4(!( class="[![Class]!]")!)>', closeWith:'</h4>', placeHolder:'Your title here...', className:'h4' },
-		{name:'Heading 5', key:'5', openWith:'<h5(!( class="[![Class]!]")!)>', closeWith:'</h5>', placeHolder:'Your title here...', className:'h5' },
-		{name:'Heading 6', key:'6', openWith:'<h6(!( class="[![Class]!]")!)>', closeWith:'</h6>', placeHolder:'Your title here...', className:'h6' },
 		{name:'Paragraph', openWith:'<p(!( class="[![Class]!]")!)>', closeWith:'</p>', className:'p' },
-		{separator:'---------------', className:'sep' },
+		{separator:' ', className:'sep' },
 		{name:'Bold', key:'B', openWith:'(!(<strong>|!|<b>)!)', closeWith:'(!(</strong>|!|</b>)!)', className:'b' },
 		{name:'Italic', key:'I', openWith:'(!(<em>|!|<i>)!)', closeWith:'(!(</em>|!|</i>)!)', className:'i' },
 		{name:'Stroke through', key:'S', openWith:'<del>', closeWith:'</del>', className:'strike' },
-		{separator:'---------------', className:'sep' },
+		{separator:' ', className:'sep' },
 		{name:'Ul', openWith:'<ul>\n', closeWith:'</ul>\n', className:'ul' },
 		{name:'Ol', openWith:'<ol>\n', closeWith:'</ol>\n', className:'ol' },
 		{name:'Li', openWith:'<li>', closeWith:'</li>', className:'li' },
-		{separator:'---------------', className:'sep' },
-		{name:'Link to an External Image', key:'E', replaceWith:'<img src="[![Source:!:http://]!]" alt="[![Alternative text]!]" />', className:'img' },
+		{separator:' ', className:'sep' },
+		{name:'Link to an External Image', replaceWith:'<img src="[![Source:!:http://]!]" alt="[![Alternative text]!]" />', className:'img' },
 		{name:'Link', key:'L', openWith:'<a href="[![Link:!:http://]!]"(!( title="[![Title]!]")!)>', closeWith:'</a>', placeHolder:'Your text to link...', className:'a' },
-		{separator:'---------------', className:'sep' },
+		{separator:' ', className:'sep' },
 		{name:'Clean', className:'clean', replaceWith:function(markitup) { return markitup.selection.replace(/<(.*?)>/g, "") } },
 		{name:'Preview', key: 'P', className:'preview', call:'preview' }
 	]
-} 
+}
+
+var atwho_twig_commands = [
+	{ name: "{% if placeholder %}{% else %}{% endif %}", content: "If...else" },
+	{ name: "{% for placeholder in array %}\n{% endfor %}", content: "For loop" },
+	{ name: "{% set var = 'Value' %}", content: "Set temporary variable" },
+	{ name: "{% spaceless%}\n{% endspaceless %}\n", content: "Ignore whitespace" },
+];
+
+var atwho_twig_modifiers = [
+	{ name: "capitalize", content: "Capitalize text" },
+	{ name: "date('F d, Y')", content: "Format timestamp as a date" },
+	{ name: "date_pretty", content: "Format text as relative date" },
+	{ name: "default('text')", content: "Set a default value for an empty placeholder" },
+	{ name: "lower", content: "Convert text to lowercase" },
+	{ name: "secs_pretty", content: "Format a number of seconds as a time elapsed" },
+	{ name: "title", content: "Titlecase text by capitalizing each word" },
+	{ name: "upper", content: "Convert text to uppercase" },
+	
+	{ name: "abs", content: "Return the absolute value of a number" },
+	{ name: "bytes_pretty(2)", content: "Format a number as human-readable bytes" },
+	{ name: "date_modify('+1 day')", content: "Modify a date or timestamp" },
+	{ name: "escape", content: "Escape text for html, js, css, or url" },
+	{ name: "first", content: "Return the first element of an array or text" },
+	{ name: "format", content: "Replace %s in formatted text with placeholders" },
+	{ name: "join(',')", content: "Join array elements into one string" },
+	{ name: "json_encode", content: "Encode text as JSON" },
+	{ name: "json_pretty", content: "Prettify JSON formatted text" },
+	{ name: "keys", content: "Return the keys of an array" },
+	{ name: "last", content: "Return the last element of an array or text" },
+	{ name: "length", content: "Calculate the length of an array or text" },
+	{ name: "md5", content: "Convert text to an MD5 hash" },
+	{ name: "merge", content: "Merge multiple arrays together" },
+	{ name: "nl2br", content: "Convert newlines to HTML breaks" },
+	{ name: "nlp_parse(patterns)", content: "Parse natural language with patterns" },
+	{ name: "number_format(2, '.', ',')", content: "Format a number" },
+	{ name: "regexp", content: "Match a regular expression" },
+	{ name: "replace('this', 'that')", content: "Replace text" },
+	{ name: "reverse", content: "Reverse an array or text" },
+	{ name: "round(0, 'common')", content: "Round a number: common, ceil, floor" },
+	{ name: "slice", content: "Extract a slice of an array or text" },
+	{ name: "sort", content: "Sort an array" },
+	{ name: "split(',')", content: "Split text into an array by delimiter" },
+	{ name: "striptags", content: "Strip HTML/XML tags in text" },
+	{ name: "trim", content: "Trim whitespace or given characters from the ends of text" },
+	{ name: "truncate(10)", content: "Truncate text" },
+	{ name: "url_encode", content: "Encode an array or text for use in a URL" },
+];
 
 $.fn.cerbDateInputHelper = function(options) {
 	var options = (typeof options == 'object') ? options : {};
@@ -189,6 +230,7 @@ $.fn.cerbDateInputHelper = function(options) {
 		$this
 			.on('send', function(e) {
 				var $input_date = $(this);
+				var val = $input_date.val();
 				
 				if(!$input_date.is('.changed')) {
 					if(e.keydown_event_caller && e.keydown_event_caller.shiftKey && e.keydown_event_caller.ctrlKey && e.keydown_event_caller.which == 13)
@@ -200,7 +242,12 @@ $.fn.cerbDateInputHelper = function(options) {
 				
 				$input_date.autocomplete('close');
 				
-				genericAjaxGet('', 'c=internal&a=handleSectionAction&section=calendars&action=parseDateJson&date=' + encodeURIComponent($input_date.val()), function(json) {
+				// If the date contains any placeholders, don't auto-parse it
+				if(-1 != val.indexOf('{'))
+					return;
+				
+				// Send the text to the server for translation
+				genericAjaxGet('', 'c=internal&a=handleSectionAction&section=calendars&action=parseDateJson&date=' + encodeURIComponent(val), function(json) {
 					if(json == false) {
 						// [TODO] Color it red for failed, and display an error somewhere
 						$input_date.val('');
@@ -246,137 +293,13 @@ $.fn.cerbDateInputHelper = function(options) {
 };
 
 var cAjaxCalls = function() {
-	// [TODO] We don't really need all this
-	this.showBatchPanel = function(view_id, target) {
-		var viewForm = document.getElementById('viewForm'+view_id);
-		if(null == viewForm) return;
-		var elements = viewForm.elements['ticket_id[]'];
-		if(null == elements) return;
-
-		var len = elements.length;
-		var ids = new Array();
-
-		if(null == len && null != elements.value) {
-			ids[0] = elements.value;
-		} else {
-			for(var x=len-1;x>=0;x--) {
-				if(elements[x].checked) {
-					//frm.appendChild(elements[x]);
-					ids[ids.length] = elements[x].value;
-				}
-			}
-		}
-		
-		var ticket_ids = ids.join(','); // [TODO] Encode?
-		
-		genericAjaxPopup('peek','c=tickets&a=showBatchPanel&view_id=' + view_id + '&ids=' + ticket_ids, { my: 'top', at: 'top' }, false, '650');
-	}
-
-	// [TODO] This isn't necessary with *any* other bulk update panel
-	this.saveBatchPanel = function(view_id) {
-		var divName = 'view'+view_id;
-		var formName = 'viewForm'+view_id;
-		var viewForm = document.getElementById(formName);
-		if(null == viewForm) return;
-
-		var frm = document.getElementById('formBatchUpdate');
-		var elements = viewForm.elements['ticket_id[]'];
-		if(null == elements) return;
-		
-		var len = elements.length;
-		var ids = new Array();
-		
-		if(null == len && null != elements.value) {
-			ids[0] = elements.value;
-		} else {
-			for(var x=len-1;x>=0;x--) {
-				if(elements[x].checked) {
-					ids[ids.length] = elements[x].value;
-				}
-			}
-		}
-		
-		frm.ticket_ids.value = ids.join(',');
-
-		showLoadingPanel();
-
-		genericAjaxPost('formBatchUpdate', '', 'c=tickets&a=doBulkUpdate', function(html) {
-			$('#'+divName).html(html);
-
-			genericAjaxPopupClose('peek');
-			
-			hideLoadingPanel();
-		});
-	}
-
-	// [TODO] This is not necessary
-	this.showAddressBatchPanel = function(view_id,target) {
-		var viewForm = document.getElementById('viewForm'+view_id);
-		if(null == viewForm) return;
-		var elements = viewForm.elements['row_id[]'];
-		if(null == elements) return;
-
-		var len = elements.length;
-		var ids = new Array();
-
-		if(null == len && null != elements.value) {
-			ids[0] = elements.value;
-		} else {
-			for(var x=len-1;x>=0;x--) {
-				if(elements[x].checked) {
-					//frm.appendChild(elements[x]);
-					ids[ids.length] = elements[x].value;
-				}
-			}
-		}
-		
-		var row_ids = ids.join(','); // [TODO] Encode?
-	
-		genericAjaxPopup('bulk','c=contacts&a=showAddressBatchPanel&view_id=' + view_id + '&ids=' + row_ids, { my: 'top', at: 'top' }, false, '650');
-	}
-	
-	// [TODO] This is not necessary
-	this.saveAddressBatchPanel = function(view_id) {
-		var divName = 'view'+view_id;
-		var formName = 'viewForm'+view_id;
-		var viewDiv = document.getElementById(divName);
-		var viewForm = document.getElementById(formName);
-		if(null == viewForm || null == viewDiv) return;
-
-		var frm = document.getElementById('formBatchUpdate');
-
-		var elements = viewForm.elements['row_id[]'];
-		if(null == elements) return;
-		
-		var len = elements.length;
-		var ids = new Array();
-		
-		if(null == len && null != elements.value) {
-			ids[0] = elements.value;
-		} else {
-			for(var x=len-1;x>=0;x--) {
-				if(elements[x].checked) {
-					ids[ids.length] = elements[x].value;
-				}
-			}
-		}
-		
-		frm.address_ids.value = ids.join(',');
-
-		genericAjaxPost('formBatchUpdate', '', 'c=contacts&a=doAddressBatchUpdate', function(html) {
-			$('#'+divName).html(html);
-
-			genericAjaxPopupClose('bulk');
-		});
-	}
-
 	this.viewTicketsAction = function(view_id, action) {
 		var divName = 'view'+view_id;
 		var formName = 'viewForm'+view_id;
 
 		switch(action) {
 			case 'merge_popup':
-				$popup=genericAjaxPopup('merge','c=tickets&a=viewMergeTicketsPopup&view_id=' + view_id,null,true,'550');
+				genericAjaxPopup('merge','c=tickets&a=viewMergeTicketsPopup&view_id=' + view_id,null,true,'550');
 				break;
 			case 'merge':
 				showLoadingPanel();
@@ -440,9 +363,9 @@ var cAjaxCalls = function() {
 	}
 	
 	this.viewAddFilter = function(view_id, field, oper, values) {
-		$view = $('#view'+view_id);
+		var $view = $('#view'+view_id);
 		
-		post_str = 'c=internal' +
+		var post_str = 'c=internal' +
 			'&a=viewAddFilter' + 
 			'&id=' + view_id +
 			'&field=' + encodeURIComponent(field) +
@@ -450,8 +373,8 @@ var cAjaxCalls = function() {
 			'&' + $.param(values, true)  
 			;
 		
-		cb = function(o) {
-			$view_filters = $('#viewCustomFilters'+view_id);
+		var cb = function(o) {
+			var $view_filters = $('#viewCustomFilters'+view_id);
 			
 			if(0 != $view_filters.length) {
 				$view_filters.html(o);
@@ -459,7 +382,7 @@ var cAjaxCalls = function() {
 			}
 		}
 		
-		options = {};
+		var options = {};
 		options.type = 'POST';
 		options.data = post_str; //$('#'+formName).serialize();
 		options.url = DevblocksAppPath+'ajax.php';//+(null!=args?('?'+args):''),
@@ -470,9 +393,9 @@ var cAjaxCalls = function() {
 	}
 	
 	this.viewRemoveFilter = function(view_id, fields) {
-		$view = $('#view'+view_id);
+		var $view = $('#view'+view_id);
 		
-		post_str = 'c=internal' +
+		var post_str = 'c=internal' +
 			'&a=viewAddFilter' + 
 			'&id=' + view_id
 			;
@@ -482,7 +405,7 @@ var cAjaxCalls = function() {
 		}
 		
 		cb = function(o) {
-			$view_filters = $('#viewCustomFilters'+view_id);
+			var $view_filters = $('#viewCustomFilters'+view_id);
 			
 			if(0 != $view_filters.length) {
 				$view_filters.html(o);
@@ -490,7 +413,7 @@ var cAjaxCalls = function() {
 			}
 		}
 		
-		options = {};
+		var options = {};
 		options.type = 'POST';
 		options.data = post_str; //$('#'+formName).serialize();
 		options.url = DevblocksAppPath+'ajax.php';//+(null!=args?('?'+args):''),
@@ -611,28 +534,28 @@ var cAjaxCalls = function() {
 		if(null == options) 
 			options = { };
 		
-		$button = $(button);
+		var $button = $(button);
 
 		// The <ul> buffer
-		$ul = $button.siblings('ul.chooser-container');
+		var $ul = $button.siblings('ul.chooser-container');
 		
 		// Add the container if it doesn't exist
 		if(0==$ul.length) {
-			$ul = $('<ul class="bubbles chooser-container"></ul>');
+			var $ul = $('<ul class="bubbles chooser-container"></ul>');
 			$ul.insertAfter($button);
 		}
 		
 		// The chooser search button
 		$button.click(function(event) {
-			$button = $(this);
+			var $button = $(this);
 			var $ul = $(this).siblings('ul.chooser-container:first');
 			
-			$chooser=genericAjaxPopup('chooser' + new Date().getTime(),'c=internal&a=chooserOpen&context=' + context,null,true,'750');
+			var $chooser=genericAjaxPopup('chooser' + new Date().getTime(),'c=internal&a=chooserOpen&context=' + context,null,true,'750');
 			$chooser.one('chooser_save', function(event) {
 				// Add the labels
 				for(var idx in event.labels)
 					if(0==$ul.find('input:hidden[value="'+event.values[idx]+'"]').length) {
-						$li = $('<li>'+event.labels[idx]+'<input type="hidden" name="' + field_name + '[]" value="'+event.values[idx]+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
+						var $li = $('<li>'+event.labels[idx]+'<input type="hidden" name="' + field_name + '[]" value="'+event.values[idx]+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
 						if(null != options.style)
 							$li.addClass(options.style);
 						$ul.append($li);
@@ -647,7 +570,7 @@ var cAjaxCalls = function() {
 				options.autocomplete_class = ''; //'input_search';
 			}
 			
-			$autocomplete = $('<input type="text" class="'+options.autocomplete_class+'" size="45">');
+			var $autocomplete = $('<input type="text" class="'+options.autocomplete_class+'" size="45">');
 			$autocomplete.insertBefore($button);
 			
 			$autocomplete.autocomplete({
@@ -658,16 +581,15 @@ var cAjaxCalls = function() {
 				},
 				autoFocus:true,
 				select:function(event, ui) {
-					$this = $(this);
-					$label = ui.item.label;
-					$labelEscaped = $label.replace("<","&lt;");
-					$labelEscaped = $labelEscaped.replace(">","&gt;");
-					$value = ui.item.value;
-					$ul = $(this).siblings('button:first').siblings('ul.chooser-container:first');
+					var $this = $(this);
+					var $label = ui.item.label;
+					var $labelEscaped = $label.replace("<","&lt;").replace(">","&gt;");
+					var $value = ui.item.value;
+					var $ul = $this.siblings('button:first').siblings('ul.chooser-container:first');
 					
-					if($label.length > 0 && $value.length > 0) {
-						if(0==$ul.find('input:hidden[value="'+$value+'"]').length) {
-							$li = $('<li>'+$labelEscaped+'<input type="hidden" name="' + field_name + '[]" title="'+$labelEscaped+'" value="'+$value+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
+					if(undefined != $labelEscaped && undefined != $value) {
+						if(0 == $ul.find('input:hidden[value="'+$value+'"]').length) {
+							var $li = $('<li>'+$labelEscaped+'<input type="hidden" name="' + field_name + '[]" title="'+$labelEscaped+'" value="'+$value+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
 							$ul.append($li);
 						}
 					}
@@ -680,11 +602,11 @@ var cAjaxCalls = function() {
 	}
 	
 	this.chooserSnippet = function(layer, $textarea, contexts) {
-		ctx = [];
+		var ctx = [];
 		for(x in contexts)
 			ctx.push(x + ":" + contexts[x]);
 		
-		$chooser=genericAjaxPopup(layer,'c=internal&a=chooserOpenSnippet&context=cerberusweb.contexts.snippet&contexts=' + ctx.join(','),null,false,'600');
+		var $chooser=genericAjaxPopup(layer,'c=internal&a=chooserOpenSnippet&context=cerberusweb.contexts.snippet&contexts=' + ctx.join(','),null,false,'600');
 		$chooser.bind('snippet_select', function(event) {
 			event.stopPropagation();
 			
@@ -695,16 +617,16 @@ var cAjaxCalls = function() {
 				return;
 			
 			// Now we need to read in each snippet as either 'raw' or 'parsed' via Ajax
-			url = 'c=internal&a=snippetPaste&id='+encodeURIComponent(snippet_id);
+			var url = 'c=internal&a=snippetPaste&id='+encodeURIComponent(snippet_id);
 			
 			// Context-dependent arguments
 			if(null != contexts[context])
 				url += "&context_id=" + encodeURIComponent(contexts[context]);
 			
 			// Ajax the content (synchronously)
-			genericAjaxGet('',url,function(txt) {
-				if(txt.match(/\(__(.*?)__\)/)) {
-					var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&text=' + encodeURIComponent(txt),null,false,'600');
+			genericAjaxGet('',url,function(json) {
+				if(json.has_custom_placeholders) {
+					var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&id=' + encodeURIComponent(json.id) + '&context_id=' + encodeURIComponent(json.context_id),null,false,'600');
 					
 					$popup_paste.bind('snippet_paste', function(event) {
 						if(null == event.text)
@@ -714,7 +636,7 @@ var cAjaxCalls = function() {
 					});
 					
 				} else {
-					$textarea.insertAtCursor(txt).focus();
+					$textarea.insertAtCursor(json.text).focus();
 				}
 				
 			}, { async: false });
@@ -728,25 +650,26 @@ var cAjaxCalls = function() {
 		if(null == options) 
 			options = { };
 		
-		$button = $(button);
+		var $button = $(button);
 
 		// The <ul> buffer
-		$ul = $button.next('ul.chooser-container');
+		var $ul = $button.next('ul.chooser-container');
 		
 		if(null == options.single)
 			options.single = false;
 		
 		// Add the container if it doesn't exist
 		if(0==$ul.length) {
-			$ul = $('<ul class="bubbles chooser-container"></ul>');
+			var $ul = $('<ul class="bubbles chooser-container"></ul>');
 			$ul.insertAfter($button);
 		}
 		
 		// The chooser search button
 		$button.click(function(event) {
-			$button = $(this);
-			$ul = $(this).nextAll('ul.chooser-container:first');
-			$chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=' + (options.single ? '1' : '0'),null,true,'750');
+			var $button = $(button);
+			var $ul = $button.nextAll('ul.chooser-container:first');
+			var $chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=' + (options.single ? '1' : '0'),null,true,'750');
+			
 			$chooser.one('chooser_save', function(event) {
 				// If in single-selection mode
 				if(options.single)
@@ -755,7 +678,7 @@ var cAjaxCalls = function() {
 				// Add the labels
 				for(var idx in event.labels)
 					if(0==$ul.find('input:hidden[value="'+event.values[idx]+'"]').length) {
-						$li = $('<li>'+event.labels[idx]+'<input type="hidden" name="' + field_name + (options.single ? '' : '[]') + '" value="'+event.values[idx]+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
+						var $li = $('<li>'+event.labels[idx]+'<input type="hidden" name="' + field_name + (options.single ? '' : '[]') + '" value="'+event.values[idx]+'"><a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>');
 						if(null != options.style)
 							$li.addClass(options.style);
 						$ul.append($li);

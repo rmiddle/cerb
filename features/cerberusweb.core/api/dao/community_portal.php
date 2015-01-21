@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_CommunityTool extends Cerb_ORMHelper {
@@ -259,12 +259,8 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_CommunityTool::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -301,9 +297,9 @@ class SearchFields_CommunityTool implements IDevblocksSearchFields {
 		
 		$columns = array(
 			SearchFields_CommunityTool::ID => new DevblocksSearchField(SearchFields_CommunityTool::ID, 'ct', 'id', $translate->_('common.id'), null),
-			SearchFields_CommunityTool::NAME => new DevblocksSearchField(SearchFields_CommunityTool::NAME, 'ct', 'name', $translate->_('community_portal.name'), Model_CustomField::TYPE_SINGLE_LINE),
+			SearchFields_CommunityTool::NAME => new DevblocksSearchField(SearchFields_CommunityTool::NAME, 'ct', 'name', $translate->_('common.name'), Model_CustomField::TYPE_SINGLE_LINE),
 			SearchFields_CommunityTool::CODE => new DevblocksSearchField(SearchFields_CommunityTool::CODE, 'ct', 'code', $translate->_('community_portal.code'), Model_CustomField::TYPE_SINGLE_LINE),
-			SearchFields_CommunityTool::EXTENSION_ID => new DevblocksSearchField(SearchFields_CommunityTool::EXTENSION_ID, 'ct', 'extension_id', $translate->_('community_portal.extension_id')),
+			SearchFields_CommunityTool::EXTENSION_ID => new DevblocksSearchField(SearchFields_CommunityTool::EXTENSION_ID, 'ct', 'extension_id', $translate->_('common.extension')),
 		);
 		
 		// Custom fields with fieldsets
@@ -542,7 +538,7 @@ class Model_CommunitySession {
 	}
 };
 
-class View_CommunityPortal extends C4_AbstractView {
+class View_CommunityPortal extends C4_AbstractView implements IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'community_portals';
 	const DEFAULT_TITLE = 'Community Portals';
 
@@ -588,6 +584,50 @@ class View_CommunityPortal extends C4_AbstractView {
 	
 	function getDataSample($size) {
 		return $this->_doGetDataSample('DAO_CommunityTool', $size);
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CommunityTool::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CommunityTool::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'portal' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_CommunityTool::CODE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+		);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 
 	function render() {

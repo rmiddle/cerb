@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -48,7 +48,10 @@
  */
 
 if(version_compare(PHP_VERSION, "5.3", "<"))
-	die("Cerb6 requires PHP 5.3 or later.");
+	die("Cerb requires PHP 5.3 or later.");
+
+if(!extension_loaded('mysqli'))
+	die("Cerb requires the 'mysqli' PHP extension.  Please enable it.");
 
 require(getcwd() . '/framework.config.php');
 require(DEVBLOCKS_PATH . 'Devblocks.class.php');
@@ -70,9 +73,10 @@ DevblocksPlatform::init();
 DevblocksPlatform::setExtensionDelegate('Cerb_DevblocksExtensionDelegate');
 DevblocksPlatform::setHandlerSession('Cerb_DevblocksSessionHandler');
 
+$request = DevblocksPlatform::readRequest();
+
 // Do we need an update first?
 if(!DevblocksPlatform::versionConsistencyCheck()) {
-	$request = DevblocksPlatform::readRequest();
 	if(0 != strcasecmp(@$request->path[0],"update")) {
 		DevblocksPlatform::redirect(new DevblocksHttpResponse(array('update','locked')));
 		exit;
@@ -81,20 +85,15 @@ if(!DevblocksPlatform::versionConsistencyCheck()) {
 
 // Request
 
-$request = DevblocksPlatform::readRequest();
 $session = DevblocksPlatform::getSessionService();
 
 // Localization
 
-DevblocksPlatform::setLocale((isset($_SESSION['locale']) && !empty($_SESSION['locale'])) ? $_SESSION['locale'] : 'en_US');
-if(isset($_SESSION['timezone'])) @date_default_timezone_set($_SESSION['timezone']);
-
 DevblocksPlatform::setDateTimeFormat(DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::TIME_FORMAT, CerberusSettingsDefaults::TIME_FORMAT));
 
-if(null != ($active_worker = CerberusApplication::getActiveWorker())) {
-	if(null != ($time_format = DAO_WorkerPref::get($active_worker->id, 'time_format', null)))
-		DevblocksPlatform::setDateTimeFormat($time_format);
-}
+DevblocksPlatform::setLocale((isset($_SESSION['locale']) && !empty($_SESSION['locale'])) ? $_SESSION['locale'] : 'en_US');
+if(isset($_SESSION['timezone'])) @date_default_timezone_set($_SESSION['timezone']);
+if(isset($_SESSION['time_format'])) DevblocksPlatform::setDateTimeFormat($_SESSION['time_format']);
 
 // Initialize Logging
 

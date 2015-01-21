@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_ProfilesCalendarRecurringProfile extends Extension_PageSection {
@@ -51,8 +51,9 @@ class PageSection_ProfilesCalendarRecurringProfile extends Extension_PageSection
 			
 		$properties['calendar_id'] = array(
 			'label' => ucfirst($translate->_('common.calendar')),
-			'type' => null,
-			'value' => DAO_Calendar::get($calendar_recurring_profile->calendar_id),
+			'type' => Model_CustomField::TYPE_LINK,
+			'params' => array('context' => CerberusContexts::CONTEXT_CALENDAR),
+			'value' => $calendar_recurring_profile->calendar_id,
 		);
 		
 		$properties['event_start'] = array(
@@ -111,6 +112,32 @@ class PageSection_ProfilesCalendarRecurringProfile extends Extension_PageSection
 
 		$properties_custom_fieldsets = Page_Profiles::getProfilePropertiesCustomFieldsets(CerberusContexts::CONTEXT_CALENDAR_EVENT_RECURRING, $calendar_recurring_profile->id, $values);
 		$tpl->assign('properties_custom_fieldsets', $properties_custom_fieldsets);
+		
+		// Link counts
+		
+		$properties_links = array(
+			CerberusContexts::CONTEXT_CALENDAR_EVENT_RECURRING => array(
+				$calendar_recurring_profile->id => 
+					DAO_ContextLink::getContextLinkCounts(
+						CerberusContexts::CONTEXT_CALENDAR_EVENT_RECURRING,
+						$calendar_recurring_profile->id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			),
+		);
+		
+		if(isset($calendar_recurring_profile->calendar_id)) {
+			$properties_links[CerberusContexts::CONTEXT_CALENDAR] = array(
+				$calendar_recurring_profile->calendar_id => 
+					DAO_ContextLink::getContextLinkCounts(
+						CerberusContexts::CONTEXT_CALENDAR,
+						$calendar_recurring_profile->calendar_id,
+						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+					),
+			);
+		}
+		
+		$tpl->assign('properties_links', $properties_links);
 		
 		// Properties
 		
@@ -176,7 +203,9 @@ class PageSection_ProfilesCalendarRecurringProfile extends Extension_PageSection
 					DAO_CalendarRecurringProfile::IS_AVAILABLE => $is_available ? 1 : 0,
 					DAO_CalendarRecurringProfile::PATTERNS => $patterns,
 				);
-				$id = DAO_CalendarRecurringProfile::create($fields);
+				
+				if(false == ($id = DAO_CalendarRecurringProfile::create($fields)))
+					return false;
 				
 				// Context Link (if given)
 				@$link_context = DevblocksPlatform::importGPC($_REQUEST['link_context'],'string','');

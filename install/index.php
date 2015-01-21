@@ -12,11 +12,14 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 if(version_compare(PHP_VERSION, "5.3", "<"))
-	die("Cerb6 requires PHP 5.3 or later.");
+	die("Cerb requires PHP 5.3 or later.");
+
+if(!extension_loaded('mysqli'))
+	die("Cerb requires the 'mysqli' PHP extension.  Please enable it.");
 
 @set_time_limit(3600); // 1hr
 require('../framework.config.php');
@@ -791,7 +794,7 @@ switch($step) {
 					$message = new CerberusParserMessage();
 						$message->headers['from'] = '"Webgroup Media, LLC." <support@webgroupmedia.com>';
 						$message->headers['to'] = $replyto_default->email;
-						$message->headers['subject'] = "Welcome to Cerb6!";
+						$message->headers['subject'] = "Welcome to Cerb!";
 						$message->headers['date'] = date('r');
 						$message->headers['message-id'] = CerberusApplication::generateMessageId();
 						$message->body = <<< EOF
@@ -812,7 +815,7 @@ For project news, training resources, sneak peeks of development progress, tips 
 http://www.facebook.com/cerbapp
 http://twitter.com/cerb6
 https://vimeo.com/channels/cerb
-http://cerberusweb.com/book/6.0/worker_guide/
+http://cerbweb.com/book/latest/worker_guide/
 
 Thanks!
 ---

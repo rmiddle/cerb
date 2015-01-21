@@ -1,3 +1,12 @@
+{if !$page->isWriteableByWorker($active_worker) && empty($page_tabs)}
+	<div class="help-box" style="padding:5px;border:0;">
+		<h1 style="margin-bottom:5px;text-align:left;">This workspace is empty</h1>
+		
+		<p>
+			This page has no content, and you don't have permission to modify it.  You'll have to wait until someone else adds something.
+		</p>
+	</div>
+{else}
 <div id="pageTabs">
 	<ul>
 		{$tabs = []}
@@ -12,6 +21,7 @@
 		{/if}
 	</ul>
 </div>
+{/if}
 	
 <div style="margin-top:10px;">
 	{include file="devblocks:cerberusweb.core::internal/whos_online.tpl"}
@@ -62,16 +72,13 @@
 		// Keyboard shortcuts
 		
 		$(document).keypress(function(event) {
-			//console.log(event.which);
-			
-			is_control_character = (event.which == 9 || event.which == 10 || event.which == 13 || event.which == 32);
+			var is_control_character = (event.which == 9 || event.which == 10 || event.which == 13 || event.which == 32);
 			
 			if($(event.target).is('button') && is_control_character)
 				return;
 				
 			if($(event.target).is(':input') && !$(event.target).is('button'))
 				return;
-			
 			
 			// Allow these special keys
 			switch(event.which) {
@@ -93,17 +100,17 @@
 				return;
 			
 			// Which tab is selected?
-			tab_id = $tabs.tabs('option','active') + 1;
+			var tab_id = $tabs.tabs('option','active');
 			
 			// Find the worklists on this tab
-			$worklists = $('#ui-tabs-' + tab_id).find('TABLE.worklistBody').closest('FORM');
-			$worklist = $('');
+			var $worklists = $tabs.find('div.ui-tabs-panel').eq(tab_id).find('TABLE.worklistBody').closest('FORM');
+			var $worklist = $('');
 			
 			// Are we confident about the user's intentions with this keystroke?
 			indirect = true; // by default, we're not
 			
 			// Try to find a selected row in the worklists
-			$selected_row = $worklists.find('TABLE.worklistBody > TBODY > TR.selected').first();
+			var $selected_row = $worklists.find('TABLE.worklistBody > TBODY > TR.selected').first();
 
 			if($selected_row.length > 0) {
 				$worklist = $selected_row.closest('form');
@@ -120,19 +127,18 @@
 					
 				} else {
 					// Otherwise, just focus the first worklist
-					// [TODO] alternate
 					$worklist = $worklists.first();
 				}
 			}
 			
 			if($worklist.length > 0) {
 				$worklist.each(function(e) {
-					view_id = $(this).find('input:hidden[name=view_id]').val();
-					$view = $('#viewForm' + view_id);
+					var view_id = $(this).find('input:hidden[name=view_id]').val();
+					var $view = $('#viewForm' + view_id);
 					
 					// Intercept global worklist keys
 					
-					hotkey_activated = true;
+					var hotkey_activated = true;
 					
 					switch(event.which) {
 						case 42: // (*) reset filters
@@ -176,7 +182,7 @@
 					
 					if($view.length > 0) {
 						// Trigger event
-						e = jQuery.Event('keyboard_shortcut');
+						var e = jQuery.Event('keyboard_shortcut');
 						e.view_id = view_id;
 						e.indirect = indirect;
 						e.keypress_event = event;

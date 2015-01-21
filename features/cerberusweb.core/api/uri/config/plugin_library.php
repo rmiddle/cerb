@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class PageSection_SetupPluginLibrary extends Extension_PageSection {
@@ -63,6 +63,10 @@ class PageSection_SetupPluginLibrary extends Extension_PageSection {
 		if(isset($results['updated']) && !empty($results['upated'])) {
 			try {
 				CerberusApplication::update();
+				
+				$schema = Extension_DevblocksSearchSchema::get(Search_PluginLibrary::ID);
+				$schema->reindex();
+				$schema->index(time() + 30);
 				
 			} catch (Exception $e) {}
 	

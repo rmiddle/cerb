@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class Event_MailReceivedByApp extends Extension_DevblocksEvent {
@@ -147,7 +147,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		$vars = parent::getValuesContexts($trigger);
 		
 		$vals_to_ctx = array_merge($vals, $vars);
-		asort($vals_to_ctx);
+		DevblocksPlatform::sortObjects($vals_to_ctx, '[label]');
 		
 		return $vals_to_ctx;
 	}
@@ -183,14 +183,14 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		return $conditions;
 	}
 	
-	function renderConditionExtension($token, $trigger, $params=array(), $seq=null) {
+	function renderConditionExtension($token, $as_token, $trigger, $params=array(), $seq=null) {
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('params', $params);
 
 		if(!is_null($seq))
 			$tpl->assign('namePrefix','condition'.$seq);
 		
-		switch($token) {
+		switch($as_token) {
 			// [TODO] Internalize
 			case 'header':
 				$tpl->display('devblocks:cerberusweb.core::events/mail_received_by_group/condition_header.tpl');
@@ -204,10 +204,10 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		$tpl->clearAssign('params');
 	}
 	
-	function runConditionExtension($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
+	function runConditionExtension($token, $as_token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
 		$pass = true;
 		
-		switch($token) {
+		switch($as_token) {
 			case 'attachment_name':
 			case 'attachment_mimetype':
 				$not = (substr($params['oper'],0,1) == '!');
@@ -221,7 +221,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 					if($found)
 						continue;
 						
-					switch($token) {
+					switch($as_token) {
 						case 'attachment_name':
 							$value = $attachment_name;
 							break;
@@ -774,7 +774,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			case 'set_header':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 				
-				$header = $tpl_builder->build($params['header'], $dict);
+				$header = strtolower($tpl_builder->build($params['header'], $dict));
 				$value = $tpl_builder->build($params['value'], $dict);
 				
 				@$parser_model = $dict->_parser_model;
@@ -790,7 +790,11 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 				} else {
 					$headers[$header] = $value;
 				}
-					
+				
+				// Are we changing any threading headers?
+				if(in_array(strtolower($header), array('subject', 'in-reply-to', 'references')))
+					$dict->pre_actions['headers_dirty'] = true;
+				
 				break;
 				
 			case 'set_sender_is_banned':

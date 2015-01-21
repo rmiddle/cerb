@@ -139,6 +139,7 @@ class DevblocksPlatform extends DevblocksEngine {
 				$value = floatval($value);
 				break;
 				
+			case 'int':
 			case 'integer':
 				$value = intval($value);
 				break;
@@ -242,18 +243,28 @@ class DevblocksPlatform extends DevblocksEngine {
 		return FALSE;
 	}
 	
-	static function parseCrlfString($string, $keep_blanks=false) {
+	static function parseCrlfString($string, $keep_blanks=false, $trim_lines=true) {
 		$string = str_replace("\r\n","\n",$string);
 		$parts = preg_split("/[\r\n]/", $string);
 		
 		// Remove any empty tokens
 		foreach($parts as $idx => $part) {
-			$parts[$idx] = trim($part);
+			$parts[$idx] = $trim_lines ? trim($part) : $part;
 			if(!$keep_blanks && 0 == strlen($parts[$idx]))
 				unset($parts[$idx]);
 		}
 		
 		return $parts;
+	}
+	
+	static function parseAtMentionString($string) {
+		//$string = "@Hildy Do you have time for this today?  If not, ask @Jeff, or @Darren.";
+		preg_match_all('#(\@[A-Za-z0-9_]+)([^A-Za-z0-9_]|$)#', $string, $matches);
+		
+		if(is_array($matches) && isset($matches[1]))
+			return $matches[1];
+		
+		return false;
 	}
 	
 	static function intVersionToStr($version, $sections=3) {
@@ -288,6 +299,38 @@ class DevblocksPlatform extends DevblocksEngine {
 	}
 	
 	/**
+	 * 
+	 * @param string $a
+	 * @param string $b
+	 * @param string $oper
+	 * @return bool
+	 */
+	public static function compareStrings($a, $b, $oper) {
+		@$not = (substr($oper, 0, 1) == '!');
+		@$oper = ltrim($oper, '!');
+		
+		$pass = false;
+		
+		switch($oper) {
+			case 'is':
+				$pass = (0==strcasecmp($a, $b));
+				break;
+			case 'like':
+				$regexp = DevblocksPlatform::strToRegExp($b);
+				$pass = @preg_match($regexp, $a);
+				break;
+			case 'contains':
+				$pass = (false !== stripos($a, $b)) ? true : false;
+				break;
+			case 'regexp':
+				$pass = @preg_match($b, $a);
+				break;
+		}
+		
+		return ($not) ? !$pass : $pass;;
+	}
+	
+	/**
 	 * Return a string as a regular expression, parsing * into a non-greedy
 	 * wildcard, etc.
 	 *
@@ -310,8 +353,8 @@ class DevblocksPlatform extends DevblocksEngine {
 	 * @param string $arg
 	 * @return string
 	 */
-	static function strAlphaNum($arg, $also=null) {
-		return preg_replace("/[^A-Z0-9" . $also . "]/i","", $arg);
+	static function strAlphaNum($arg, $also=null, $replace="") {
+		return preg_replace("/[^A-Z0-9" . $also . "]/i", $replace, $arg);
 	}
 	
 	static function strUnidecode($string, $from_encoding = 'utf-8') {
@@ -416,6 +459,40 @@ class DevblocksPlatform extends DevblocksEngine {
 	
 	static function stripHTML($str, $strip_whitespace=true, $skip_blockquotes=false) {
 		
+		// Pre-process some HTML entities that confuse UTF-8
+		
+		$str = str_ireplace(
+			array(
+				'&rsquo;',     // '
+				'&#8217;',
+				'&#x2019;',
+				'&hellip;',    // ...
+				'&#8230;',
+				'&#x2026;',
+				'&ldquo;',     // "
+				'&#8220;',
+				'&#x201c;',
+				'&rdquo;',     // "
+				'&#8221;',
+				'&#x201d;',
+			),
+			array(
+				"'",
+				"'",
+				"'",
+				'...',
+				'...',
+				'...',
+				'"',
+				'"',
+				'"',
+				'"',
+				'"',
+				'"',
+			),
+			$str
+		);
+		
 		// Pre-process blockquotes
 		if(!$skip_blockquotes) {
 			$dom = new DOMDocument('1.0', LANG_CHARSET_CODE);
@@ -425,7 +502,7 @@ class DevblocksPlatform extends DevblocksEngine {
 			
 			libxml_use_internal_errors(true);
 			
-			$dom->loadHTML(sprintf('<?xml encoding="%s">', LANG_CHARSET_CODE) . $str);
+			$dom->loadHTML(sprintf('<?xml version="1.0" encoding="%s">', LANG_CHARSET_CODE) . $str);
 			
 			$errors = libxml_get_errors();
 			libxml_clear_errors();
@@ -467,6 +544,45 @@ class DevblocksPlatform extends DevblocksEngine {
 			}
 		}
 		
+		// Convert hyperlinks to plaintext
+		
+		$str = preg_replace_callback(
+			'@<a[^>]*?>(.*?)</a>@si',
+			function($matches) {
+				if(!isset($matches[0]))
+					return false;
+				
+				$out = '';
+				
+				if(false == ($dom = simplexml_load_string($matches[0])))
+					return false;
+				
+				@$href_link = $dom['href'];
+				@$href_label = (string) $dom;
+				
+				// Skip if there is no label text (images, etc)
+				if(empty($href_label)) {
+					$out = null;
+					
+				// If the link and label are the same, ignore label
+				} elseif($href_label == $href_link) {
+					$out = $href_link;
+					
+				// Otherwise, format like Markdown
+				} else {
+					$out = sprintf("[%s](%s)",
+						$href_label,
+						$href_link
+					);
+				}
+				
+				return $out;
+			},
+			$str
+		);
+		
+		// Code blocks to plaintext
+		
 		$str = preg_replace_callback(
 			'@<code[^>]*?>(.*?)</code>@si',
 			function($matches) {
@@ -478,6 +594,8 @@ class DevblocksPlatform extends DevblocksEngine {
 			},
 			$str
 		);
+		
+		// Preformatted blocks to plaintext
 		
 		$str = preg_replace_callback(
 			'#<pre.*?/pre\>#si',
@@ -647,16 +765,11 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $purifier->purify($dirty_html);
 	}
 	
-	static function parseMarkdown($text, $use_parsedown=false) {
-		if($use_parsedown) {
-			$parser = new Parsedown();
-			$parser->set_breaks_enabled(true);
-			return $parser->parse($text);
-			
-		} else {
-			$parser = new markdown();
-			return $parser->parse($text);
-		}
+	static function parseMarkdown($text) {
+		$parser = new Parsedown();
+		$parser->setBreaksEnabled(true);
+		$parser->setMarkupEscaped(false);
+		return $parser->parse($text);
 	}
 	
 	static function parseRss($url) {
@@ -1017,6 +1130,43 @@ class DevblocksPlatform extends DevblocksEngine {
 		return $tokens;
 	}
 	
+	static function formatNumberAs($number, $as) {
+		$label = $number;
+		
+		switch($as) {
+			case 'bytes':
+				$label = DevblocksPlatform::strPrettyBytes(intval($number));
+				break;
+				
+			case 'seconds':
+				$label = DevblocksPlatform::strSecsToString(intval($number));
+				break;
+				
+			case 'minutes':
+				$label = DevblocksPlatform::strSecsToString(intval($number) * 60);
+				break;
+				
+			case 'number':
+				$label = number_format($number, 0);
+				break;
+				
+			case 'decimal':
+				$label = number_format($number, 2);
+				break;
+			
+			case 'percent':
+				$label = number_format($number) . '%';
+				break;
+			
+			// [TODO] Currency
+				
+			default:
+				break;
+		}
+		
+		return $label;
+	}
+	
 	/**
 	 * Indents a flat JSON string to make it more human-readable.
 	 *
@@ -1216,8 +1366,8 @@ class DevblocksPlatform extends DevblocksEngine {
 	 * @return boolean
 	 */
 	static function isDatabaseEmpty() {
-		$tables = self::getDatabaseTables();
-		return empty($tables);
+		$db = DevblocksPlatform::getDatabaseService();
+		return $db->isEmpty();
 	}
 	
 	static function getDatabaseTables($nocache=false) {
@@ -1534,7 +1684,8 @@ class DevblocksPlatform extends DevblocksEngine {
 			return $plugins;
 
 		$db = DevblocksPlatform::getDatabaseService();
-		if(is_null($db))
+		
+		if(is_null($db) || !$db->isConnected() || $db->isEmpty())
 			return;
 
 		$plugins = array();
@@ -1748,6 +1899,13 @@ class DevblocksPlatform extends DevblocksEngine {
 	}
 
 	/**
+	 * @return _DevblocksNaturalLanguageManager
+	 */
+	static function getNaturalLanguageService() {
+		return _DevblocksNaturalLanguageManager::getInstance();
+	}
+	
+	/**
 	 * @return _DevblocksUrlManager
 	 */
 	static function getUrlService() {
@@ -1819,6 +1977,7 @@ class DevblocksPlatform extends DevblocksEngine {
 				return $array;
 				break;
 				
+			case 'int':
 			case 'integer':
 				$array = _DevblocksSanitizationManager::arrayAs($array, 'integer');
 				
@@ -2108,7 +2267,9 @@ class DevblocksPlatform extends DevblocksEngine {
 	static function shutdown() {
 		// Trigger changed context events
 		Extension_DevblocksContext::shutdownTriggerChangedContextsEvents();
-		CerberusContexts::shutdown();
+		
+		if(class_exists('CerberusContexts'))
+			CerberusContexts::shutdown();
 		
 		// Clean up any temporary files
 		while(null != ($tmpfile = array_pop(self::$_tmp_files))) {

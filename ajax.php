@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 /*
  * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
@@ -64,10 +64,11 @@ $worker = CerberusApplication::getActiveWorker();
 
 // Localization
 
+DevblocksPlatform::setDateTimeFormat(DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::TIME_FORMAT, CerberusSettingsDefaults::TIME_FORMAT));
+
 DevblocksPlatform::setLocale((isset($_SESSION['locale']) && !empty($_SESSION['locale'])) ? $_SESSION['locale'] : 'en_US');
 if(isset($_SESSION['timezone'])) @date_default_timezone_set($_SESSION['timezone']);
-
-DevblocksPlatform::setDateTimeFormat(DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::TIME_FORMAT, CerberusSettingsDefaults::TIME_FORMAT));
+if(isset($_SESSION['time_format'])) DevblocksPlatform::setDateTimeFormat($_SESSION['time_format']);
 
 // Scope
 
@@ -84,9 +85,6 @@ if(!empty($worker)) {
 	
 	$keyboard_shortcuts = intval(DAO_WorkerPref::get($worker->id,'keyboard_shortcuts', 1));
 	$tpl->assign('pref_keyboard_shortcuts', $keyboard_shortcuts);
-
-	if(null != ($time_format = DAO_WorkerPref::get($worker->id, 'time_format', null)))
-		DevblocksPlatform::setDateTimeFormat($time_format);
 }
 
 CerberusApplication::processRequest($request,true);

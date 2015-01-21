@@ -11,7 +11,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 $.fn.extend({
 	devblocksCharts : function(type, options) {
@@ -28,7 +28,7 @@ $.fn.extend({
 				
 			} else if(null != e.originalEvent && undefined != e.originalEvent.layerX) {
 				pos.x = e.originalEvent.layerX;
-				posy = e.originalEvent.layerY;
+				pos.y = e.originalEvent.layerY;
 			}
 			
 			return pos;

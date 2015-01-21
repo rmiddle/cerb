@@ -214,7 +214,7 @@ abstract class DevblocksORMHelper {
 						$tables[$fields[$p->field]->db_table] = $fields[$p->field]->db_table;
 						$group_wheres[] = $p->getWhereSQL($fields);
 						
-						$where = sprintf("(%s)",
+						$where = sprintf("%s",
 							implode(" $group_oper ", $group_wheres)
 						);
 					}
@@ -223,16 +223,14 @@ abstract class DevblocksORMHelper {
 				break;
 		}
 		
-		if(!empty($outer_wheres)) {
-			return sprintf("(%s)",
-				implode(" $group_oper ", $outer_wheres)
-			);
-			
-		} else {
-			return $where;
-			
-		}
+		if(!empty($where))
+			$outer_wheres[] = $where;
 		
+		$sql = sprintf("(%s)",
+			implode(" $group_oper ", $outer_wheres)
+		);
+		
+		return $sql;
 	}
 };
 
@@ -437,10 +435,15 @@ class DAO_DevblocksSetting extends DevblocksORMHelper {
 	
 	// This doesn't need to cache because it's handled by the platform
 	static function getSettings($plugin_id) {
+		$tables = DevblocksPlatform::getDatabaseTables();
+		
 		if(false == ($db = DevblocksPlatform::getDatabaseService()))
 			return;
 		
 		$settings = array();
+		
+		if(!isset($tables['devblocks_setting']))
+			return $settings;
 		
 		$results = $db->GetArray(sprintf("SELECT setting, value FROM devblocks_setting WHERE plugin_id = %s",
 			$db->qstr($plugin_id)
@@ -743,12 +746,8 @@ class DAO_DevblocksTemplate extends DevblocksORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_DevblocksTemplate::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -1179,12 +1178,8 @@ class DAO_Translation extends DevblocksORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$id = intval($row[SearchFields_Translation::ID]);
-			$results[$id] = $result;
+			$results[$id] = $row;
 		}
 
 		$total = count($results);
@@ -1499,12 +1494,8 @@ class DAO_DevblocksStorageProfile extends DevblocksORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_DevblocksStorageProfile::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);

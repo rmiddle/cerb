@@ -170,6 +170,12 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 	}
 	
 	private function _getDataSeries(Model_WorkspaceWidget $widget, array $params=array(), $params_prefix=null) {
+		$date = DevblocksPlatform::getDateService();
+		$db = DevblocksPlatform::getDatabaseService();
+		
+		// Use the worker's timezone for MySQL date functions
+		$db->Execute(sprintf("SET time_zone = %s", $db->qstr($date->formatTime('P', time()))));
+		
 		$series_idx = $this->_getSeriesIdxFromPrefix($params_prefix);
 		
 		$view_id = sprintf("widget%d_worklist%s",
@@ -198,8 +204,6 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 		$view->renderPage = 0;
 		$view->renderLimit = 30;
 			
-		$db = DevblocksPlatform::getDatabaseService();
-
 		// Initial query planner
 		
 		$query_parts = $dao_class::getSearchQueryComponents(
@@ -529,11 +533,14 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 					foreach($results as $result) {
 						$x = ($params['xaxis_field'] == '_id') ? $counter++ : (float)$result['xaxis'];
 
+						$xaxis_label = DevblocksPlatform::formatNumberAs((float)$result['xaxis'], @$params['xaxis_format']);
+						$yaxis_label = DevblocksPlatform::formatNumberAs((float)$result['yaxis'], @$params['yaxis_format']);
+						
 						$data[] = array(
 							'x' => $x,
 							'y' => (float)$result['yaxis'],
-							'x_label' => (float)$result['xaxis'],
-							'y_label' => (float)$result['yaxis'],
+							'x_label' => $xaxis_label,
+							'y_label' => $yaxis_label,
 						);
 					}
 

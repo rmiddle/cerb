@@ -12,7 +12,7 @@
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+ |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
 if(class_exists('Extension_PageSection')):
@@ -391,12 +391,12 @@ class WorkspaceTab_Dashboards extends Extension_WorkspaceTab {
 		// Get by workspace tab
 		// [TODO] Cache
 		$widgets = DAO_WorkspaceWidget::getWhere(
-				sprintf("%s = %d",
-					DAO_WorkspaceWidget::WORKSPACE_TAB_ID,
-					$tab->id
-				),
-				DAO_WorkspaceWidget::POS,
-				true
+			sprintf("%s = %d",
+				DAO_WorkspaceWidget::WORKSPACE_TAB_ID,
+				$tab->id
+			),
+			DAO_WorkspaceWidget::POS,
+			true
 		);
 
 		$columns = array();

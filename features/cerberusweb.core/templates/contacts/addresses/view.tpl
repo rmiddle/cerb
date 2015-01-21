@@ -10,8 +10,10 @@
 	<tr>
 		<td nowrap="nowrap"><span class="title">{$view->name}</span></td>
 		<td nowrap="nowrap" align="right">
-			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$view_context}&context_id=0&view_id={$view->id}',null,false,'500');"><span class="cerb-sprite2 sprite-plus-circle-frame"></span></a>
-			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',this,false,'400');"><span class="cerb-sprite2 sprite-document-search-result"></span></a>
+			{if $view->id != 'org_contacts'}
+			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek_address','c=internal&a=showPeekPopup&context={$view_context}&context_id=0&view_id={$view->id}',null,false,'500');"><span class="cerb-sprite2 sprite-plus-circle-frame"></span></a>
+			{/if}
+			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',null,false,'400');"><span class="cerb-sprite2 sprite-document-search-result"></span></a>
 			<a href="javascript:;" title="{'common.customize'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('customize{$view->id}','c=internal&a=viewCustomize&id={$view->id}');toggleDiv('customize{$view->id}','block');"><span class="cerb-sprite2 sprite-gear"></span></a>
 			<a href="javascript:;" title="Subtotals" class="subtotals minimal"><span class="cerb-sprite2 sprite-application-sidebar-list"></span></a>
 			<a href="javascript:;" title="{'common.import'|devblocks_translate|capitalize}" onclick="genericAjaxPopup('import','c=internal&a=showImportPopup&context={$view_context}&view_id={$view->id}',null,false,'500');"><span class="cerb-sprite2 sprite-application-import"></span></a>
@@ -42,7 +44,7 @@
 		{foreach from=$view->view_columns item=header name=headers}
 			{* start table header, insert column title and link *}
 			<th nowrap="nowrap">
-			{if $header=="x"}<a href="javascript:;" onclick="genericAjaxGet('view{$view->id}','c=internal&a=viewSortBy&id={$view->id}&sortBy=a_id');">{'contact_org.id'|devblocks_translate|capitalize}</a>
+			{if $header=="x"}<a href="javascript:;" onclick="genericAjaxGet('view{$view->id}','c=internal&a=viewSortBy&id={$view->id}&sortBy=a_id');">{'common.id'|devblocks_translate|capitalize}</a>
 			{else}<a href="javascript:;" onclick="genericAjaxGet('view{$view->id}','c=internal&a=viewSortBy&id={$view->id}&sortBy={$header}');">{$view_fields.$header->db_label|capitalize}</a>
 			{/if}
 			
@@ -78,7 +80,7 @@
 				<a href="{devblocks_url}c=profiles&type=address&id={$result.a_id}-{$result.a_email|devblocks_permalink}{/devblocks_url}" class="subject">{$result.a_email}</a>
 				{if $result.a_is_banned}<span class="tag tag-red">banned</span> {/if}
 				{if $result.a_is_defunct}<span class="tag tag-gray">defunct</span> {/if}
-				<button type="button" class="peek" style="visibility:hidden;padding:1px;margin:0px 5px;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&email={$result.a_email|escape:'url'}&view_id={$view->id}',null,false,'550');"><span class="cerb-sprite2 sprite-document-search-result" style="margin-left:2px" title="{'views.peek'|devblocks_translate}"></span></button>
+				<button type="button" class="peek" style="visibility:hidden;padding:1px;margin:0px 5px;" onclick="genericAjaxPopup('peek_address','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&email={$result.a_email|escape:'url'}&view_id={$view->id}',null,false,'550');"><span class="cerb-sprite2 sprite-document-search-result" style="margin-left:2px" title="{'views.peek'|devblocks_translate}"></span></button>
 			</td>
 		</tr>
 		<tr class="{$tableRowClass}">
@@ -90,7 +92,7 @@
 			{elseif $column=="o_name"}
 			<td>
 				{if !empty($result.o_name)}
-				<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ORG}&context_id={$result.a_contact_org_id}&view_id={$view->id}',null,false,'600');">{$result.o_name}</a>
+				<a href="javascript:;" onclick="genericAjaxPopup('peek_org','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ORG}&context_id={$result.a_contact_org_id}&view_id={$view->id}',null,false,'600');">{$result.o_name}</a>
 				{/if}
 			</td>
 			{elseif $column=="a_is_banned" || $column == "a_is_defunct"}
@@ -136,7 +138,7 @@
 	{if $total}
 	<div style="float:left;" id="{$view->id}_actions">
 		<button type="button" class="action-always-show action-explore" onclick="this.form.explore_from.value=$(this).closest('form').find('tbody input:checkbox:checked:first').val();this.form.a.value='viewAddysExplore';this.form.submit();"><span class="cerb-sprite sprite-media_play_green"></span> {'common.explore'|devblocks_translate|lower}</button>
-		{if $active_worker->hasPriv('core.addybook.addy.actions.update')}<button type="button" class="action-always-show action-bulkupdate" onclick="ajax.showAddressBatchPanel('{$view->id}',this);"><span class="cerb-sprite2 sprite-folder-gear"></span> {'common.bulk_update'|devblocks_translate|lower}</button>{/if}
+		{if $active_worker->hasPriv('core.addybook.addy.actions.update')}<button type="button" class="action-always-show action-bulkupdate" onclick="genericAjaxPopup('peek','c=contacts&a=showAddressBatchPanel&view_id={$view->id}&ids=' + Devblocks.getFormEnabledCheckboxValues('viewForm{$view->id}','row_id[]'),null,false,'500');"><span class="cerb-sprite2 sprite-folder-gear"></span> {'common.bulk_update'|devblocks_translate|lower}</button>{/if}
 	</div>
 	{/if}
 </div>
@@ -148,7 +150,7 @@
 {include file="devblocks:cerberusweb.core::internal/views/view_common_jquery_ui.tpl"}
 
 <script type="text/javascript">
-$frm = $('#viewForm{$view->id}');
+var $frm = $('#viewForm{$view->id}');
 
 {if $pref_keyboard_shortcuts}
 $frm.bind('keyboard_shortcut',function(event) {

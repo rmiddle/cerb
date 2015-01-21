@@ -4,13 +4,13 @@
 {$col = $custom_fields[$col_id]}
 
 {if $col->type==Model_CustomField::TYPE_SINGLE_LINE}
-	<td>{$result.$column}</td>
+	<td>{$result.$column|escape|devblocks_hyperlinks nofilter}</td>
 {elseif $col->type==Model_CustomField::TYPE_URL}
-	<td>{if !empty($result.$column)}<a href="{$result.$column}" target="_blank">{$result.$column}</a>{/if}</td>
+	<td>{$result.$column|escape|devblocks_hyperlinks nofilter}</td>
 {elseif $col->type==Model_CustomField::TYPE_NUMBER}
 	<td>{$result.$column}</td>
 {elseif $col->type==Model_CustomField::TYPE_MULTI_LINE}
-	<td title="{$result.$column}">{$result.$column|truncate:32}</td>
+	<td title="{$result.$column}">{$result.$column|escape|devblocks_hyperlinks nofilter}</td>
 {elseif $col->type==Model_CustomField::TYPE_DROPDOWN}
 	<td>{$result.$column}</td>
 {elseif $col->type==Model_CustomField::TYPE_MULTI_CHECKBOX}
@@ -45,10 +45,7 @@
 	<td>
 		{$file_id = $result.$column}
 		{$file = DAO_Attachment::get($file_id)}
-		{$links = DAO_AttachmentLink::getByAttachmentId($file_id)}
-		{foreach from=$links item=link}
-			<a href="{devblocks_url}c=files&guid={$link->guid}&file={$file->display_name}{/devblocks_url}" title="{$file->display_name}" target="_blank">{$file->storage_size|devblocks_prettybytes}</a>
-		{/foreach}
+		<a href="{devblocks_url}c=files&guid={$file->storage_sha1hash}&file={$file->display_name|escape:'url'}{/devblocks_url}" title="{$file->display_name} ({$file->storage_size|devblocks_prettybytes})" target="_blank">{$file->display_name}</a>
 	</td>
 {elseif $col->type==Model_CustomField::TYPE_FILES}
 	<td>
@@ -56,10 +53,7 @@
 
 		{foreach from=$file_ids item=file_id name=files}
 			{$file = DAO_Attachment::get($file_id)}
-			{$links = DAO_AttachmentLink::getByAttachmentId($file_id)}
-			{foreach from=$links item=link}
-				<a href="{devblocks_url}c=files&guid={$link->guid}&file={$file->display_name}{/devblocks_url}" title="{$file->display_name}" target="_blank">{$file->storage_size|devblocks_prettybytes}</a>{if !$smarty.foreach.files.last}, {/if}
-			{/foreach}
+			<a href="{devblocks_url}c=files&guid={$file->storage_sha1hash}&file={$file->display_name|escape:'url'}{/devblocks_url}" title="{$file->display_name} ({$file->storage_size|devblocks_prettybytes})" target="_blank">{$file->display_name}</a>{if !$smarty.foreach.files.last}, {/if}
 		{/foreach}
 	</td>
 {elseif $col->type==Model_CustomField::TYPE_WORKER}

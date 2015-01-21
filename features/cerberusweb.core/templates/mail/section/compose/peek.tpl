@@ -1,3 +1,5 @@
+{$mail_reply_html = DAO_WorkerPref::get($active_worker->id, 'mail_reply_html', 0)}
+
 {$random = uniqid()}
 <form action="{devblocks_url}{/devblocks_url}" method="POST" id="frmComposePeek{$random}" onsubmit="return false;">
 <input type="hidden" name="c" value="tickets">
@@ -7,8 +9,11 @@
 {if !empty($link_context)}
 <input type="hidden" name="link_context" value="{$link_context}">
 <input type="hidden" name="link_context_id" value="{$link_context_id}">
+{elseif !empty($draft->params.link_context)}
+<input type="hidden" name="link_context" value="{$draft->params.link_context}">
+<input type="hidden" name="link_context_id" value="{$draft->params.link_context_id}">
 {/if}
-<input type="hidden" name="format" value="">
+<input type="hidden" name="format" value="{if ($draft && $draft->params.format == 'parsedown') || $mail_reply_html}parsedown{/if}">
 
 <fieldset class="peek">
 	<legend>{'common.message'|devblocks_translate|capitalize}</legend>
@@ -19,7 +24,9 @@
 			<td width="100%">
 				<select name="group_id">
 					{foreach from=$groups item=group key=group_id}
-					<option value="{$group_id}" {if $active_worker->isGroupMember($group_id)}member="true"{/if} {if $defaults.group_id == $group_id}selected="selected"{/if}>{$group->name}</option>
+					{if $active_worker->isGroupMember($group_id)}
+					<option value="{$group_id}" member="true" {if $defaults.group_id == $group_id}selected="selected"{/if}>{$group->name}</option>
+					{/if}
 					{/foreach}
 				</select>
 				<select class="ticket-peek-bucket-options" style="display:none;">
@@ -97,7 +104,14 @@
 					</fieldset>
 				</div>
 				
-				<textarea id="divComposeContent{$random}" name="content" style="width:98%;height:150px;border:1px solid rgb(180,180,180);padding:2px;">{$draft->body}</textarea>
+				<textarea id="divComposeContent{$random}" name="content" style="width:98%;height:150px;border:1px solid rgb(180,180,180);padding:2px;">{if !empty($draft)}{$draft->body}{else}
+
+
+
+#signature
+#cut{/if}</textarea>
+
+				<div class="cerb-form-hint" style="display:block;">(Use #commands to perform additional actions)</div>
 			</td>
 		</tr>
 	</table>
@@ -140,7 +154,7 @@
 					<option value="0"></option>
 					{foreach from=$workers item=v key=k}
 					{if !$v->is_disabled}
-					<option value="{$k}">{$v->getName()}</option>
+					<option value="{$k}" {if $draft->params.owner_id==$k}selected="selected"{/if}>{$v->getName()}</option>
 					{/if}
 					{/foreach}
 				</select>
@@ -154,7 +168,20 @@
 			</td>
 			<td width="99%">
 				<button type="button" class="chooser_watcher"><span class="cerb-sprite sprite-view"></span></button>
-				<ul class="chooser-container bubbles" style="display:block;"></ul>
+				<ul class="chooser-container bubbles" style="display:block;">
+					{if $draft->params.add_watcher_ids && is_array($draft->params.add_watcher_ids)}
+					{foreach from=$draft->params.add_watcher_ids item=watcher_id}
+						{$watcher = DAO_Worker::get($watcher_id)}
+						{if $watcher}
+						<li>
+							<input type="hidden" name="add_watcher_ids[]" value="{$watcher_id}">
+							{$watcher->getName()}
+							<a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a>
+						</li>
+						{/if}
+					{/foreach}
+					{/if}
+				</ul>
 			</td>
 		</tr>
 	</table>
@@ -186,6 +213,8 @@
 	{/if}
 	</ul>
 </fieldset>
+
+<div class="status"></div>
 
 <button type="button" class="submit"><span class="cerb-sprite2 sprite-tick-circle"></span> {'display.ui.send_message'|devblocks_translate}</button>
 </form>
@@ -263,8 +292,29 @@
 		};
 		
 		markitupPlaintextSettings.markupSet.unshift(
-			{ name:'Switch to Markdown', openWith: markitupReplyFunctions.switchToMarkdown, className:'parsedown' }
+			{ name:'Switch to Markdown', openWith: markitupReplyFunctions.switchToMarkdown, className:'parsedown' },
+			{ separator:' ' },
+			{ name:'Preview', key: 'P', call:'preview', className:"preview" }
 		);
+		
+		markitupPlaintextSettings.previewAutoRefresh = true;
+		markitupPlaintextSettings.previewInWindow = 'width=800, height=600, titlebar=no, location=no, menubar=no, status=no, toolbar=no, resizable=yes, scrollbars=yes';
+		
+		markitupPlaintextSettings.previewParser = function(content) {
+			genericAjaxPost(
+				$frm,
+				'',
+				'c=display&a=getReplyPreview',
+				function(o) {
+					content = o;
+				},
+				{
+					async: false
+				}
+			);
+			
+			return content;
+		};
 		
 		markitupParsedownSettings.previewParser = function(content) {
 			genericAjaxPost(
@@ -284,7 +334,7 @@
 		
 		markitupParsedownSettings.markupSet.unshift(
 			{ name:'Switch to Plaintext', openWith: markitupReplyFunctions.switchToPlaintext, className:'plaintext' },
-			{ separator:'---------------' }
+			{ separator:' ' }
 		);
 		
 		markitupParsedownSettings.markupSet.splice(
@@ -304,12 +354,16 @@
 				key: 'U',
 				className:'image-inline'
 			}
-			//{ separator:'---------------' }
+			//{ separator:' ' }
 		);
 		
-		{* [TODO] Load the worker preference for formatting *}
 		try {
 			$content.markItUp(markitupPlaintextSettings);
+			
+			{if ($draft && $draft->params.format == 'parsedown') || $mail_reply_html}
+			markitupReplyFunctions.switchToMarkdown();
+			{/if}
+			
 			$content.elastic();
 			
 		} catch(e) {
@@ -318,6 +372,55 @@
 		}
 		
 		$frm.validate();
+		
+		// @who and #command
+		
+		var atwho_file_bundles = {CerberusApplication::getFileBundleDictionaryJson() nofilter};
+		var atwho_workers = {CerberusApplication::getAtMentionsWorkerDictionaryJson() nofilter};
+		
+		$content
+			.atwho({
+				at: '#attach ',
+				{literal}tpl: '<li data-value="#attach ${tag}\n">${name} <small style="margin-left:10px;">${tag}</small></li>',{/literal}
+				suffix: '',
+				data: atwho_file_bundles,
+				limit: 10
+			})
+			.atwho({
+				at: '#',
+				data: [
+					'attach',
+					'comment',
+					'comment @',
+					'cut\n',
+					'signature\n',
+					'unwatch\n',
+					'watch\n'
+				],
+				limit: 10,
+				suffix: '',
+				hide_without_suffix: true,
+				callbacks: {
+					before_insert: function(value, $li) {
+						if(value.substr(-1) != '\n' && value.substr(-1) != '@')
+							value += ' ';
+						
+						return value;
+					}
+				}
+			})
+			.atwho({
+				at: '@',
+				{literal}tpl: '<li data-value="@${at_mention}">${name} <small style="margin-left:10px;">${title}</small></li>',{/literal}
+				data: atwho_workers,
+				limit: 10
+			})
+			;
+		
+		$content.on('inserted.atwho', function(event, $li) {
+			//if($li.text() == 'delete quote from here\n')
+			//	$(this).trigger('delete_quote_from_cursor');
+		});
 		
 		// Group and bucket
 		$frm.find('select[name=group_id]').on('change', function(e) {
@@ -401,23 +504,8 @@
 		// Insert Sig
 		
 		$('#btnComposeInsertSig{$random}').click(function(e) {
-			var $this = $(this);
-			var $frm = $this.closest('form');
-			var $select_group = $frm.find('select[name=group_id]');
-			var $select_bucket = $frm.find('select[name=bucket_id]');
-			
-			genericAjaxGet(
-				'',
-				'c=tickets&a=getComposeSignature&group_id='+$select_group.val()+'&bucket_id='+$select_bucket.val(),
-				function(text) {
-					var $textarea = $('#divComposeContent{$random}');
-					
-					if(text.slice(-1) != "\n")
-						text += "\n";
-					
-					$textarea.insertAtCursor(text).focus();
-				}
-			);
+			var $textarea = $('#divComposeContent{$random}');
+			$textarea.insertAtCursor('#signature\n').focus();
 		});
 		
 		// Drafts
@@ -472,11 +560,11 @@
 			},
 			autoFocus:true,
 			select:function(event, ui) {
-				$this = $(this);
-				$textarea = $('#divComposeContent{$random}');
+				var $this = $(this);
+				var $textarea = $('#divComposeContent{$random}');
 				
-				$label = ui.item.label.replace("<","&lt;").replace(">","&gt;");
-				$value = ui.item.value;
+				var $label = ui.item.label.replace("<","&lt;").replace(">","&gt;");
+				var $value = ui.item.value;
 				
 				// Now we need to read in each snippet as either 'raw' or 'parsed' via Ajax
 				var url = 'c=internal&a=snippetPaste&id=' + $value;
@@ -486,10 +574,10 @@
 					url += "&context_id={$active_worker->id}";
 				}
 
-				genericAjaxGet('',url,function(txt) {
+				genericAjaxGet('',url,function(json) {
 					// If the content has placeholders, use that popup instead
-					if(txt.match(/\(__(.*?)__\)/)) {
-						var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&text=' + encodeURIComponent(txt),null,false,'600');
+					if(json.has_custom_placeholders) {
+						var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&id=' + encodeURIComponent(json.id) + '&context_id=' + encodeURIComponent(json.context_id), null, false, '600');
 					
 						$popup_paste.bind('snippet_paste', function(event) {
 							if(null == event.text)
@@ -499,7 +587,7 @@
 						});
 						
 					} else {
-						$textarea.insertAtCursor(txt).focus();
+						$textarea.insertAtCursor(json.text).focus();
 					}
 					
 				}, { async: false });
@@ -631,6 +719,17 @@
 		$frm.find('button.submit').click(function() {
 			var $frm = $(this).closest('form');
 			var $input = $frm.find('input#emailinput{$random}');
+			var $status = $frm.find('div.status').html('').hide();
+			
+			var $to = $frm.find('input[name=to]');
+			var $cc = $frm.find('input[name=cc]');
+			var $bcc = $frm.find('input[name=bcc]');
+			
+			// If we have a Cc:/Bcc: but no To:
+			if($to.val().length == 0 && ($cc.val().length > 0 || $bcc.val().length > 0)) {
+				$status.html("A 'To:' address is required when using 'Cc:' and 'Bcc:'.").addClass('error').fadeIn();
+				return false;
+			}
 			
 			if($frm.validate().form()) {
 				if(null != draftComposeAutoSaveInterval) { 

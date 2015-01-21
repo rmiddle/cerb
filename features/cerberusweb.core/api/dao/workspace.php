@@ -12,7 +12,7 @@
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerberusweb.com	  http://www.webgroupmedia.com/
+|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
 ***********************************************************************/
 
 class DAO_WorkspacePage extends Cerb_ORMHelper {
@@ -282,12 +282,12 @@ class DAO_WorkspacePage extends Cerb_ORMHelper {
 		);
 		
 		$sql =
-		$select_sql.
-		$join_sql.
-		$where_sql.
-		($has_multiple_values ? 'GROUP BY workspace_page.id ' : '').
-		$sort_sql;
-			
+			$select_sql.
+			$join_sql.
+			$where_sql.
+			($has_multiple_values ? 'GROUP BY workspace_page.id ' : '').
+			$sort_sql;
+
 		if($limit > 0) {
 			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs ADORecordSet */
 		} else {
@@ -298,12 +298,8 @@ class DAO_WorkspacePage extends Cerb_ORMHelper {
 		$results = array();
 
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_WorkspacePage::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -622,12 +618,8 @@ class DAO_WorkspaceTab extends Cerb_ORMHelper {
 		$results = array();
 		
 		while($row = mysqli_fetch_assoc($rs)) {
-			$result = array();
-			foreach($row as $f => $v) {
-				$result[$f] = $v;
-			}
 			$object_id = intval($row[SearchFields_WorkspaceTab::ID]);
-			$results[$object_id] = $result;
+			$results[$object_id] = $row;
 		}
 
 		$total = count($results);
@@ -786,15 +778,20 @@ class Model_WorkspacePage {
 		//	return true;
 	
 		switch($this->owner_context) {
+			case CerberusContexts::CONTEXT_APPLICATION:
+				return true;
+				break;
+				
+			case CerberusContexts::CONTEXT_ROLE:
+				if(in_array($this->owner_context_id, array_keys($worker->getRoles())))
+					return true;
+				break;
+				
 			case CerberusContexts::CONTEXT_GROUP:
 				if(in_array($this->owner_context_id, array_keys($worker->getMemberships())))
 					return true;
 				break;
 	
-			case CerberusContexts::CONTEXT_ROLE:
-				if(in_array($this->owner_context_id, array_keys($worker->getRoles())))
-					return true;
-				break;
 	
 			case CerberusContexts::CONTEXT_WORKER:
 				if($worker->id == $this->owner_context_id)
@@ -820,14 +817,15 @@ class Model_WorkspacePage {
 			return true;
 	
 		switch($this->owner_context) {
-			case CerberusContexts::CONTEXT_GROUP:
-				if(in_array($this->owner_context_id, array_keys($worker->getMemberships())))
-					if($worker->isGroupManager($this->owner_context_id))
+			case CerberusContexts::CONTEXT_APPLICATION:
+			case CerberusContexts::CONTEXT_ROLE:
+				if($worker->is_superuser)
 					return true;
 				break;
 	
-			case CerberusContexts::CONTEXT_ROLE:
-				if($worker->is_superuser)
+			case CerberusContexts::CONTEXT_GROUP:
+				if(in_array($this->owner_context_id, array_keys($worker->getMemberships())))
+					if($worker->isGroupManager($this->owner_context_id))
 					return true;
 				break;
 	
@@ -1013,14 +1011,13 @@ class Model_WorkspaceListView {
 	public $subtotals = '';
 };
 
-class View_WorkspacePage extends C4_AbstractView {
+class View_WorkspacePage extends C4_AbstractView implements IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'workspace_page';
 
 	function __construct() {
 		$translate = DevblocksPlatform::getTranslationService();
 
 		$this->id = self::DEFAULT_ID;
-		// [TODO] Name the worklist view
 		$this->name = $translate->_('Pages');
 		$this->renderLimit = 25;
 		$this->renderSortBy = SearchFields_WorkspacePage::ID;
@@ -1061,6 +1058,49 @@ class View_WorkspacePage extends C4_AbstractView {
 
 	function getDataSample($size) {
 		return $this->_doGetDataSample('DAO_WorkspacePage', $size);
+	}
+	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_WorkspacePage::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+			'name' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_WorkspacePage::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_WORKSPACE_PAGE, $fields, null);
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
 	}
 
 	function render() {
@@ -1412,8 +1452,8 @@ class Context_WorkspacePage extends Extension_DevblocksContext {
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;
@@ -1663,8 +1703,8 @@ class Context_WorkspaceTab extends Extension_DevblocksContext {
 		return $view;
 	}
 	
-	function getView($context=null, $context_id=null, $options=array()) {
-		$view_id = str_replace('.','_',$this->id);
+	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
+		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
 		$defaults = new C4_AbstractViewModel();
 		$defaults->id = $view_id;
