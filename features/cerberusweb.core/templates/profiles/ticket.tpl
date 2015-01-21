@@ -97,7 +97,12 @@
 </div>
 
 <fieldset class="properties">
-	<legend>{'common.conversation'|devblocks_translate|capitalize}</legend>
+	<legend>
+            {'common.conversation'|devblocks_translate|capitalize}
+            {if DevblocksPlatform::isPluginEnabled('cerberusweb.timetracking')}
+                - Total Ticket Time Worked: {$total_time_hours} Hours {$total_time_minutes} Mins&nbsp;
+            {/if}
+        </legend>
 
 	<div style="margin-left:15px;">
 

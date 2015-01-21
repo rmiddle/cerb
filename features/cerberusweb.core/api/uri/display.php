@@ -1313,7 +1313,7 @@ class ChDisplayPage extends CerberusPageExtension {
 		// Prefs
 		$mail_reply_button = DAO_WorkerPref::get($active_worker->id, 'mail_reply_button', 0);
 		$tpl->assign('mail_reply_button', $mail_reply_button);
-		
+
 		$tpl->display('devblocks:cerberusweb.core::display/modules/conversation/index.tpl');
 	}
 	
