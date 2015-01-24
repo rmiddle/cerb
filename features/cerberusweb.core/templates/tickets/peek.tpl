@@ -99,7 +99,7 @@
 			
 			{if $active_worker->hasPriv('core.ticket.actions.move')}
 			<tr>
-				<td width="0%" nowrap="nowrap" align="right">Bucket: </td>
+				<td width="0%" nowrap="nowrap" valign="middle" align="right">Bucket: </td>
 				<td width="100%">
 					<div>
 						<select name="group_id">
@@ -230,9 +230,5 @@
 		
 		// Dates
 		$frm.find('div#ticketPeekProps > fieldset:first input.input_date').cerbDateInputHelper();
-		
-		// CSS overrides
-		$popup.closest('.ui-dialog').css('overflow', 'visible');
-		$popup.css('overflow', 'inherit');
 	});
 </script>

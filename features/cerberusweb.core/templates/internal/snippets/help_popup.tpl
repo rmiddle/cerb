@@ -109,7 +109,13 @@ Hi {{name|default('there')}}
 {% set var = <b>dict_set</b>(var, '2.2.[]', 7) %}
 {% set var = <b>dict_set</b>(var, '2.2.[]', 8) %}
 {% set var = <b>dict_set</b>(var, '2.3', 9) %}
-{{var|json_encode|json_pretty}}	
+{{var|json_encode|json_pretty}}
+
+{# Array diffs #}
+{% set arr1 = ['Apple', 'Google', 'Microsoft'] %}
+{% set arr2 = ['Apple', 'Microsoft', 'Cerb'] %}
+{% set diff = <b>array_diff</b>(arr2, arr1) %}
+These are new: {{diff|join(', ')}}
 </pre>
 	{/literal}
 </fieldset>
@@ -412,8 +418,14 @@ When: {{json.when|first}}
 $(function() {
 	var $popup = genericAjaxPopupFetch('help');
 	
-	$popup.one('popup_open', function(event,ui) {
-		$(this).dialog('option','title',"Help: Placeholders \x26 Scripting");
+	$popup.one('popup_open', function(event, ui) {
+		$popup.dialog('option','title',"Help: Placeholders \x26 Scripting");
+		$popup.dialog('option', 'resizeable', false);
+
+		var max_height = Math.round($(window).height() * 0.85);
+		$popup.css('max-height', max_height + 'px');
+		
+		$popup.css('overflow', 'auto');
 	});
 });
 </script>
