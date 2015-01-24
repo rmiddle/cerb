@@ -384,6 +384,7 @@ class _DevblocksTwigExtensions extends Twig_Extension {
 	
 	public function getFunctions() {
 		return array(
+			'array_diff' => new Twig_Function_Method($this, 'function_array_diff'),
 			'dict_set' => new Twig_Function_Method($this, 'function_dict_set'),
 			'json_decode' => new Twig_Function_Method($this, 'function_json_decode'),
 			'jsonpath_set' => new Twig_Function_Method($this, 'function_jsonpath_set'),
@@ -393,6 +394,13 @@ class _DevblocksTwigExtensions extends Twig_Extension {
 			'xml_xpath_ns' => new Twig_Function_Method($this, 'function_xml_xpath_ns'),
 			'xml_xpath' => new Twig_Function_Method($this, 'function_xml_xpath'),
 		);
+	}
+	
+	function function_array_diff($arr1, $arr2) {
+		if(!is_array($arr1) || !is_array($arr2))
+			return;
+		
+		return array_diff($arr1, $arr2);
 	}
 	
 	function function_json_decode($str) {
@@ -531,6 +539,8 @@ class _DevblocksTwigExtensions extends Twig_Extension {
 			'nlp_parse' => new Twig_Filter_Method($this, 'filter_nlp_parse'),
 			'regexp' => new Twig_Filter_Method($this, 'filter_regexp'),
 			'secs_pretty' => new Twig_Filter_Method($this, 'filter_secs_pretty'),
+			'split_crlf' => new Twig_Filter_Method($this, 'filter_split_crlf'),
+			'split_csv' => new Twig_Filter_Method($this, 'filter_split_csv'),
 			'truncate' => new Twig_Filter_Method($this, 'filter_truncate'),
 		);
 	}
@@ -584,6 +594,14 @@ class _DevblocksTwigExtensions extends Twig_Extension {
 	
 	function filter_secs_pretty($string, $precision=0) {
 		return DevblocksPlatform::strSecsToString($string, $precision);
+	}
+	
+	function filter_split_crlf($string) {
+		return DevblocksPlatform::parseCrlfString($string);
+	}
+	
+	function filter_split_csv($string) {
+		return DevblocksPlatform::parseCsvString($string);
 	}
 	
 	/**

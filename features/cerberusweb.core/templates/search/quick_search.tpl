@@ -7,11 +7,11 @@
 	<input type="hidden" name="view_id" value="{$view->id}">
 
 	<div style="border:1px solid rgb(200,200,200);border-radius:10px;display:inline-block;">
-		<input type="text" name="query" class="input_search cerb-input-quicksearch" style="border:0;" size="50" value="{$quick_search_query}" autocomplete="off" spellcheck="false" placeholder="{'common.search'|devblocks_translate|lower}">
+		<input type="text" name="query" class="input_search cerb-input-quicksearch" style="border:0;" size="50" value="{$quick_search_query}" autocomplete="off" spellcheck="false">
 		<a href="javascript:;" class="cerb-quick-search-menu-trigger" style="position:relative;top:5px;padding:0px 10px;"><span class="cerb-sprite sprite-arrow-down-black" style="height:12px;width:12px;"></span></a>
 	</div>
 	
-	<ul class="cerb-quick-search-menu" style="position:absolute;float:right;margin-right:10px;z-index:5;">
+	<ul class="cerb-quick-search-menu" style="position:absolute;float:right;margin-right:10px;z-index:5;display:none;">
 		{if !empty($search_fields)}
 		{foreach from=$search_fields key=field_key item=field}
 		<li field="{$field_key}">
@@ -81,13 +81,26 @@
 </form>
 
 <script type="text/javascript">
+$(function() {
 var $frm = $('#{$uniqid}').each(function(e) {
 	var $frm = $(this);
 	var $input = $frm.find('input:text');
+	var $popup = $input.closest('.ui-dialog');
+	var isInPopup = ($popup.length > 0);
 	
 	$input.keyup(function(e) {
 		if(e.keyCode == 27) {
-			$menu.hide();
+			if(!isInPopup) {
+				$menu.hide();
+				
+			} else {
+				if($menu.is(':visible')) {
+					$menu.hide();
+					
+				} else {
+					$popup.find('.devblocks-popup').dialog('close');
+				}
+			}
 		}
 	});
 	
@@ -113,6 +126,7 @@ var $frm = $('#{$uniqid}').each(function(e) {
 				$input.insertAtCursor(insert_txt).scrollLeft(2000);
 			}
 		})
+		.css('width', $input.width())
 		.hide()
 		;
 	
@@ -140,5 +154,5 @@ var $frm = $('#{$uniqid}').each(function(e) {
 		});
 	});
 });
-
+});
 </script>

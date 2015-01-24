@@ -1,5 +1,5 @@
 <div style="float:right;">
-{include file="devblocks:cerberusweb.core::search/quick_search.tpl" view=$view return_url=null reset=false is_popup=true}
+{include file="devblocks:cerberusweb.core::search/quick_search.tpl" view=$view return_url=null}
 </div>
 
 <div style="clear:both;"></div>
@@ -110,10 +110,6 @@ $(function() {
 			
 			genericAjaxPopupDestroy('{$layer}');
 		});
-		
-		// CSS overrides
-		$popup.closest('.ui-dialog').css('overflow', 'visible');
-		$popup.css('overflow', 'inherit');
 	});
 	
 	$popup.one('dialogclose', function(event) {

@@ -2,7 +2,7 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2014, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
@@ -740,6 +740,19 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 		// Add searchable custom fields
 		
 		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_TASK, $fields, null);
+		
+		// Engine/schema examples: Comments
+		
+		$ft_examples = array();
+		
+		if(false != ($schema = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID))) {
+			if(false != ($engine = $schema->getEngine())) {
+				$ft_examples = $engine->getQuickSearchExamples($schema);
+			}
+		}
+		
+		if(!empty($ft_examples))
+			$fields['comments']['examples'] = $ft_examples;
 		
 		// Sort by keys
 		
