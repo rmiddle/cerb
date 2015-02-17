@@ -11,7 +11,7 @@
 	<tr>
 		<td width="1%" nowrap="nowrap" rowspan="2" valign="top" style="padding-left:10px;">
 			{if $gravatar_enabled}
-			<img src="{if $is_ssl}https://secure.{else}http://www.{/if}gravatar.com/avatar/{$reply_to->email|trim|lower|md5}?s=64&d=http://cerbweb.com/gravatar/gravatar_nouser.jpg" height="64" width="64" border="0" style="margin:0px 5px 5px 0px;">
+			<img src="{if $is_ssl}https://secure.{else}http://www.{/if}gravatar.com/avatar/{$reply_to->email|trim|lower|md5}?s=64&d=http://cerbweb.com/gravatar/gravatar_nouser.jpg" height="64" width="64" border="0" style="margin:0px 5px 5px 0px;border-radius:40px;">
 			{/if}
 		</td>
 		<td width="98%" valign="top">
@@ -88,7 +88,7 @@
 {include file="devblocks:cerberusweb.core::internal/macros/behavior/scheduled_behavior_profile.tpl" context=$page_context context_id=$page_context_id}
 </div>
 
-<div id="profileTabs">
+<div id="profileGroupTabs">
 	<ul>
 		{$tabs = []}
 		{$point = "cerberusweb.profiles.group.{$group->id}"}
@@ -133,7 +133,7 @@
 			<fieldset>
 				<div style="float:left;">
 					{if $gravatar_enabled}
-					<img src="{if $is_ssl}https://secure.{else}http://www.{/if}gravatar.com/avatar/{$worker->email|trim|lower|md5}?s=64&d=http://cerbweb.com/gravatar/gravatar_nouser.jpg" height="64" width="64" border="0" style="margin:0px 5px 5px 0px;">
+					<img src="{if $is_ssl}https://secure.{else}http://www.{/if}gravatar.com/avatar/{$worker->email|trim|lower|md5}?s=64&d=http://cerbweb.com/gravatar/gravatar_nouser.jpg" height="64" width="64" border="0" style="margin:0px 5px 5px 0px;border-radius:40px;">
 					{/if}
 				</div>
 				<div style="float:left;">
@@ -150,21 +150,15 @@
 		{/if}
 		{/foreach}
 	</div>
-</div> 
-
+</div>
 <br>
-
-{$selected_tab_idx=0}
-{foreach from=$tabs item=tab_label name=tabs}
-	{if $tab_label==$selected_tab}{$selected_tab_idx = $smarty.foreach.tabs.index}{/if}
-{/foreach}
 
 <script type="text/javascript">
 $(function() {
 	var tabOptions = Devblocks.getDefaultjQueryUiTabOptions();
-	tabOptions.active = {$selected_tab_idx};
+	tabOptions.active = Devblocks.getjQueryUiTabSelected('profileGroupTabs');
 	
-	var tabs = $("#profileTabs").tabs(tabOptions);
+	var tabs = $("#profileGroupTabs").tabs(tabOptions);
 
 	{if $active_worker->is_superuser}
 	$('#btnProfileGroupEdit').bind('click', function() {

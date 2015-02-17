@@ -47,7 +47,7 @@ class DAO_Bucket extends DevblocksORMHelper {
 	static function getAll($nocache=false) {
 		$cache = DevblocksPlatform::getCacheService();
 		if($nocache || null === ($buckets = $cache->load(self::CACHE_ALL))) {
-			$buckets = self::getList();
+			$buckets = self::getWhere(null, DAO_Bucket::POS, true, null, Cerb_ORMHelper::OPT_GET_MASTER_ONLY);
 			$cache->save($buckets, self::CACHE_ALL);
 		}
 		
@@ -60,6 +60,9 @@ class DAO_Bucket extends DevblocksORMHelper {
 	 * @return Model_Bucket
 	 */
 	static function get($id) {
+		if(empty($id))
+			return null;
+		
 		$buckets = self::getAll();
 	
 		if(isset($buckets[$id]))
@@ -73,44 +76,34 @@ class DAO_Bucket extends DevblocksORMHelper {
 			return 0;
 		
 		$db = DevblocksPlatform::getDatabaseService();
-		if(null != ($next_pos = $db->GetOne(sprintf("SELECT MAX(pos)+1 FROM bucket WHERE group_id = %d", $group_id))))
+		if(null != ($next_pos = $db->GetOneMaster(sprintf("SELECT MAX(pos)+1 FROM bucket WHERE group_id = %d", $group_id))))
 			return $next_pos;
 			
 		return 0;
 	}
 	
-	static function getList($ids=array()) {
+	static function getWhere($where=null, $sortBy=null, $sortAsc=null, $limit=null, $options=null) {
 		$db = DevblocksPlatform::getDatabaseService();
+
+		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
 		
+		// SQL
 		$sql = "SELECT bucket.id, bucket.pos, bucket.name, bucket.group_id, bucket.is_assignable, bucket.reply_address_id, bucket.reply_personal, bucket.reply_signature, bucket.reply_html_template_id ".
 			"FROM bucket ".
-			"INNER JOIN worker_group ON (bucket.group_id=worker_group.id) ".
-			(!empty($ids) ? sprintf("WHERE bucket.id IN (%s) ", implode(',', $ids)) : "").
-			"ORDER BY worker_group.name ASC, bucket.pos ASC "
+			$where_sql.
+			$sort_sql.
+			$limit_sql
 		;
-		$rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 		
-		$buckets = array();
-		
-		while($row = mysqli_fetch_assoc($rs)) {
-			$bucket = new Model_Bucket();
-			$bucket->id = intval($row['id']);
-			$bucket->pos = intval($row['pos']);
-			$bucket->name = $row['name'];
-			$bucket->group_id = intval($row['group_id']);
-			$bucket->is_assignable = intval($row['is_assignable']);
-			$bucket->reply_address_id = $row['reply_address_id'];
-			$bucket->reply_personal = $row['reply_personal'];
-			$bucket->reply_signature = $row['reply_signature'];
-			$bucket->reply_html_template_id = $row['reply_html_template_id'];
-			$buckets[$bucket->id] = $bucket;
+		if($options & Cerb_ORMHelper::OPT_GET_MASTER_ONLY) {
+			$rs = $db->ExecuteMaster($sql);
+		} else {
+			$rs = $db->ExecuteSlave($sql);
 		}
 		
-		mysqli_free_result($rs);
-		
-		return $buckets;
+		return self::_getObjectsFromResult($rs);
 	}
-	
+		
 	static function getByGroup($group_ids) {
 		if(!is_array($group_ids))
 			$group_ids = array($group_ids);
@@ -166,7 +159,7 @@ class DAO_Bucket extends DevblocksORMHelper {
 			$db->qstr($name),
 			$group_id
 		);
-		$rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+		$rs = $db->ExecuteMaster($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 		$id = $db->LastInsertId();
 
 		self::clearCache();
@@ -205,11 +198,11 @@ class DAO_Bucket extends DevblocksORMHelper {
 		);
 		
 		$sql = sprintf("DELETE FROM bucket WHERE id IN (%s)", implode(',',$ids));
-		$db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+		$db->ExecuteMaster($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 		
 		// Reset any tickets using this bucket
 		$sql = sprintf("UPDATE ticket SET bucket_id = 0 WHERE bucket_id IN (%s)", implode(',',$ids));
-		$db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+		$db->ExecuteMaster($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
 
 		self::clearCache();
 	}
@@ -227,6 +220,28 @@ class DAO_Bucket extends DevblocksORMHelper {
 				)
 			)
 		);
+	}
+	
+	private static function _getObjectsFromResult($rs) {
+		$buckets = array();
+		
+		while($row = mysqli_fetch_assoc($rs)) {
+			$bucket = new Model_Bucket();
+			$bucket->id = intval($row['id']);
+			$bucket->pos = intval($row['pos']);
+			$bucket->name = $row['name'];
+			$bucket->group_id = intval($row['group_id']);
+			$bucket->is_assignable = intval($row['is_assignable']);
+			$bucket->reply_address_id = $row['reply_address_id'];
+			$bucket->reply_personal = $row['reply_personal'];
+			$bucket->reply_signature = $row['reply_signature'];
+			$bucket->reply_html_template_id = $row['reply_html_template_id'];
+			$buckets[$bucket->id] = $bucket;
+		}
+		
+		mysqli_free_result($rs);
+		
+		return $buckets;
 	}
 	
 	static public function clearCache() {
@@ -581,7 +596,6 @@ class Context_Bucket extends Extension_DevblocksContext {
 		$view->renderLimit = 10;
 		$view->renderFilters = false;
 		$view->renderTemplate = 'contextlinks_chooser';
-		C4_AbstractViewLoader::setView($view_id, $view);
 
 		return $view;
 	}
@@ -607,7 +621,6 @@ class Context_Bucket extends Extension_DevblocksContext {
 		$view->addParamsRequired($params_req, true);
 		
 		$view->renderTemplate = 'context';
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 };

@@ -865,7 +865,6 @@ class ChTicketsPage extends CerberusPageExtension {
 
 		$view->renderPage = 0; // Reset the paging since we may have reduced our list size
 		$view->removeParam('tmpMemberships'); // Remove our filter
-		C4_AbstractViewLoader::setView($view_id,$view);
 
 		$view->render();
 	}
@@ -956,6 +955,7 @@ class ChTicketsPage extends CerberusPageExtension {
 		
 		$fields = array(
 			DAO_Ticket::IS_CLOSED => CerberusTicketStatus::CLOSED,
+			DAO_Ticket::REOPEN_AT => 0,
 		);
 		
 		//====================================

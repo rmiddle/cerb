@@ -131,6 +131,10 @@ class ChDisplayPage extends CerberusPageExtension {
 			DAO_Ticket::IS_CLOSED => intval($closed),
 			DAO_Ticket::IS_DELETED => intval($deleted),
 		);
+		
+		if($closed) {
+			$properties[DAO_Ticket::REOPEN_AT] = 0;
+		}
 
 		// Undeleting?
 		if(empty($spam) && empty($closed) && empty($deleted)
@@ -1143,13 +1147,9 @@ class ChDisplayPage extends CerberusPageExtension {
 		@$point = DevblocksPlatform::importGPC($_REQUEST['point'],'string','');
 
 		$tpl = DevblocksPlatform::getTemplateService();
-		$visit = CerberusApplication::getVisit();
 
 		@$active_worker = CerberusApplication::getActiveWorker();
 		
-		if(!empty($point))
-			$visit->set($point, 'conversation');
-				
 		$tpl->assign('expand_all', $expand_all);
 		$tpl->assign('focus_ctx', $focus_ctx);
 		$tpl->assign('focus_ctx_id', $focus_ctx_id);
@@ -1460,9 +1460,6 @@ class ChDisplayPage extends CerberusPageExtension {
 		@$ticket_id = DevblocksPlatform::importGPC($_REQUEST['ticket_id'],'integer');
 		@$point = DevblocksPlatform::importGPC($_REQUEST['point'],'string','');
 				
-		if(!empty($point))
-			$visit->set($point, 'history');
-
 		// Scope
 		$scope = $visit->get('display.history.scope', '');
 		
@@ -1474,10 +1471,7 @@ class ChDisplayPage extends CerberusPageExtension {
 		$tpl->assign('scope', $scope);
 
 		$view = DAO_Ticket::getViewForRequesterHistory('contact_history', $ticket, $scope);
-		$view->renderPage = 0;
 		$tpl->assign('view', $view);
-		
-		C4_AbstractViewLoader::setView($view->id,$view);
 		
 		$tpl->display('devblocks:cerberusweb.core::display/modules/history/index.tpl');
 	}

@@ -167,8 +167,6 @@ class ChPageController extends DevblocksControllerExtension {
 			
 			$active_worker_memberships = $active_worker->getMemberships();
 			$tpl->assign('active_worker_memberships', $active_worker_memberships);
-			
-			DAO_Worker::logActivity($page->getActivity());
 		}
 		$tpl->assign('tour_enabled', $tour_enabled);
 		
@@ -208,6 +206,8 @@ class ChPageController extends DevblocksControllerExtension {
 		$tpl->display('devblocks:cerberusweb.core::border.tpl');
 		
 		if(!empty($active_worker)) {
+			DAO_Worker::logActivity($page->getActivity());
+			
 			$unread_notifications = DAO_Notification::getUnreadCountByWorker($active_worker->id);
 			$tpl->assign('active_worker_notify_count', $unread_notifications);
 			$tpl->display('devblocks:cerberusweb.core::badge_notifications_script.tpl');
@@ -236,6 +236,7 @@ class VaAction_HttpRequest extends Extension_DevblocksEventAction {
 		@$http_url = $tpl_builder->build($params['http_url'], $dict);
 		@$http_headers = DevblocksPlatform::parseCrlfString($tpl_builder->build($params['http_headers'], $dict));
 		@$http_body = $tpl_builder->build($params['http_body'], $dict);
+		@$options = $params['options'] ?: array();
 		@$run_in_simulator = $params['run_in_simulator'];
 		@$response_placeholder = $params['response_placeholder'];
 		
@@ -249,21 +250,31 @@ class VaAction_HttpRequest extends Extension_DevblocksEventAction {
 			return "[ERROR] No result placeholder given.";
 		
 		// Output
-		$out = sprintf(">>> Sending HTTP request:\n%s %s\n%s\n%s\n",
+		$out = sprintf(">>> Sending HTTP request:\n%s %s\n%s%s\n",
 			mb_convert_case($http_verb, MB_CASE_UPPER),
 			$http_url,
-			!empty($http_headers) ? (implode("\n", $http_headers)) : '',
+			!empty($http_headers) ? (implode("\n", $http_headers)."\n") : '',
 			(in_array($http_verb, array('post','put')) ? ("\n" . $http_body. "\n") : "")
 		);
 		
-		$out .= sprintf(">>> Saving response to {{%s}}\n",
-			$response_placeholder
+		$out .= sprintf(">>> Saving response to {{%1\$s}}\n".
+				" * {{%1\$s.content_type}}\n".
+				" * {{%1\$s.body}}\n".
+				" * {{%1\$s.info}}\n".
+				" * {{%1\$s.info.http_code}}\n".
+				" * {{%1\$s.error}}\n".
+				"\n",
+				$response_placeholder
 		);
 
 		// If set to run in simulator as well
 		if($run_in_simulator) {
-			$response = $this->_execute($http_verb, $http_url, array(), $http_body, $http_headers);
+			$response = $this->_execute($http_verb, $http_url, array(), $http_body, $http_headers, $options);
 			$dict->$response_placeholder = $response;
+			
+			if(isset($response['error']) && !empty($response['error'])) {
+				$out .= sprintf(">>> Error in response:\n%s\n", $response['error']);
+			}
 		}
 		
 		return $out;
@@ -276,6 +287,7 @@ class VaAction_HttpRequest extends Extension_DevblocksEventAction {
 		@$http_url = $tpl_builder->build($params['http_url'], $dict);
 		@$http_headers = DevblocksPlatform::parseCrlfString($tpl_builder->build($params['http_headers'], $dict));
 		@$http_body = $tpl_builder->build($params['http_body'], $dict);
+		@$options = $params['options'] ?: array();
 		@$response_placeholder = $params['response_placeholder'];
 		
 		if(empty($http_verb) || empty($http_url))
@@ -284,111 +296,78 @@ class VaAction_HttpRequest extends Extension_DevblocksEventAction {
 		if(empty($response_placeholder))
 			return false;
 		
-		$response = $this->_execute($http_verb, $http_url, array(), $http_body, $http_headers);
+		$response = $this->_execute($http_verb, $http_url, array(), $http_body, $http_headers, $options);
 		$dict->$response_placeholder = $response;
 	}
 	
-	private function _execute($verb, $url, $params=array(), $body=null, $headers=array()) {
-		switch($verb) {
-			case 'get':
-				return $this->_get($url, $params, $headers);
-				break;
-				
-			case 'post':
-			case 'put':
-				return $this->_post($url, $params, $body, $verb, $headers);
-				break;
-				
-			case 'delete':
-				// [TODO]
-				break;
-		}
-		
-	}
-	
-	private function _post($url, $params=array(), $body=null, $verb='post', $headers=array()) {
+	private function _execute($verb='get', $url, $params=array(), $body=null, $headers=array(), $options=array()) {
 		if(!empty($params) && is_array($params))
 			$url .= '?' . http_build_query($params);
 		
 		$ch = curl_init($url);
-
+		
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		
+		if(isset($options['ignore_ssl_validation']) && $options['ignore_ssl_validation']) {
+			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		}
 
 		switch($verb) {
+			case 'get':
+				break;
+				
 			case 'post':
 				curl_setopt($ch, CURLOPT_POST, 1);
+				curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
 				break;
 				
 			case 'put':
 				curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
 				curl_setopt($ch, CURLOPT_POST, 1);
+				curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+				break;
+				
+			case 'delete':
+				curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
 				break;
 		}
-
-		if(!empty($headers))
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-		
-		$out = curl_exec($ch);
-		
-		$info = curl_getinfo($ch);
-
-		// [TODO] This can fail without HTTPS
-		
-		if(curl_errno($ch)) {
-			
-		} else {
-			switch(@$info['content_type']) {
-				case 'application/json':
-					@$out = json_decode($out, true);
-					break;
-			}
-		}
-		
-		curl_close($ch);
-		return array(
-			'content_type' => $info['content_type'],
-			'body' => $out,
-		);
-	}
-	
-	private function _get($url, $params=array(), $headers=array()) {
-		if(!empty($params) && is_array($params))
-			$url .= '?' . http_build_query($params);
-		
-		$ch = curl_init($url);
-		
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		
 		if(!empty($headers))
 			curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		
 		$out = curl_exec($ch);
-
-		$info = curl_getinfo($ch);
 		
+		$info = curl_getinfo($ch);
+		$error = curl_error($ch);
+
 		if(curl_errno($ch)) {
 			
 		} else {
-			switch(@$info['content_type']) {
-				case 'application/json':
-					@$out = json_decode($out, true);
-					break;
-					
-				case 'image/gif':
-				case 'image/jpeg':
-				case 'image/jpg':
-				case 'image/png':
-					@$out = base64_encode($out);
-					break;
+			// Auto-convert the response body based on the type
+			if(!(isset($options['raw_response_body']) && $options['raw_response_body'])) {
+				switch(@$info['content_type']) {
+					case 'application/json':
+						@$out = json_decode($out, true);
+						break;
+						
+					case 'image/gif':
+					case 'image/jpeg':
+					case 'image/jpg':
+					case 'image/png':
+						@$out = base64_encode($out);
+						break;
+				}
 			}
 		}
 		
 		curl_close($ch);
+		
 		return array(
 			'content_type' => $info['content_type'],
 			'body' => $out,
+			'info' => $info,
+			'error' => $error,
 		);
 	}
 };
@@ -596,3 +575,195 @@ XML;
 		return $xml->asXML();
 	}
 };
+
+if(class_exists('Extension_MailTransport')):
+class CerbMailTransport_Smtp extends Extension_MailTransport {
+	const ID = 'core.mail.transport.smtp';
+	
+	function renderConfig(Model_MailTransport $model) {
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->assign('model', $model);
+		$tpl->assign('extension', $this);
+		$tpl->display('devblocks:cerberusweb.core::internal/mail_transport/smtp/config.tpl');
+	}
+	
+	function testConfig(array $params, &$error=null) {
+		@$host = $params['host'];
+		@$port = $params['port'];
+		@$encryption = $params['encryption'];
+		@$auth_enabled = $params['auth_enabled'];
+		@$auth_user = $params['auth_user'];
+		@$auth_pass = $params['auth_pass'];
+		@$timeout = $params['timeout'];
+		
+		if(empty($host)) {
+			$error = 'The SMTP "host" parameter is required.';
+			return false;
+		}
+		
+		if(empty($port)) {
+			$error = 'The SMTP "port" parameter is required.';
+			return false;
+		}
+		
+		// Try connecting
+		
+		$mail_service = DevblocksPlatform::getMailService();
+		
+		$options = array(
+			'host' => $host,
+			'port' => $port,
+			'enc' => $encryption,
+			'auth_user' => $auth_user,
+			'auth_pass' => $auth_pass,
+			'timeout' => $timeout,
+		);
+		
+		try {
+			$mailer = $this->_getMailer($options);
+			
+			@$transport = $mailer->getTransport();
+			@$transport->start();
+			@$transport->stop();
+			return true;
+			
+		} catch(Exception $e) {
+			$error = $e->getMessage();
+			return false;
+		}
+		
+		return true;
+	}
+	
+	/**
+	 * @param Swift_Message $message
+	 * @return boolean
+	 */
+	function send(Swift_Message $message, Model_MailTransport $model) {
+		$options = array(
+			'host' => @$model->params['host'],
+			'port' => @$model->params['port'],
+			'auth_user' => @$model->params['auth_user'],
+			'auth_pass' => @$model->params['auth_pass'],
+			'enc' => @$model->params['encryption'],
+			'max_sends' => @$model->params['max_sends'],
+			'timeout' => @$model->params['timeout'],
+		);
+		
+		if(false == ($mailer = $this->_getMailer($options)))
+			return false;
+		
+		$failed_recipients = array();
+		
+		// [TODO] Actually use failed recipients
+		
+		return $mailer->send($message, $failed_recipients);
+	}
+	
+	/**
+	 * @return Swift_Mailer
+	 */
+	private function _getMailer(array $options) {
+		static $connections = array();
+		
+		// Options
+		$smtp_host = isset($options['host']) ? $options['host'] : '127.0.0.1';
+		$smtp_port = isset($options['port']) ? $options['port'] : '25';
+		$smtp_user = isset($options['auth_user']) ? $options['auth_user'] : null;
+		$smtp_pass = isset($options['auth_pass']) ? $options['auth_pass'] : null;
+		$smtp_enc = isset($options['enc']) ? $options['enc'] : 'None';
+		$smtp_max_sends = isset($options['max_sends']) ? intval($options['max_sends']) : 20;
+		$smtp_timeout = isset($options['timeout']) ? intval($options['timeout']) : 30;
+		
+		/*
+		 * [JAS]: We'll cache connection info hashed by params and hold a persistent
+		 * connection for the request cycle.  If we ask for the same params again
+		 * we'll get the existing connection if it exists.
+		 */
+
+		$hash = md5(json_encode(array(
+			$smtp_host,
+			$smtp_user,
+			$smtp_pass,
+			$smtp_port,
+			$smtp_enc,
+			$smtp_max_sends,
+			$smtp_timeout
+		)));
+		
+		if(!isset($connections[$hash])) {
+			// Encryption
+			switch($smtp_enc) {
+				case 'TLS':
+					$smtp_enc = 'tls';
+					break;
+					
+				case 'SSL':
+					$smtp_enc = 'ssl';
+					break;
+					
+				default:
+					$smtp_enc = null;
+					break;
+			}
+			
+			$smtp = Swift_SmtpTransport::newInstance($smtp_host, $smtp_port, $smtp_enc);
+			$smtp->setTimeout($smtp_timeout);
+			
+			if(!empty($smtp_user)) {
+				$smtp->setUsername($smtp_user);
+				$smtp->setPassword($smtp_pass);
+			}
+			
+			$mailer = Swift_Mailer::newInstance($smtp);
+			$mailer->registerPlugin(new Swift_Plugins_AntiFloodPlugin($smtp_max_sends, 1));
+			
+			$connections[$hash] = $mailer;
+		}
+		
+		if($connections[$hash])
+			return $connections[$hash];
+		
+		return null;
+	}
+}
+endif;
+
+if(class_exists('Extension_MailTransport')):
+class CerbMailTransport_Null extends Extension_MailTransport {
+	const ID = 'core.mail.transport.null';
+	
+	function renderConfig(Model_MailTransport $model) {
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->assign('model', $model);
+		$tpl->assign('extension', $this);
+		$tpl->display('devblocks:cerberusweb.core::internal/mail_transport/null/config.tpl');
+	}
+	
+	function testConfig(array $params, &$error=null) {
+		return true;
+	}
+	
+	/**
+	 * @param Swift_Message $message
+	 * @return boolean
+	 */
+	function send(Swift_Message $message, Model_MailTransport $model) {
+		if(false == ($mailer = $this->_getMailer()))
+			return false;
+		
+		return $mailer->send($message);
+	}
+	
+	private function _getMailer() {
+		static $mailer = null;
+		
+		if(is_null($mailer)) {
+			$null = Swift_NullTransport::newInstance();
+			$mailer = Swift_Mailer::newInstance($null);
+		}
+		
+		return $mailer;
+	}
+}
+endif;

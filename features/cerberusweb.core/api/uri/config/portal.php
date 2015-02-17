@@ -127,8 +127,6 @@ class PageSection_SetupPortal extends Extension_PageSection {
 			$view->addParamsRequired(array(
 				new DevblocksSearchCriteria(SearchFields_DevblocksTemplate::TAG,'=','portal_'.$tool->code),
 			), true);
-			
-			C4_AbstractViewLoader::setView($view->id, $view);
 		}
 		
 		$tpl->assign('view', $view);
@@ -285,7 +283,7 @@ class PageSection_SetupPortal extends Extension_PageSection {
 		// Pull from filesystem for editing
 		$content = '';
 		if(null != ($plugin = DevblocksPlatform::getPlugin($plugin_id))) {
-			$path = APP_PATH . '/' . $plugin->dir . '/templates/' . $template_path;
+			$path = $plugin->getStoragePath() . '/templates/' . $template_path;
 			if(file_exists($path)) {
 				$content = file_get_contents($path);
 			}

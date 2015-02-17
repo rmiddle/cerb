@@ -136,9 +136,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		$tpl->assign('context', $context);
 		$tpl->assign('context_id', $context_id);
 
-		if(!empty($point))
-			$visit->set($point, 'links');
-
 		// Context Links
 
 		$contexts = DAO_ContextLink::getDistinctContexts($context, $context_id);
@@ -655,8 +652,6 @@ class ChInternalController extends DevblocksControllerExtension {
 				}
 			}
 			
-			C4_AbstractViewLoader::setView($view->id, $view);
-			
 			$tpl->assign('view', $view);
 			$tpl->assign('single', $single);
 			
@@ -730,8 +725,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			$view->setPlaceholderLabels($labels);
 			$view->setPlaceholderValues($values);
 		}
-		
-		C4_AbstractViewLoader::setView($view->id, $view);
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('context', $context);
@@ -891,16 +884,11 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'],'integer');
 		@$point = DevblocksPlatform::importGPC($_REQUEST['point'],'string');
 		
-		$visit = CerberusApplication::getVisit();
 		$tpl = DevblocksPlatform::getTemplateService();
 
 		if(empty($context) || empty($context_id))
 			return;
 		
-		// Remember tab
-		if(!empty($point))
-			$visit->set($point, 'activity');
-
 		switch($scope) {
 			case 'target':
 				$params = array(
@@ -961,8 +949,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			), true);
 			
 			$view->addParamsRequired($params, true);
-			
-			C4_AbstractViewLoader::setView($view->id, $view);
 			
 			$tpl->assign('view', $view);
 		}
@@ -1295,15 +1281,11 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'],'integer',null);
 		
 		$active_worker = CerberusApplication::getActiveWorker();
-		$visit = CerberusApplication::getVisit();
 		$tpl = DevblocksPlatform::getTemplateService();
 
 		$tpl->assign('owner_context', $context);
 		$tpl->assign('owner_context_id', $context_id);
 		
-		// Remember the tab
-		$visit->set($point, 'snippets');
-
 		$view_id = str_replace('.','_',$point) . '_snippets';
 		
 		$view = C4_AbstractViewLoader::getView($view_id);
@@ -1323,7 +1305,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			), true);
 		}
 		
-		C4_AbstractViewLoader::setView($view->id,$view);
 		$tpl->assign('view', $view);
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
@@ -1825,7 +1806,6 @@ class ChInternalController extends DevblocksControllerExtension {
 
 		if(null != ($view = C4_AbstractViewLoader::getView($id))) {
 			$view->doSortBy($sortBy);
-			C4_AbstractViewLoader::setView($id, $view);
 			$view->render();
 		}
 	}
@@ -1836,7 +1816,6 @@ class ChInternalController extends DevblocksControllerExtension {
 
 		if(null != ($view = C4_AbstractViewLoader::getView($id))) {
 			$view->doPage($page);
-			C4_AbstractViewLoader::setView($id, $view);
 			$view->render();
 		}
 	}
@@ -1882,7 +1861,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		if(null != ($view = C4_AbstractViewLoader::getView($id))) {
 			$view->renderFilters = !empty($show) ? 1 : 0;
-			C4_AbstractViewLoader::setView($view->id, $view);
 		}
 	}
 	
@@ -1928,8 +1906,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		// Reset the paging when adding a filter
 		$view->renderPage = 0;
 		
-		C4_AbstractViewLoader::setView($view->id, $view);
-
 		$this->_viewRenderInlineFilters($view, $is_custom);
 	}
 
@@ -1940,8 +1916,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			return;
 
 		$view->doResetCriteria();
-
-		C4_AbstractViewLoader::setView($view->id, $view);
 
 		$this->_viewRenderInlineFilters($view);
 	}
@@ -1962,8 +1936,6 @@ class ChInternalController extends DevblocksControllerExtension {
 				$view->renderSortAsc = !empty($preset->sort_asc);
 			}
 		}
-
-		C4_AbstractViewLoader::setView($view->id, $view);
 
 		$this->_viewRenderInlineFilters($view);
 	}
@@ -2671,8 +2643,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			}
 		}
 
-		C4_AbstractViewLoader::setView($id, $view);
-
 		$view->render();
 	}
 
@@ -2730,8 +2700,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			
 		}
 		
-		C4_AbstractViewLoader::setView($view->id, $view);
-
 		// If hidden, no need to draw template
 		if(empty($view->renderSubtotals) || '__'==substr($view->renderSubtotals,0,2))
 			return;
@@ -3034,16 +3002,11 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		$translate = DevblocksPlatform::getTranslationService();
 		$active_worker = CerberusApplication::getActiveWorker();
-		$visit = CerberusApplication::getVisit();
 		$tpl = DevblocksPlatform::getTemplateService();
 		
 		if(empty($context))
 			return;
 
-		// Remember tab
-		if(!empty($point))
-			$visit->set($point, 'attendants');
-		
 		$tpl->assign('owner_context', $context);
 		$tpl->assign('owner_context_id', $context_id);
 		
@@ -3066,7 +3029,6 @@ class ChInternalController extends DevblocksControllerExtension {
 			), true);
 		}
 		
-		C4_AbstractViewLoader::setView($view->id,$view);
 		$tpl->assign('view', $view);
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
@@ -3078,15 +3040,10 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		$translate = DevblocksPlatform::getTranslationService();
 		$active_worker = CerberusApplication::getActiveWorker();
-		$visit = CerberusApplication::getVisit();
 		$tpl = DevblocksPlatform::getTemplateService();
 
 		if(empty($id))
 			return;
-		
-		// Remember tab
-		if(!empty($point))
-			$visit->set($point, 'behaviors');
 		
 		if(null == ($va = DAO_VirtualAttendant::get($id)))
 			return;
@@ -4385,10 +4342,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$point = DevblocksPlatform::importGPC($_REQUEST['point'],'string','');
 
 		$tpl = DevblocksPlatform::getTemplateService();
-		$visit = CerberusApplication::getVisit();
-
-		if(!empty($point))
-			$visit->set($point, 'comments');
 
 		$tpl->assign('context', $context);
 		$tpl->assign('context_id', $context_id);

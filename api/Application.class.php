@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2015012301);
-define("APP_VERSION", '6.9.0');
+define("APP_BUILD", 2015021601);
+define("APP_VERSION", '6.9.2');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -427,6 +427,12 @@ class CerberusApplication extends DevblocksApplication {
 		return TRUE;
 	}
 	
+	/**
+	 * 
+	 * @param integer $length
+	 * @return string
+	 * @test CerberusApplicationTest
+	 */
 	static function generatePassword($length=8) {
 		$chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789';
 		$len = strlen($chars)-1;
@@ -561,6 +567,9 @@ class CerberusApplication extends DevblocksApplication {
 	
 	/**
 	 * Generate an RFC-compliant Message-ID
+	 * 
+	 * @return string
+	 * @test CerberusApplicationTest
 	 */
 	static function generateMessageId() {
 		$message_id = sprintf('<%s.%s@%s>', base_convert(time(), 10, 36), base_convert(mt_rand(), 10, 36), !empty($_SERVER['HTTP_HOST']) ?  $_SERVER['HTTP_HOST'] : $_SERVER['SERVER_NAME']);
@@ -1750,6 +1759,9 @@ class CerberusContexts {
 
 		$models = array();
 		
+		if(empty($ids))
+			return $models;
+		
 		if(false == ($context_ext = Extension_DevblocksContext::get($context)))
 			return $models;
 		
@@ -2059,14 +2071,6 @@ class CerberusSettings {
 	const HELPDESK_TITLE = 'helpdesk_title';
 	const HELPDESK_FAVICON_URL = 'helpdesk_favicon_url';
 	const HELPDESK_LOGO_URL = 'helpdesk_logo_url';
-	const SMTP_HOST = 'smtp_host';
-	const SMTP_AUTH_ENABLED = 'smtp_auth_enabled';
-	const SMTP_AUTH_USER = 'smtp_auth_user';
-	const SMTP_AUTH_PASS = 'smtp_auth_pass';
-	const SMTP_PORT = 'smtp_port';
-	const SMTP_ENCRYPTION_TYPE = 'smtp_enc';
-	const SMTP_MAX_SENDS = 'smtp_max_sends';
-	const SMTP_TIMEOUT = 'smtp_timeout';
 	const ATTACHMENTS_ENABLED = 'attachments_enabled';
 	const ATTACHMENTS_MAX_SIZE = 'attachments_max_size';
 	const PARSER_AUTO_REQ = 'parser_autoreq';
@@ -2082,14 +2086,6 @@ class CerberusSettings {
 
 class CerberusSettingsDefaults {
 	const HELPDESK_TITLE = 'Cerb - a fast and flexible web-based platform for business collaboration and automation.';
-	const SMTP_HOST = 'localhost';
-	const SMTP_AUTH_ENABLED = 0;
-	const SMTP_AUTH_USER = '';
-	const SMTP_AUTH_PASS = '';
-	const SMTP_PORT = 25;
-	const SMTP_ENCRYPTION_TYPE = 'None';
-	const SMTP_MAX_SENDS = 20;
-	const SMTP_TIMEOUT = 30;
 	const ATTACHMENTS_ENABLED = 1;
 	const ATTACHMENTS_MAX_SIZE = 10;
 	const PARSER_AUTO_REQ = 0;
@@ -2135,7 +2131,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 		// [TODO] Allow Cerb to enable user-agent comparisons as setting
 		// [TODO] Limit the IPs a worker can log in from (per-worker?)
 		
-		if(null != ($session = $db->GetRow(sprintf("SELECT session_data, refreshed_at, user_ip, user_agent FROM devblocks_session WHERE session_key = %s", $db->qstr($id))))) {
+		if(null != ($session = $db->GetRowSlave(sprintf("SELECT session_data, refreshed_at, user_ip, user_agent FROM devblocks_session WHERE session_key = %s", $db->qstr($id))))) {
 			$maxlifetime = DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::SESSION_LIFESPAN, CerberusSettingsDefaults::SESSION_LIFESPAN);
 			$is_ajax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest');
 			
@@ -2145,7 +2141,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 				
 				setcookie('Devblocks', $id, time()+$maxlifetime, '/', NULL, $url_writer->isSSL(), true);
 				
-				$db->Execute(sprintf("UPDATE devblocks_session SET refreshed_at=%d WHERE session_key = %s",
+				$db->ExecuteMaster(sprintf("UPDATE devblocks_session SET refreshed_at=%d WHERE session_key = %s",
 					time(),
 					$db->qstr($id)
 				));
@@ -2182,7 +2178,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 			$db->qstr($user_agent),
 			$db->qstr($id)
 		);
-		$result = $db->Execute($sql);
+		$result = $db->ExecuteMaster($sql);
 		
 		if(0==$db->Affected_Rows()) {
 			// Insert
@@ -2197,7 +2193,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 				$db->qstr($user_agent),
 				$db->qstr($session_data)
 			);
-			$db->Execute($sql);
+			$db->ExecuteMaster($sql);
 		}
 		
 		return true;
@@ -2209,7 +2205,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 		if(!self::isReady())
 			return false;
 		
-		$db->Execute(sprintf("DELETE FROM devblocks_session WHERE session_key = %s", $db->qstr($id)));
+		$db->ExecuteMaster(sprintf("DELETE FROM devblocks_session WHERE session_key = %s", $db->qstr($id)));
 		return true;
 	}
 	
@@ -2225,7 +2221,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 			$maxlifetime = 86400;
 		
 		$db = DevblocksPlatform::getDatabaseService();
-		$db->Execute(sprintf("DELETE FROM devblocks_session WHERE updated + %d < %d", $maxlifetime, time()));
+		$db->ExecuteMaster(sprintf("DELETE FROM devblocks_session WHERE updated + %d < %d", $maxlifetime, time()));
 		return true;
 	}
 	
@@ -2235,7 +2231,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 		if(!self::isReady())
 			return false;
 		
-		return $db->GetArray("SELECT session_key, created, updated, user_id, user_ip, user_agent, session_data FROM devblocks_session");
+		return $db->GetArraySlave("SELECT session_key, created, updated, user_id, user_ip, user_agent, session_data FROM devblocks_session");
 	}
 	
 	static function destroyAll() {
@@ -2244,7 +2240,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 		if(!self::isReady())
 			return false;
 		
-		$db->Execute("DELETE FROM devblocks_session");
+		$db->ExecuteMaster("DELETE FROM devblocks_session");
 	}
 	
 	static function destroyByWorkerIds($ids) {
@@ -2259,7 +2255,7 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 			return;
 		
 		$db = DevblocksPlatform::getDatabaseService();
-		$db->Execute(sprintf("DELETE FROM devblocks_session WHERE user_id IN (%s)", $ids_list));
+		$db->ExecuteMaster(sprintf("DELETE FROM devblocks_session WHERE user_id IN (%s)", $ids_list));
 	}
 };
 
@@ -2322,8 +2318,27 @@ class CerberusVisit extends DevblocksVisit {
 	public function setWorker(Model_Worker $worker=null) {
 		if(is_null($worker)) {
 			$this->worker_id = null;
+			
 		} else {
 			$this->worker_id = $worker->id;
+			
+			// Language
+			if($worker->language) {
+				$_SESSION['locale'] = $worker->language;
+				DevblocksPlatform::setLocale($worker->language);
+			}
+			
+			// Timezone
+			if($worker->timezone) {
+				$_SESSION['timezone'] = $worker->timezone;
+				@date_default_timezone_set($worker->timezone);
+			}
+			
+			// Time format
+			if($worker->time_format) {
+				$_SESSION['time_format'] = $worker->time_format;
+				DevblocksPlatform::setDateTimeFormat($worker->time_format);
+			}
 		}
 	}
 	
@@ -2436,8 +2451,8 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 	
 	static protected function _getRandom($table, $pkey='id') {
 		$db = DevblocksPlatform::getDatabaseService();
-		$offset = $db->GetOne(sprintf("SELECT ROUND(RAND()*(SELECT COUNT(*)-1 FROM %s))", $table));
-		return $db->GetOne(sprintf("SELECT %s FROM %s LIMIT %d,1", $pkey, $table, $offset));
+		$offset = $db->GetOneSlave(sprintf("SELECT ROUND(RAND()*(SELECT COUNT(*)-1 FROM %s))", $table));
+		return $db->GetOneSlave(sprintf("SELECT %s FROM %s LIMIT %d,1", $pkey, $table, $offset));
 	}
 	
 	static protected function _appendSelectJoinSqlForCustomFieldTables($tables, $params, $key, $select_sql, $join_sql) {

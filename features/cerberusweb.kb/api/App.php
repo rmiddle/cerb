@@ -235,8 +235,6 @@ class WorkspaceTab_KbBrowse extends Extension_WorkspaceTab {
 
 		$view->renderPage = 0;
 
-		C4_AbstractViewLoader::setView($view->id, $view);
-		
 		$tpl->assign('view', $view);
 		
 		$tpl->display('devblocks:cerberusweb.kb::kb/tabs/articles/index.tpl');
@@ -619,7 +617,7 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 		$sql = sprintf("INSERT INTO kb_category () ".
 			"VALUES ()"
 		);
-		$db->Execute($sql);
+		$db->ExecuteMaster($sql);
 		$id = $db->LastInsertId();
 		
 		self::update($id, $fields);
@@ -651,7 +649,7 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 		
 		// Add counts (and bubble up)
 		$sql = "SELECT count(*) AS hits, kb_category_id FROM kb_article_to_category GROUP BY kb_category_id";
-		$rs = $db->Execute($sql);
+		$rs = $db->ExecuteSlave($sql);
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$count_cat = intval($row['kb_category_id']);
@@ -680,7 +678,13 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 	static function getAll($nocache=false) {
 		$cache = DevblocksPlatform::getCacheService();
 		if($nocache || null === ($categories = $cache->load(self::CACHE_ALL))) {
-			$categories = self::getWhere();
+			$categories = self::getWhere(
+				null,
+				DAO_KbCategory::NAME,
+				true,
+				null,
+				Cerb_ORMHelper::OPT_GET_MASTER_ONLY
+			);
 			$cache->save($categories, self::CACHE_ALL);
 		}
 		
@@ -732,14 +736,24 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 	 * @param string $where
 	 * @return Model_KbCategory[]
 	 */
-	static function getWhere($where=null) {
+	static function getWhere($where=null, $sortBy=DAO_KbCategory::NAME, $sortAsc=true, $limit=null, $options=null) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
+		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
+		
+		// SQL
 		$sql = "SELECT id, parent_id, name ".
 			"FROM kb_category ".
-			(!empty($where) ? sprintf("WHERE %s ",$where) : "").
-			"ORDER BY name asc";
-		$rs = $db->Execute($sql);
+			$where_sql.
+			$sort_sql.
+			$limit_sql
+		;
+
+		if($options & Cerb_ORMHelper::OPT_GET_MASTER_ONLY) {
+			$rs = $db->ExecuteMaster($sql);
+		} else {
+			$rs = $db->ExecuteSlave($sql);
+		}
 		
 		return self::_getObjectsFromResult($rs);
 	}
@@ -748,6 +762,9 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 	 * @param integer $id
 	 * @return Model_KbCategory	 */
 	static function get($id) {
+		if(empty($id))
+			return null;
+		
 		$objects = self::getWhere(sprintf("%s = %d",
 			self::ID,
 			$id
@@ -788,9 +805,9 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 		
 		$ids_list = implode(',', $ids);
 		
-		$db->Execute(sprintf("DELETE FROM kb_category WHERE id IN (%s)", $ids_list));
+		$db->ExecuteMaster(sprintf("DELETE FROM kb_category WHERE id IN (%s)", $ids_list));
 
-		$db->Execute(sprintf("DELETE FROM kb_article_to_category WHERE kb_category_id IN (%s)", $ids_list));
+		$db->ExecuteMaster(sprintf("DELETE FROM kb_article_to_category WHERE kb_category_id IN (%s)", $ids_list));
 		
 		self::clearCache();
 		
@@ -888,7 +905,7 @@ class DAO_KbCategory extends Cerb_ORMHelper {
 					($has_multiple_values ? "SELECT COUNT(DISTINCT kbc.id) " : "SELECT COUNT(kbc.id) ").
 					$join_sql.
 					$where_sql;
-				$total = $db->GetOne($count_sql);
+				$total = $db->GetOneSlave($count_sql);
 			}
 		}
 		
@@ -1082,7 +1099,6 @@ class Context_KbCategory extends Extension_DevblocksContext {
 		$view->renderLimit = 10;
 		$view->renderTemplate = 'contextlinks_chooser';
 		
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 	
@@ -1107,7 +1123,6 @@ class Context_KbCategory extends Extension_DevblocksContext {
 		$view->addParamsRequired($params_req, true);
 		
 		$view->renderTemplate = 'context';
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 };

@@ -673,8 +673,6 @@ class DevblocksEventHelper {
 		if(null == ($view = DevblocksEventHelper::getViewFromAbstractJson($token, $params, $trigger, $context)))
 			return;
 		
-		C4_AbstractViewLoader::setView($view->id, $view);
-		
 		$tpl->assign('context', $context);
 		$tpl->assign('params', $params);
 		$tpl->assign('view', $view);
@@ -977,7 +975,7 @@ class DevblocksEventHelper {
 						$sql = sprintf("SELECT COUNT(id) AS hits, owner_id FROM ticket WHERE is_closed = 0 AND is_deleted = 0 AND is_waiting = 0 AND owner_id != 0 AND owner_id IN (%s) GROUP BY owner_id",
 							implode(',', array_keys($possible_workers))
 						);
-						$results = $db->GetArray($sql);
+						$results = $db->GetArraySlave($sql);
 						
 						if(!empty($results))
 						foreach($results as $row) {
@@ -4005,7 +4003,6 @@ class DevblocksEventHelper {
 		$logger = DevblocksPlatform::getConsoleLog('Attendant');
 		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 		$mail_service = DevblocksPlatform::getMailService();
-		$mailer = $mail_service->getMailer(CerberusMail::getMailerDefaults());
 		$settings = DevblocksPlatform::getPluginSettingsService();
 		
 		$relay_spoof_from = $settings->get('cerberusweb.core', CerberusSettings::RELAY_SPOOF_FROM, CerberusSettingsDefaults::RELAY_SPOOF_FROM);
@@ -4099,7 +4096,7 @@ class DevblocksEventHelper {
 					
 				}
 				
-				$result = $mailer->send($mail);
+				$result = $mail_service->send($mail);
 				unset($mail);
 				
 				/*
@@ -4285,7 +4282,9 @@ class DevblocksEventHelper {
 		
 		// Load values and ignore _labels and _types
 		$view->setPlaceholderValues($dict->getDictionary(null, false));
-		C4_AbstractViewLoader::setView($view->id, $view);
+
+		$view->persist();
+		$view->setAutoPersist(false);
 		
 		// Save the generated view_id in the dictionary for reuse (paging, etc)
 		$var_view_id_key = sprintf("%s_view_id", $token);

@@ -61,7 +61,7 @@ foreach($fields as $field_name => $field_type) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
 		$sql = "INSERT INTO <?php echo $table_name; ?> () VALUES ()";
-		$db->Execute($sql);
+		$db->ExecuteMaster($sql);
 		$id = $db->LastInsertId();
 		
 		self::update($id, $fields);
@@ -118,7 +118,7 @@ foreach($fields as $field_name => $field_type) {
 	 * @param integer $limit
 	 * @return Model_<?php echo $class_name; ?>[]
 	 */
-	static function getWhere($where=null, $sortBy=null, $sortAsc=true, $limit=null) {
+	static function getWhere($where=null, $sortBy=null, $sortAsc=true, $limit=null, $options=null) {
 		$db = DevblocksPlatform::getDatabaseService();
 
 		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
@@ -130,7 +130,12 @@ foreach($fields as $field_name => $field_type) {
 			$sort_sql.
 			$limit_sql
 		;
-		$rs = $db->Execute($sql);
+		
+		if($options & Cerb_ORMHelper::OPT_GET_MASTER_ONLY) {
+			$rs = $db->ExecuteMaster($sql);
+		} else {
+			$rs = $db->ExecuteSlave($sql);
+		}
 		
 		return self::_getObjectsFromResult($rs);
 	}
@@ -140,6 +145,9 @@ foreach($fields as $field_name => $field_type) {
 	 * @return Model_<?php echo $class_name,"\n"; ?>
 	 */
 	static function get($id) {
+		if(empty($id))
+			return null;
+		
 		$objects = self::getWhere(sprintf("%s = %d",
 			self::ID,
 			$id
@@ -189,7 +197,7 @@ foreach($fields as $field_name => $field_type) {
 		
 		$ids_list = implode(',', $ids);
 		
-		$db->Execute(sprintf("DELETE FROM <?php echo $table_name; ?> WHERE id IN (%s)", $ids_list));
+		$db->ExecuteMaster(sprintf("DELETE FROM <?php echo $table_name; ?> WHERE id IN (%s)", $ids_list));
 		
 		// Fire event
 		$eventMgr = DevblocksPlatform::getEventService();
@@ -340,9 +348,9 @@ foreach($fields as $field_name => $field_type) {
 			$sort_sql;
 			
 		if($limit > 0) {
-			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs ADORecordSet */
+			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
 		} else {
-			$rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs ADORecordSet */
+			$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
 			$total = mysqli_num_rows($rs);
 		}
 		
@@ -362,7 +370,7 @@ foreach($fields as $field_name => $field_type) {
 					($has_multiple_values ? "SELECT COUNT(DISTINCT <?php echo $table_name; ?>.id) " : "SELECT COUNT(<?php echo $table_name; ?>.id) ").
 					$join_sql.
 					$where_sql;
-				$total = $db->GetOne($count_sql);
+				$total = $db->GetOneSlave($count_sql);
 			}
 		}
 		
@@ -619,7 +627,7 @@ foreach($fields as $field_name => $field_type) {
 		
 		// Add searchable custom fields
 		
-		$fields = self::_appendFieldsFromQuickSearchContext(<?php echo $ctx_ext_id; ?>, $fields, null);
+		$fields = self::_appendFieldsFromQuickSearchContext('<?php echo $ctx_ext_id; ?>', $fields, null);
 		
 		// Sort by keys
 		ksort($fields);
@@ -1096,7 +1104,6 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 		$view->renderFilters = false;
 		$view->renderTemplate = 'contextlinks_chooser';
 		
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 	
@@ -1121,7 +1128,6 @@ class Context_<?php echo $class_name;?> extends Extension_DevblocksContext imple
 		$view->addParamsRequired($params_req, true);
 		
 		$view->renderTemplate = 'context';
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 	
@@ -1889,28 +1895,23 @@ class PageSection_Profiles<?php echo $class_name; ?> extends Extension_PageSecti
 </div>
 <br>
 
-{$selected_tab_idx=0}
-{foreach from=$tabs item=tab_label name=tabs}
-	{if $tab_label==$tab_selected}{$selected_tab_idx = $smarty.foreach.tabs.index}{/if}
-{/foreach}
-
 <script type="text/javascript">
-	$(function() {
-		var tabOptions = Devblocks.getDefaultjQueryUiTabOptions();
-		tabOptions.active = {$selected_tab_idx};
-	
-		var tabs = $("#<?php echo $table_name; ?>Tabs").tabs(tabOptions);
-		
-		$('#btnDisplay<?php echo $class_name; ?>Edit').bind('click', function() {
-			$popup = genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$page_context}&context_id={$page_context_id}',null,false,'550');
-			$popup.one('<?php echo $table_name; ?>_save', function(event) {
-				event.stopPropagation();
-				document.location.reload();
-			});
-		});
+$(function() {
+	var tabOptions = Devblocks.getDefaultjQueryUiTabOptions();
+	tabOptions.active = Devblocks.getjQueryUiTabSelected('<?php echo $table_name; ?>Tabs');
 
-		{include file="devblocks:cerberusweb.core::internal/macros/display/menu_script.tpl" selector_button=null selector_menu=null}
+	var tabs = $("#<?php echo $table_name; ?>Tabs").tabs(tabOptions);
+	
+	$('#btnDisplay<?php echo $class_name; ?>Edit').bind('click', function() {
+		$popup = genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$page_context}&context_id={$page_context_id}',null,false,'550');
+		$popup.one('<?php echo $table_name; ?>_save', function(event) {
+			event.stopPropagation();
+			document.location.reload();
+		});
 	});
+
+	{include file="devblocks:cerberusweb.core::internal/macros/display/menu_script.tpl" selector_button=null selector_menu=null}
+});
 </script>
 
 <script type="text/javascript">

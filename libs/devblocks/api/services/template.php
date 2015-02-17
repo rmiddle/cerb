@@ -33,7 +33,7 @@ class _DevblocksTemplateManager {
 
 			$instance->caching = 0;
 			$instance->cache_lifetime = 0;
-			$instance->compile_check = (defined('DEVELOPMENT_MODE') && DEVELOPMENT_MODE) ? true : false;
+			$instance->compile_check = DEVELOPMENT_MODE ? true : false;
 			
 			$instance->error_unassigned = false;
 			$instance->error_reporting = E_ERROR & ~E_NOTICE;
@@ -311,7 +311,7 @@ class _DevblocksSmartyTemplateResource {
 		}
 			
 		// If not in DB, check plugin's relative path on disk
-		$path = APP_PATH . '/' . $plugin->dir . '/templates/' . $tpl_path;
+		$path = $plugin->getStoragePath() . '/templates/' . $tpl_path;
 		
 		if(!file_exists($path))
 			return false;
@@ -354,7 +354,7 @@ class _DevblocksSmartyTemplateResource {
 		}
 			
 		// If not in DB, check plugin's relative path on disk
-		$path = APP_PATH . '/' . $plugin->dir . '/templates/' . $tpl_path;
+		$path = $plugin->getStoragePath() . '/templates/' . $tpl_path;
 		
 		if(!file_exists($path))
 			return false;

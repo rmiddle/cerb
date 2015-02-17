@@ -74,12 +74,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 				break;
 
 			default:
-				// Remember the last tab/URL
-				if(null == ($selected_tab = @$response->path[1])) {
-					$selected_tab = $visit->get(Extension_PreferenceTab::POINT, '');
-				}
-				$tpl->assign('selected_tab', $selected_tab);
-
 				$tpl->assign('tab', $section);
 				$tpl->display('devblocks:cerberusweb.core::preferences/index.tpl');
 				break;
@@ -90,12 +84,9 @@ class ChPreferencesPage extends CerberusPageExtension {
 	function showTabAction() {
 		@$ext_id = DevblocksPlatform::importGPC($_REQUEST['ext_id'],'string','');
 
-		$visit = CerberusApplication::getVisit();
-
 		if(null != ($tab_mft = DevblocksPlatform::getExtension($ext_id))
 			&& null != ($inst = $tab_mft->createInstance())
 			&& $inst instanceof Extension_PreferenceTab) {
-				$visit->set(Extension_PreferenceTab::POINT, $inst->manifest->params['uri']);
 				$inst->showTab();
 		}
 	}
@@ -130,11 +121,7 @@ class ChPreferencesPage extends CerberusPageExtension {
 	
 	function showWatcherTabAction() {
 		$active_worker = CerberusApplication::getActiveWorker();
-		$visit = CerberusApplication::getVisit();
 		$tpl = DevblocksPlatform::getTemplateService();
-		
-		// Remember tab
-		$visit->set(Extension_PreferenceTab::POINT, 'watcher');
 		
 		// Activities
 		$activities = DevblocksPlatform::getActivityPointRegistry();
@@ -161,11 +148,7 @@ class ChPreferencesPage extends CerberusPageExtension {
 	function showMyNotificationsTabAction() {
 		$translate = DevblocksPlatform::getTranslationService();
 		$active_worker = CerberusApplication::getActiveWorker();
-		$visit = CerberusApplication::getVisit();
 		$tpl = DevblocksPlatform::getTemplateService();
-
-		// Remember tab
-		$visit->set('cerberusweb.profiles.worker.'.$active_worker->id, 'notifications');
 
 		// My Events
 		$defaults = new C4_AbstractViewModel();
@@ -196,13 +179,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 			SearchFields_Notification::WORKER_ID => new DevblocksSearchCriteria(SearchFields_Notification::WORKER_ID,'=',$active_worker->id),
 			SearchFields_Notification::IS_READ => new DevblocksSearchCriteria(SearchFields_Notification::IS_READ,'=',0),
 		), true);
-
-		/*
-		 * [TODO] This doesn't need to save every display, but it was possible to
-		 * lose the params in the saved version of the view in the DB w/o recovery.
-		 * This should be moved back into the if(null==...) check in a later build.
-		 */
-		C4_AbstractViewLoader::setView($myNotificationsView->id, $myNotificationsView);
 
 		$tpl->assign('view', $myNotificationsView);
 		$tpl->display('devblocks:cerberusweb.core::preferences/tabs/notifications/index.tpl');
@@ -469,9 +445,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 	function showGeneralTabAction() {
 		$date_service = DevblocksPlatform::getDateService();
 		$tpl = DevblocksPlatform::getTemplateService();
-		$visit = CerberusApplication::getVisit();
-
-		$visit->set(Extension_PreferenceTab::POINT, 'general');
 
 		$worker = CerberusApplication::getActiveWorker();
 		$tpl->assign('worker', $worker);
@@ -516,9 +489,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 
 	function showSecurityTabAction() {
 		$tpl = DevblocksPlatform::getTemplateService();
-		$visit = CerberusApplication::getVisit();
-		
-		$visit->set(Extension_PreferenceTab::POINT, 'security');
 
 		$worker = CerberusApplication::getActiveWorker();
 		$tpl->assign('worker', $worker);
@@ -564,9 +534,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 	
 	function showSessionsTabAction() {
 		$tpl = DevblocksPlatform::getTemplateService();
-		$visit = CerberusApplication::getVisit();
-		
-		$visit->set(Extension_PreferenceTab::POINT, 'sessions');
 
 		$worker = CerberusApplication::getActiveWorker();
 		$tpl->assign('worker', $worker);
@@ -587,8 +554,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 		
 		$view->addParamsHidden(array(SearchFields_DevblocksSession::USER_ID));
 		
-		C4_AbstractViewLoader::setView($view->id, $view);
-		
 		$tpl->assign('view', $view);
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
@@ -597,9 +562,6 @@ class ChPreferencesPage extends CerberusPageExtension {
 	function showRssTabAction() {
 		$tpl = DevblocksPlatform::getTemplateService();
 		$active_worker = CerberusApplication::getActiveWorker();
-		$visit = CerberusApplication::getVisit();
-
-		$visit->set(Extension_PreferenceTab::POINT, 'rss');
 
 		$feeds = DAO_ViewRss::getByWorker($active_worker->id);
 		$tpl->assign('feeds', $feeds);

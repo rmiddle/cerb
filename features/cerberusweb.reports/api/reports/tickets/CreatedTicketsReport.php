@@ -22,7 +22,7 @@ class ChReportNewTickets extends Extension_Report {
 		$date = DevblocksPlatform::getDateService();
 		
 		// Use the worker's timezone for MySQL date functions
-		$db->Execute(sprintf("SET time_zone = %s", $db->qstr($date->formatTime('P', time()))));
+		$db->ExecuteSlave(sprintf("SET time_zone = %s", $db->qstr($date->formatTime('P', time()))));
 		
 		// Filters
 		
@@ -42,7 +42,7 @@ class ChReportNewTickets extends Extension_Report {
 		// Year shortcuts
 		$years = array();
 		$sql = "SELECT date_format(from_unixtime(created_date),'%Y') as year FROM ticket WHERE created_date > 0 GROUP BY year having year <= date_format(now(),'%Y') ORDER BY year desc limit 0,10";
-		$rs = $db->Execute($sql);
+		$rs = $db->ExecuteSlave($sql);
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$years[] = intval($row['year']);
@@ -149,27 +149,24 @@ class ChReportNewTickets extends Extension_Report {
 			$view->renderSortBy = SearchFields_Ticket::TICKET_CREATED_DATE;
 			$view->renderSortAsc = false;
 			
-			C4_AbstractViewLoader::setView($view->id, $view);
-			
 			$tpl->assign('view', $view);
 		}
 		
 		// Chart
+		
+		$query_parts = DAO_Ticket::getSearchQueryComponents($view->view_columns, $view->getParams());
+
 		$sql = sprintf("SELECT t.group_id AS group_id, DATE_FORMAT(FROM_UNIXTIME(t.created_date),'%s') AS date_plot, ".
-			"COUNT(*) AS hits ".
-			"FROM ticket t ".
-			"WHERE t.created_date >= %d ".
-			"AND t.created_date <= %d ".
+			"COUNT(t.id) AS hits ".
 			"%s ".
-			"AND t.is_deleted = 0 ".
-			"AND t.spam_training != 'S' ".
+			"%s ".
 			"GROUP BY group_id, date_plot ",
 			$date_group,
-			$start_time,
-			$end_time,
-			(is_array($filter_group_ids) && !empty($filter_group_ids) ? sprintf("AND t.group_id IN (%s)", implode(',', $filter_group_ids)) : "")
+			$query_parts['join'],
+			$query_parts['where']
 		);
-		$rs = $db->Execute($sql);
+		
+		$rs = $db->ExecuteSlave($sql);
 		
 		$data = array();
 		while($row = mysqli_fetch_assoc($rs)) {

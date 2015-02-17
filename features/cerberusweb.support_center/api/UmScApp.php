@@ -471,7 +471,7 @@ class UmScLoginAuthenticator extends Extension_ScLoginAuthenticator {
 			if(null != ($address = DAO_Address::lookupAddress($email, false)) && !empty($address->contact_person_id))
 				throw new Exception("The provided email address is already associated with an account.");
 				
-			if($address->is_banned)
+			if($address instanceof Model_Address && $address->is_banned)
 				throw new Exception("The provided email address is not available.");
 			
 			// Update the preferred email address
@@ -1106,7 +1106,7 @@ class UmScAbstractViewLoader {
 	/**
 	 * Enter description here...
 	 *
-	 * @param string $class C4_AbstractView
+	 * @param string $class UmScAbstractView
 	 * @param string $view_label ID
 	 * @return C4_AbstractView instance
 	 */
@@ -1133,7 +1133,7 @@ class UmScAbstractViewLoader {
 	/**
 	 * Enter description here...
 	 *
-	 * @param string $class C4_AbstractView
+	 * @param string $class UmScAbstractView
 	 * @param string $view_label ID
 	 * @param C4_AbstractView $view
 	 */

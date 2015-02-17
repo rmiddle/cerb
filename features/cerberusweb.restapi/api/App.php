@@ -119,8 +119,6 @@ class Ch_RestPreferencesTab extends Extension_PreferenceTab {
 		
 		$view->addParamsRequired($params, true);
 		
-		C4_AbstractViewLoader::setView($view->id, $view);
-		
 		$tpl->assign('view', $view);
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/views/search_and_view.tpl');
@@ -684,6 +682,8 @@ abstract class Extension_RestController extends DevblocksExtension {
 	}
 	
 	protected function _handlePostSearch() {
+		@$query = DevblocksPlatform::importGPC($_REQUEST['q'],'string',null);
+		
 		@$criteria = DevblocksPlatform::importGPC($_REQUEST['criteria'],'array',array());
 		@$opers = DevblocksPlatform::importGPC($_REQUEST['oper'],'array',array());
 		@$values = DevblocksPlatform::importGPC($_REQUEST['value'],'array',array());
@@ -716,6 +716,7 @@ abstract class Extension_RestController extends DevblocksExtension {
 		}
 		
 		$options = array(
+			'query' => $query,
 			'show_results' => $show_results,
 			'subtotals' => $subtotals,
 		);
@@ -839,7 +840,6 @@ abstract class Extension_RestController extends DevblocksExtension {
 		}
 		
 		// [TODO] Cursors? (ephemeral view id, paging, sort, etc)
-		C4_AbstractViewLoader::setView($view->id, $view);
 		
 		return $view;
 	}

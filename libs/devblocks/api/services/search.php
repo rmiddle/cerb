@@ -371,7 +371,7 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 		
 		switch($verb) {
 			case 'PUT':
-				//$headers[] = 'Content-Type: application/json';
+				$headers[] = 'Content-Type: application/json';
 				curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
 				curl_setopt($ch, CURLOPT_POST, true);
 				curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
@@ -380,8 +380,15 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 		
 		$out = curl_exec($ch);
 		
+		$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		$content_type = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 		
-		return json_decode($out, true);
+		curl_close($ch);
+		
+		if($status != 200 || false == (@$json = json_decode($out, true)))
+			return false; 
+		
+		return $json;
 	}
 	
 	private function _putRecord($type, $id, $doc) {
@@ -398,13 +405,13 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 			$id
 		);
 		
-		
-		$json = $this->_execute('PUT', $url, $doc);
+		if(false == ($json = $this->_execute('PUT', $url, $doc)))
+			return false;
 		
 		return $json;
 	}
 	
-	private function _getSearch($type, $query) {
+	private function _getSearch($type, $query, $limit=500) {
 		@$base_url = rtrim($this->_config['base_url'], '/');
 		@$index = trim($this->_config['index'], '/');
 		
@@ -412,14 +419,16 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 			return false;
 		
 		
-		$url = sprintf("%s/%s/%s/_search?q=%s&_source=false&size=500&default_operator=AND",
+		$url = sprintf("%s/%s/%s/_search?q=%s&_source=false&size=%d&default_operator=AND",
 			$base_url,
 			urlencode($index),
 			urlencode($type),
-			urlencode($query)
+			urlencode($query),
+			$limit
 		);
 		
-		$json = $this->_execute('GET', $url);
+		if(false == ($json = $this->_execute('GET', $url)))
+			return false;
 		
 		return $json;
 	}
@@ -437,7 +446,8 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 			urlencode($type)
 		);
 		
-		$json = $this->_execute('GET', $url);
+		if(false == ($json = $this->_execute('GET', $url)))
+			return false;
 		
 		if(!is_array($json) || !isset($json['count']))
 			return false;
@@ -563,7 +573,7 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 		
 		if(null === ($ids = $cache->load($cache_key, false, $is_only_cached_for_request))) {
 			$ids = array();
-			$json = $this->_getSearch($type, $query);
+			$json = $this->_getSearch($type, $query, $limit);
 			
 			if(is_array($json) && isset($json['hits']))
 			foreach($json['hits']['hits'] as $hit) {
@@ -745,7 +755,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 		if(!isset($tables['fulltext_' . $ns]))
 			return false;
 		
-		return intval($db->GetOne(sprintf("SELECT MAX(id) FROM fulltext_%s", $db->escape($ns))));
+		return intval($db->GetOneSlave(sprintf("SELECT MAX(id) FROM fulltext_%s", $db->escape($ns))));
 	}
 	
 	private function _getCount(Extension_DevblocksSearchSchema $schema) {
@@ -756,7 +766,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 		if(!isset($tables['fulltext_' . $ns]))
 			return false;
 		
-		return intval($db->GetOne(sprintf("SELECT COUNT(id) FROM fulltext_%s", $db->escape($ns))));
+		return intval($db->GetOneSlave(sprintf("SELECT COUNT(id) FROM fulltext_%s", $db->escape($ns))));
 	}
 	
 	public function getQuickSearchExamples(Extension_DevblocksSearchSchema $schema) {
@@ -822,7 +832,8 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 		// Our temp table name is consistently named because we may keep it around for the duration of the request
 		$temp_table = sprintf("_search_%s", sha1($ns.$query));
 		
-		$sql = sprintf("CREATE TEMPORARY TABLE IF NOT EXISTS %s SELECT id, MATCH content AGAINST ('%s' IN BOOLEAN MODE) AS score ".
+		$sql = sprintf("CREATE TEMPORARY TABLE IF NOT EXISTS %s (PRIMARY KEY (id)) ".
+			"SELECT id, MATCH content AGAINST ('%s' IN BOOLEAN MODE) AS score ".
 			"FROM fulltext_%s ".
 			"WHERE MATCH content AGAINST ('%s' IN BOOLEAN MODE) ".
 			"%s ".
@@ -835,7 +846,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 			!empty($where_sql) ? ('AND ' . implode(' AND ', $where_sql)) : ''
 		);
 		
-		$db->Execute($sql);
+		$db->ExecuteSlave($sql);
 		
 		return $temp_table;
 	}
@@ -1127,7 +1138,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 			implode(',', $fields)
 		);
 		
-		$result = $db->Execute($sql);
+		$result = $db->ExecuteMaster($sql);
 		
 		$return = (false !== $result) ? true : false;
 		
@@ -1143,6 +1154,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 	
 	private function _createTable(Extension_DevblocksSearchSchema $schema) {
 		$db = DevblocksPlatform::getDatabaseService();
+		$tables = DevblocksPlatform::getDatabaseTables();
 		$namespace = $schema->getNamespace();
 		$attributes = $schema->getAttributes();
 		
@@ -1188,18 +1200,6 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 			);
 		}
 		
-		$rs = $db->Execute("SHOW TABLES");
-
-		$tables = array();
-		
-		if($rs instanceof mysqli_result) {
-			while($row = mysqli_fetch_row($rs)) {
-				$tables[$row[0]] = true;
-			}
-			
-			mysqli_free_result($rs);
-		}
-		
 		$namespace = $this->escapeNamespace($namespace);
 		
 		if(isset($tables['fulltext_'.$namespace]))
@@ -1217,7 +1217,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 			(!empty($attributes_sql) ? implode(",\n", $attributes_sql) : '')
 		);
 		
-		$result = $db->Execute($sql);
+		$result = $db->ExecuteMaster($sql);
 		
 		$return = (false !== $result) ? true : false;
 		
@@ -1239,7 +1239,7 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 		if(empty($ns) || empty($ids))
 			return;
 			
-		$result = $db->Execute(sprintf("DELETE FROM fulltext_%s WHERE id IN (%s) ",
+		$result = $db->ExecuteMaster(sprintf("DELETE FROM fulltext_%s WHERE id IN (%s) ",
 			$this->escapeNamespace($ns),
 			implode(',', $ids)
 		));

@@ -27,7 +27,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 	static function create($fields, $also_notify_worker_ids=array(), $file_ids=array()) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		$db->Execute("INSERT INTO comment () VALUES ()");
+		$db->ExecuteMaster("INSERT INTO comment () VALUES ()");
 		$id = $db->LastInsertId();
 		
 		self::update($id, $fields);
@@ -129,7 +129,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 			$sort_sql.
 			$limit_sql
 		;
-		$rs = $db->Execute($sql);
+		$rs = $db->ExecuteSlave($sql);
 		
 		return self::_getObjectsFromResult($rs);
 	}
@@ -148,7 +148,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 			$db->qstr($context),
 			implode(',', $ids)
 		);
-		$rows = $db->GetArray($sql);
+		$rows = $db->GetArraySlave($sql);
 		
 		$ids = array();
 		
@@ -178,6 +178,9 @@ class DAO_Comment extends Cerb_ORMHelper {
 	 * @param integer $id
 	 * @return Model_Comment	 */
 	static function get($id) {
+		if(empty($id))
+			return null;
+		
 		$objects = self::getWhere(sprintf("%s = %d",
 			self::ID,
 			$id
@@ -215,7 +218,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 	
 	static public function count($from_context, $from_context_id) {
 		$db = DevblocksPlatform::getDatabaseService();
-		return $db->GetOne(sprintf("SELECT count(*) FROM comment ".
+		return $db->GetOneSlave(sprintf("SELECT count(*) FROM comment ".
 			"WHERE context = %s AND context_id = %d",
 			$db->qstr($from_context),
 			$from_context_id
@@ -231,7 +234,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 			
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		$db->Execute(sprintf("DELETE FROM comment WHERE context = %s AND context_id IN (%s) ",
+		$db->ExecuteMaster(sprintf("DELETE FROM comment WHERE context = %s AND context_id IN (%s) ",
 			$db->qstr($context),
 			implode(',', $context_ids)
 		));
@@ -249,7 +252,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 		$ids_list = implode(',', $ids);
 		
 		// Comments
-		$db->Execute(sprintf("DELETE FROM comment WHERE id IN (%s)", $ids_list));
+		$db->ExecuteMaster(sprintf("DELETE FROM comment WHERE id IN (%s)", $ids_list));
 		
 		// Search index
 		$search = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID, true);
@@ -354,6 +357,38 @@ class DAO_Comment extends Cerb_ORMHelper {
 		settype($param_key, 'string');
 		
 		switch($param_key) {
+			case SearchFields_Comment::FULLTEXT_COMMENT_CONTENT:
+				$search = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID);
+				$query = $search->getQueryFromParam($param);
+				
+				if(false === ($ids = $search->query($query))) {
+					$args['where_sql'] .= 'AND 0 ';
+					
+				} elseif(is_array($ids)) {
+					$args['where_sql'] .= sprintf('AND %s IN (%s) ',
+						$from_index,
+						implode(', ', (!empty($ids) ? $ids : array(-1)))
+					);
+					
+				} elseif(is_string($ids)) {
+					$db = DevblocksPlatform::getDatabaseService();
+					$temp_table = sprintf("_tmp_%s", uniqid());
+					
+					$db->ExecuteSlave(sprintf("CREATE TEMPORARY TABLE %s (PRIMARY KEY (id)) SELECT DISTINCT id FROM comment INNER JOIN %s ON (%s.id=%s)",
+						$temp_table,
+						$ids,
+						$ids,
+						$from_index
+					));
+					
+					$args['join_sql'] .= sprintf("INNER JOIN %s ON (%s.id=%s) ",
+						$temp_table,
+						$temp_table,
+						$from_index
+					);
+				}
+				break;
+			
 			case SearchFields_Comment::VIRTUAL_OWNER:
 				if(!is_array($param->value))
 					break;
@@ -450,9 +485,9 @@ class DAO_Comment extends Cerb_ORMHelper {
 			$sort_sql;
 			
 		if($limit > 0) {
-			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs ADORecordSet */
+			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
 		} else {
-			$rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs ADORecordSet */
+			$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
 			$total = mysqli_num_rows($rs);
 		}
 		
@@ -472,7 +507,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 					($has_multiple_values ? "SELECT COUNT(DISTINCT comment.id) " : "SELECT COUNT(comment.id) ").
 					$join_sql.
 					$where_sql;
-				$total = $db->GetOne($count_sql);
+				$total = $db->GetOneSlave($count_sql);
 			}
 		}
 		
@@ -488,7 +523,7 @@ class DAO_Comment extends Cerb_ORMHelper {
 
 		// Search indexes
 		if(isset($tables['fulltext_comment_content'])) {
-			$db->Execute("DELETE FROM fulltext_comment_content WHERE id NOT IN (SELECT id FROM comment)");
+			$db->ExecuteMaster("DELETE FROM fulltext_comment_content WHERE id NOT IN (SELECT id FROM comment)");
 			$logger->info('[Maint] Purged ' . $db->Affected_Rows() . ' fulltext_comment_content records.');
 		}
 		
@@ -516,6 +551,8 @@ class SearchFields_Comment implements IDevblocksSearchFields {
 	const OWNER_CONTEXT_ID = 'c_owner_context_id';
 	const COMMENT = 'c_comment';
 	
+	const FULLTEXT_COMMENT_CONTENT = 'ftcc_content';
+	
 	const VIRTUAL_HAS_FIELDSET = '*_has_fieldset';
 	const VIRTUAL_OWNER = '*_owner';
 	const VIRTUAL_TARGET = '*_target';
@@ -538,6 +575,8 @@ class SearchFields_Comment implements IDevblocksSearchFields {
 			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null),
 			self::VIRTUAL_OWNER => new DevblocksSearchField(self::VIRTUAL_OWNER, '*', 'owner', $translate->_('common.owner'), null),
 			self::VIRTUAL_TARGET => new DevblocksSearchField(self::VIRTUAL_TARGET, '*', 'target', $translate->_('common.target'), null),
+				
+			self::FULLTEXT_COMMENT_CONTENT => new DevblocksSearchField(self::FULLTEXT_COMMENT_CONTENT, 'ftcc', 'content', $translate->_('comment.filters.content'), 'FT'),
 		);
 		
 		// Sort by label (translation-conscious)
@@ -698,7 +737,7 @@ class Model_Comment {
 	}
 };
 
-class View_Comment extends C4_AbstractView implements IAbstractView_Subtotals {
+class View_Comment extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
 	const DEFAULT_ID = 'comment';
 
 	function __construct() {
@@ -719,6 +758,7 @@ class View_Comment extends C4_AbstractView implements IAbstractView_Subtotals {
 		$this->addColumnsHidden(array(
 			SearchFields_Comment::COMMENT,
 			SearchFields_Comment::CONTEXT_ID,
+			SearchFields_Comment::FULLTEXT_COMMENT_CONTENT,
 			SearchFields_Comment::OWNER_CONTEXT,
 			SearchFields_Comment::OWNER_CONTEXT_ID,
 			SearchFields_Comment::VIRTUAL_HAS_FIELDSET,
@@ -811,6 +851,79 @@ class View_Comment extends C4_AbstractView implements IAbstractView_Subtotals {
 		return $counts;
 	}
 	
+	function getQuickSearchFields() {
+		$fields = array(
+			'_fulltext' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
+					'options' => array('param_key' => SearchFields_Comment::FULLTEXT_COMMENT_CONTENT),
+				),
+			'comment' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
+					'options' => array('param_key' => SearchFields_Comment::FULLTEXT_COMMENT_CONTENT),
+				),
+			'context' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_TEXT,
+					'options' => array('param_key' => SearchFields_Comment::CONTEXT),
+				),
+			'context.id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_Comment::CONTEXT_ID),
+				),
+			'created' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_DATE,
+					'options' => array('param_key' => SearchFields_Comment::CREATED),
+				),
+		);
+		
+		// Add searchable custom fields
+		
+		$fields = self::_appendFieldsFromQuickSearchContext(CerberusContexts::CONTEXT_COMMENT, $fields, null);
+		
+		// Engine/schema examples: Comments
+		
+		$ft_examples = array();
+		
+		if(false != ($schema = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID))) {
+			if(false != ($engine = $schema->getEngine())) {
+				$ft_examples = $engine->getQuickSearchExamples($schema);
+			}
+		}
+		
+		if(!empty($ft_examples)) {
+			$fields['_fulltext']['examples'] = $ft_examples;
+			$fields['comment']['examples'] = $ft_examples;
+		}
+		
+		// Sort by keys
+		
+		ksort($fields);
+		
+		return $fields;
+	}	
+	
+	function getParamsFromQuickSearchFields($fields) {
+		$search_fields = $this->getQuickSearchFields();
+		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
+
+		// Handle virtual fields and overrides
+		if(is_array($fields))
+		foreach($fields as $k => $v) {
+			switch($k) {
+				// ...
+			}
+		}
+		
+		$this->renderPage = 0;
+		$this->addParams($params, true);
+		
+		return $params;
+	}	
+	
 	function render() {
 		$this->_sanitize();
 		
@@ -849,6 +962,10 @@ class View_Comment extends C4_AbstractView implements IAbstractView_Subtotals {
 				$tpl->assign('contexts', $contexts);
 				
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__context.tpl');
+				break;
+				
+			case SearchFields_Comment::FULLTEXT_COMMENT_CONTENT:
+				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__fulltext.tpl');
 				break;
 				
 			case SearchFields_Comment::VIRTUAL_HAS_FIELDSET:
@@ -945,6 +1062,11 @@ class View_Comment extends C4_AbstractView implements IAbstractView_Subtotals {
 			case SearchFields_Comment::OWNER_CONTEXT:
 				@$contexts = DevblocksPlatform::importGPC($_REQUEST['contexts'],'array',array());
 				$criteria = new DevblocksSearchCriteria($field,$oper,$contexts);
+				break;
+				
+			case SearchFields_Comment::FULLTEXT_COMMENT_CONTENT:
+				@$scope = DevblocksPlatform::importGPC($_REQUEST['scope'],'string','expert');
+				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_FULLTEXT,array($value,$scope));
 				break;
 				
 			case SearchFields_Comment::VIRTUAL_HAS_FIELDSET:
@@ -1270,7 +1392,6 @@ class Context_Comment extends Extension_DevblocksContext {
 		$view->renderSortAsc = false;
 		$view->renderLimit = 10;
 		$view->renderTemplate = 'contextlinks_chooser';
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 	
@@ -1302,7 +1423,6 @@ class Context_Comment extends Extension_DevblocksContext {
 //		$view->addParams($params, false);
 		
 		$view->renderTemplate = 'context';
-		C4_AbstractViewLoader::setView($view_id, $view);
 		return $view;
 	}
 };
