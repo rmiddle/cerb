@@ -25,7 +25,7 @@
 
 <script type="text/javascript">
 $(function() {
-	var $popup = genericAjaxPopupFetch('peek');
+	var $popup = genericAjaxPopupFind('#internalCommentPopup');
 	
 	$popup.one('popup_open',function(event,ui) {
 		var $frm = $('#internalCommentPopup');
@@ -33,10 +33,10 @@ $(function() {
 		$(this).dialog('option','title','Comment');
 		
 		$frm.find('button.submit').click(function() {
-			var $popup = genericAjaxPopupFetch('peek');
+			var $popup = genericAjaxPopupFind('#internalCommentPopup');
 			genericAjaxPost('internalCommentPopup','','', null, { async: false } );
 			$popup.trigger('comment_save');
-			genericAjaxPopupClose('peek');
+			genericAjaxPopupClose('comment');
 		});
 	
 		$frm.find('button.chooser_file').each(function() {
@@ -61,7 +61,7 @@ $(function() {
 		var atwho_workers = {CerberusApplication::getAtMentionsWorkerDictionaryJson() nofilter};
 		
 		$textarea
-			.elastic()
+			.autosize()
 			.focus()
 			.atwho({
 				at: '@',

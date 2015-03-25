@@ -146,7 +146,7 @@
 
 {$message_content = $message->getContent()}
 {$mail_reply_html = DAO_WorkerPref::get($active_worker->id, 'mail_reply_html', 0)}
-{$mail_reply_textbox_size_inelastic = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_inelastic', 0)}
+{$mail_reply_textbox_size_auto = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_auto', 0)}
 {$mail_reply_textbox_size_px = DAO_WorkerPref::get($active_worker->id, 'mail_reply_textbox_size_px', 300)}
 
 <form id="reply{$message->id}_part2" action="{devblocks_url}{/devblocks_url}" method="POST" enctype="multipart/form-data">
@@ -369,8 +369,12 @@
 		ajax.emailAutoComplete('#reply{$message->id}_part1 input[name=bcc]', { multiple: true } );
 		
 		$frm.find('input:text').blur(function(event) {
-			name = event.target.name;
-			$('#reply{$message->id}_part2 input:hidden[name='+name+']').val(event.target.value);
+			var name = event.target.name;
+			
+			if(0 == name.length)
+				return;
+			
+			$('#reply{$message->id}_part2 input:hidden[name="'+name+'"]').val(event.target.value);
 		} );
 		
 		$frm.find('input:text[name=to], input:text[name=cc], input:text[name=bcc]').focus(function(event) {
@@ -406,8 +410,8 @@
 		var markitupReplyFunctions = {
 			switchToMarkdown: function(markItUp) { 
 				$content.markItUpRemove().markItUp(markitupParsedownSettings);
-				{if empty($mail_reply_textbox_size_inelastic)}
-				$content.elastic();
+				{if !empty($mail_reply_textbox_size_auto)}
+				$content.autosize();
 				{/if}
 				$content.closest('form').find('input:hidden[name=format]').val('parsedown');
 
@@ -433,8 +437,8 @@
 			
 			switchToPlaintext: function(markItUp) { 
 				$content.markItUpRemove().markItUp(markitupPlaintextSettings);
-				{if empty($mail_reply_textbox_size_inelastic)}
-				$content.elastic();
+				{if !empty($mail_reply_textbox_size_auto)}
+				$content.autosize();
 				{/if}
 				$content.closest('form').find('input:hidden[name=format]').val('');
 			}
@@ -600,8 +604,8 @@
 		
 		// Elastic
 
-		{if empty($mail_reply_textbox_size_inelastic)}
-		$content.elastic();
+		{if !empty($mail_reply_textbox_size_auto)}
+		$content.autosize();
 		{/if}
 		
 		$frm2.find('input[name=ticket_reopen]')
@@ -760,6 +764,8 @@
 				genericAjaxGet('',url,function(json) {
 					// If the content has placeholders, use that popup instead
 					if(json.has_custom_placeholders) {
+						$textarea.focus();
+						
 						var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&id=' + encodeURIComponent(json.id) + '&context_id=' + encodeURIComponent(json.context_id),null,false,'600');
 					
 						$popup_paste.bind('snippet_paste', function(event) {

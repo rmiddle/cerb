@@ -3,6 +3,8 @@
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset={$smarty.const.LANG_CHARSET_CODE}">
 	<meta http-equiv="Cache-Control" content="no-cache">
+	<meta name="robots" content="noindex">
+	<meta name="googlebot" content="noindex">
 	<!--[if gte IE 9]>
 	<meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
 	<![endif]-->
@@ -24,10 +26,7 @@
 	<script type="text/javascript" src="{devblocks_url}c=resource&p=devblocks.core&f=js/devblocks.js{/devblocks_url}?v={$smarty.const.APP_BUILD}"></script>
 
 	<!-- Application -->
-	<link type="text/css" rel="stylesheet" href="{devblocks_url}c=resource&p=cerberusweb.core&f=css/cerberus.css{/devblocks_url}?v={$smarty.const.APP_BUILD}">
-	<!--[if lt IE 9]>
-	<link type="text/css" rel="stylesheet" href="{devblocks_url}c=resource&p=cerberusweb.core&f=css/cerberus-iehacks.css{/devblocks_url}?v={$smarty.const.APP_BUILD}">
-	<![endif]-->
+	<link type="text/css" rel="stylesheet" href="{devblocks_url}c=resource&p=cerberusweb.core&f=css/cerb.css{/devblocks_url}?v={$smarty.const.APP_BUILD}">
 	<script type="text/javascript" src="{devblocks_url}c=resource&p=cerberusweb.core&f=js/markitup/jquery.markitup.js{/devblocks_url}?v={$smarty.const.APP_BUILD}"></script>
 	<script type="text/javascript" src="{devblocks_url}c=resource&p=cerberusweb.core&f=js/cerberus.js{/devblocks_url}?v={$smarty.const.APP_BUILD}"></script>
 </head>

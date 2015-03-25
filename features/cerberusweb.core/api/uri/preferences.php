@@ -211,6 +211,7 @@ class ChPreferencesPage extends CerberusPageExtension {
 		// View
 		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string');
 		$view = C4_AbstractViewLoader::getView($view_id);
+		$view->setAutoPersist(false);
 
 		// Task fields
 		$is_read = trim(DevblocksPlatform::importGPC($_POST['is_read'],'string',''));
@@ -292,6 +293,7 @@ class ChPreferencesPage extends CerberusPageExtension {
 
 		// Loop through view and get IDs
 		$view = C4_AbstractViewLoader::getView($view_id);
+		$view->setAutoPersist(false);
 
 		// Page start
 		@$explore_from = DevblocksPlatform::importGPC($_REQUEST['explore_from'],'integer',0);
@@ -456,7 +458,7 @@ class ChPreferencesPage extends CerberusPageExtension {
 		$prefs['mail_always_show_all'] = DAO_WorkerPref::get($worker->id,'mail_always_show_all',0);
 		$prefs['mail_display_inline_log'] = DAO_WorkerPref::get($worker->id,'mail_display_inline_log',0);
 		$prefs['mail_reply_html'] = DAO_WorkerPref::get($worker->id,'mail_reply_html',0);
-		$prefs['mail_reply_textbox_size_inelastic'] = DAO_WorkerPref::get($worker->id,'mail_reply_textbox_size_inelastic',0);
+		$prefs['mail_reply_textbox_size_auto'] = DAO_WorkerPref::get($worker->id,'mail_reply_textbox_size_auto',0);
 		$prefs['mail_reply_textbox_size_px'] = DAO_WorkerPref::get($worker->id,'mail_reply_textbox_size_px',300);
 		$prefs['mail_reply_button'] = DAO_WorkerPref::get($worker->id,'mail_reply_button',0);
 		$prefs['mail_status_compose'] = DAO_WorkerPref::get($worker->id,'compose.status','waiting');
@@ -625,8 +627,8 @@ class ChPreferencesPage extends CerberusPageExtension {
 		@$mail_reply_textbox_size_px = DevblocksPlatform::importGPC($_REQUEST['mail_reply_textbox_size_px'],'integer',0);
 		DAO_WorkerPref::set($worker->id, 'mail_reply_textbox_size_px', max(100, min(2000, $mail_reply_textbox_size_px)));
 		
-		@$mail_reply_textbox_size_inelastic = DevblocksPlatform::importGPC($_REQUEST['mail_reply_textbox_size_inelastic'],'integer',0);
-		DAO_WorkerPref::set($worker->id, 'mail_reply_textbox_size_inelastic', $mail_reply_textbox_size_inelastic);
+		@$mail_reply_textbox_size_auto = DevblocksPlatform::importGPC($_REQUEST['mail_reply_textbox_size_auto'],'integer',0);
+		DAO_WorkerPref::set($worker->id, 'mail_reply_textbox_size_auto', $mail_reply_textbox_size_auto);
 		
 		@$mail_reply_button = DevblocksPlatform::importGPC($_REQUEST['mail_reply_button'],'integer',0);
 		DAO_WorkerPref::set($worker->id, 'mail_reply_button', $mail_reply_button);

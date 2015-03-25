@@ -1363,13 +1363,21 @@ class CerberusParser {
 					DAO_Attachment::MIME_TYPE => 'text/html',
 					DAO_Attachment::STORAGE_SHA1HASH => $sha1_hash,
 				);
-				$file_id = DAO_Attachment::create($fields);
 				
-				Storage_Attachments::put($file_id, $message->htmlbody);
+				if(false != ($file_id = DAO_Attachment::create($fields))) {
+					Storage_Attachments::put($file_id, $message->htmlbody);
+				}
 			}
 			
-			if(!empty($file_id))
+			// Link the HTML part to the message
+			if(!empty($file_id)) {
 				DAO_AttachmentLink::create($file_id, CerberusContexts::CONTEXT_MESSAGE, $model->getMessageId());
+				
+				// This built-in field is faster than searching for the HTML part again in the attachments
+				DAO_Message::update($message_id, array(
+					DAO_Message::HTML_ATTACHMENT_ID => $file_id,
+				));
+			}
 		}
 		
 		// Pre-load custom fields
@@ -1539,25 +1547,27 @@ class CerberusParser {
 			);
 		}
 		
-		if($charset && @mb_check_encoding($text, $charset)) {
-			if(false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE, $charset)))
+		if($charset 
+			&& mb_check_encoding($text, $charset)
+			&& false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE, $charset))
+			) {
 				return $out;
 			
 		} else {
 			$has_iconv = extension_loaded('iconv') ? true : false;
+			$charset = mb_detect_encoding($text);
 			
-			// If we can use iconv, do so.
-			if($has_iconv && $charset && false !== ($out = iconv($charset, LANG_CHARSET_CODE . '//TRANSLIT//IGNORE', $text)))
+			// If we can use iconv, do so first
+			if($has_iconv && false !== ($out = iconv($charset, LANG_CHARSET_CODE . '//TRANSLIT//IGNORE', $text)))
 				return $out;
 			
-			if(false !== ($charset = mb_detect_encoding($text))) {
-				if(false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE, $charset)))
-					return $out;
-				
-			} else {
-				if(false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE)))
-					return $out;
-			}
+			// Then try mbstring
+			if(false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE, $charset)))
+				return $out;
+			
+			// Try with the internal charset
+			if(false !== ($out = mb_convert_encoding($text, LANG_CHARSET_CODE)))
+				return $out;
 		}
 		
 		return $text;
