@@ -418,6 +418,7 @@ class DevblocksSearchEngineElasticSearch extends Extension_DevblocksSearchEngine
 		if(empty($base_url) || empty($index) || empty($type))
 			return false;
 		
+		// [TODO] Paging
 		
 		$url = sprintf("%s/%s/%s/_search?q=%s&_source=false&size=%d&default_operator=AND",
 			$base_url,
@@ -1231,6 +1232,8 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 	
 	public function delete(Extension_DevblocksSearchSchema $schema, $ids) {
 		$db = DevblocksPlatform::getDatabaseService();
+		$tables = DevblocksPlatform::getDatabaseTables();
+		
 		$ns = $schema->getNamespace();
 		
 		if(!is_array($ids))
@@ -1239,8 +1242,13 @@ class DevblocksSearchEngineMysqlFulltext extends Extension_DevblocksSearchEngine
 		if(empty($ns) || empty($ids))
 			return;
 			
+		$namespace = $this->escapeNamespace($ns);
+		
+		if(!isset($tables['fulltext_'.$namespace]))
+			return true;
+		
 		$result = $db->ExecuteMaster(sprintf("DELETE FROM fulltext_%s WHERE id IN (%s) ",
-			$this->escapeNamespace($ns),
+			$namespace,
 			implode(',', $ids)
 		));
 		

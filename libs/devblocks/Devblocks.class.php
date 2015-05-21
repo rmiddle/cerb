@@ -161,7 +161,7 @@ class DevblocksPlatform extends DevblocksEngine {
 				if(is_bool($value))
 					return $value ? 'true' : 'false';
 				
-				$value = (string) $value;
+				@$value = (string) $value;
 				break;
 				
 			case 'timestamp':
@@ -225,6 +225,18 @@ class DevblocksPlatform extends DevblocksEngine {
 	 */
 	static function intClamp($n, $min, $max) {
 		return min(max((integer)$n, $min), $max);
+	}
+	
+	/**
+	 * 
+	 * @param float $n The number to test
+	 * @param float $min Inclusive lower bounds
+	 * @param float $max Inclusive upper bounds
+	 * @return float
+	 * @test DevblocksPlatformTest
+	 */
+	static function floatClamp($n, $min, $max) {
+		return min(max((float)$n, $min), $max);
 	}
 	
 	/**
@@ -316,6 +328,23 @@ class DevblocksPlatform extends DevblocksEngine {
 	
 	/**
 	 * 
+	 * @param array $objects
+	 * @return string[]
+	 * @test DevblocksPlatformTest
+	 */
+	static function objectsToStrings($objects) {
+		$strings = array();
+		
+		if(is_array($objects))
+		foreach($objects as $k => $o) {
+			$strings[$k] = (string) $o;
+		}
+		
+		return $strings;
+	}
+	
+	/**
+	 * 
 	 * @param integer $version
 	 * @param integer $sections
 	 * @return string A dot-delimited version string
@@ -328,7 +357,7 @@ class DevblocksPlatform extends DevblocksEngine {
 		
 		// If we don't have enough requested sections, pad the right.
 		// We assume the given digits are always the most significant part of the version.
-		$version = str_pad($version, $sections * 2, '0', STR_PAD_RIGHT);
+		$version = str_pad($version, $sections * 2, '0', STR_PAD_LEFT);
 		$parts = str_split($version, 2);
 		
 		// Trim padded zeroes in a version section
@@ -358,7 +387,7 @@ class DevblocksPlatform extends DevblocksEngine {
 		
 		// Pad versions with too few significant places
 		for($ctr=count($parts); $ctr < $sections; $ctr++)
-			$parts[] = '0';
+			array_unshift($parts, '0');
 		
 		$v = 0;
 		$multiplier = 1;
@@ -719,6 +748,58 @@ class DevblocksPlatform extends DevblocksEngine {
 			$str
 		);
 		
+		// Unordered and ordered lists
+		
+		$dom = new DOMDocument('1.0', LANG_CHARSET_CODE);
+		$dom->strictErrorChecking = false;
+		$dom->recover = true;
+		$dom->validateOnParse = false;
+		
+		libxml_use_internal_errors(true);
+		
+		$dom->loadHTML(sprintf('<?xml version="1.0" encoding="%s">', LANG_CHARSET_CODE) . $str);
+		
+		$errors = libxml_get_errors();
+		libxml_clear_errors();
+		
+		$xpath = new DOMXPath($dom);
+		
+		// Ordered lists
+		
+		$lists = $xpath->query('//ol');
+		
+		foreach($lists as $list) { /* @var $list DOMElement */
+			$items = $xpath->query('./li/text()', $list);
+			
+			$counter = 1;
+			foreach($items as $item) { /* @var $item DOMText */
+				$txt = $dom->createTextNode('');
+				$txt->nodeValue = $counter++ . '. ' . $item->nodeValue;
+				$item->parentNode->replaceChild($txt, $item);
+			}
+		}
+
+		// Unordered lists
+		
+		$lists = $xpath->query('//ul');
+		
+		foreach($lists as $list) { /* @var $list DOMElement */
+			$items = $xpath->query('./li/text()', $list);
+			
+			foreach($items as $idx => $item) { /* @var $item DOMText */
+				$txt = $dom->createTextNode('- ' . $item->nodeValue);
+				$item->parentNode->replaceChild($txt, $item);
+			}
+		}
+		
+		$html = $dom->saveXML();
+		
+		// Make sure it's not blank before trusting it.
+		if(!empty($html)) {
+			$str = $html;
+			unset($html);
+		}
+		
 		// Strip all CRLF and tabs, spacify </TD>
 		if($strip_whitespace) {
 			$str = str_ireplace(
@@ -778,14 +859,6 @@ class DevblocksPlatform extends DevblocksEngine {
 			$str
 		);
 
-		$str = str_ireplace(
-			array(
-				'<LI>',
-			),
-			"<LI>* ",
-			$str
-		);
-		
 		// Strip non-content tags
 		$search = array(
 			'@<head[^>]*?>.*?</head>@si',
@@ -1564,6 +1637,7 @@ class DevblocksPlatform extends DevblocksEngine {
 			if(!$nocache)
 				$cache->save($tables, self::CACHE_TABLES);
 		}
+		
 		return $tables;
 	}
 
@@ -2094,6 +2168,13 @@ class DevblocksPlatform extends DevblocksEngine {
 	}
 	
 	/**
+	 * @return DevblocksNeuralNetwork
+	 */
+	static function getNeuralNetwork($inputs, $hiddens, $outputs, $learning_rate) {
+		return _DevblocksNeuralNetworkService::createNeuralNetwork($inputs, $hiddens, $outputs, $learning_rate);
+	}
+	
+	/**
 	 * @return _DevblocksUrlManager
 	 */
 	static function getUrlService() {
@@ -2147,6 +2228,25 @@ class DevblocksPlatform extends DevblocksEngine {
 	 */
 	static function getOpenIDService() {
 		return _DevblocksOpenIDManager::getInstance();
+	}
+	
+	static private function _deepCloneArray(&$array) {
+		if(is_array($array))
+		foreach($array as &$element) {
+			// Recurse if needed
+			if(is_array($element)) {
+				self::_deepCloneArray($element);
+				
+			} else if(is_object($element)) {
+				$element = clone $element;
+			}
+		}
+	}
+	
+	static function deepCloneArray($array) {
+		$copy = $array;
+		self::_deepCloneArray($copy);
+		return $copy;
 	}
 	
 	/**

@@ -4,7 +4,7 @@
 	<name>Cerb Core</name>
 	<description>The core functionality of Cerb.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>6.9.1</version>
+	<version>7.0.0</version>
 	<link>http://www.cerbweb.com/</link>
 	
 	<!-- Plugin Dependencies -->
@@ -56,7 +56,7 @@
 		<patch version="6.8.0" revision="1108" file="patches/6.x/6.8.0.php" />
 		<patch version="6.9.0" revision="1115" file="patches/6.x/6.9.0.php" />
 		
-		<patch version="7.0.0" revision="1121" file="patches/7.x/7.0.0.php" />
+		<patch version="7.0.0" revision="1123" file="patches/7.x/7.0.0.php" />
 	</patches>
 
 	<!-- Controller Routing -->
@@ -127,8 +127,11 @@
 		</file>
 		
 		<file path="api/dao/bucket.php">
+			<class name="Context_Bucket" />
 			<class name="DAO_Bucket" />
 			<class name="Model_Bucket" />
+			<class name="SearchFields_Bucket" />
+			<class name="View_Bucket" />
 		</file>
 		
 		<file path="api/dao/calendar.php">
@@ -219,6 +222,10 @@
 		
 		<file path="api/dao/context_merge_history.php">
 			<class name="DAO_ContextMergeHistory" />
+		</file>
+		
+		<file path="api/dao/context_recommendation.php">
+			<class name="DAO_ContextRecommendation" />
 		</file>
 		
 		<file path="api/dao/context_scheduled_behavior.php">
@@ -331,9 +338,28 @@
 			<class name="View_PluginLibrary" />
 		</file>
 		
-		<file path="api/dao/pop3_account.php">
-			<class name="DAO_Pop3Account" />
-			<class name="Model_Pop3Account" />
+		<file path="api/dao/mailbox.php">
+			<class name="Context_Mailbox" />
+			<class name="DAO_Mailbox" />
+			<class name="Model_Mailbox" />
+			<class name="SearchFields_Mailbox" />
+			<class name="View_Mailbox" />
+		</file>
+		
+		<file path="api/dao/skill.php">
+			<class name="Context_Skill" />
+			<class name="DAO_Skill" />
+			<class name="Model_Skill" />
+			<class name="SearchFields_Skill" />
+			<class name="View_Skill" />
+		</file>
+		
+		<file path="api/dao/skillset.php">
+			<class name="Context_Skillset" />
+			<class name="DAO_Skillset" />
+			<class name="Model_Skillset" />
+			<class name="SearchFields_Skillset" />
+			<class name="View_Skillset" />
 		</file>
 		
 		<file path="api/dao/snippet.php">
@@ -630,11 +656,20 @@
 			<class name="ChPortalHelper" />
 		</file>
 		
+		<file path="api/uri/profiles.php">
+			<class name="Page_Profiles" />
+		</file>
+		
 	</class_loader>
 	
 	<!-- Activity Points -->
 	
 	<activity_points>
+		<activity point="custom.other">
+			<param key="label_key" value="(Other)" />
+			<param key="string_key" value="activities.custom.other" />
+			<param key="options" value="" />
+		</activity>
 		<activity point="calendar_event.created">
 			<param key="label_key" value="Calendar Event Created" />
 			<param key="string_key" value="activities.calendar_event.created" />
@@ -658,6 +693,11 @@
 		<activity point="connection.unlink">
 			<param key="label_key" value="Connection Unlinked" />
 			<param key="string_key" value="activities.connection.unlink" />
+			<param key="options" value="" />
+		</activity>
+		<activity point="mailbox.check.error">
+			<param key="label_key" value="Mailbox Error" />
+			<param key="string_key" value="activities.mailbox.check.error" />
 			<param key="options" value="" />
 		</activity>
 		<activity point="org.merge">
@@ -1058,16 +1098,15 @@
 				<param key="alias" value="bucket" />
 				<param key="dao_class" value="DAO_Bucket" />
 				<param key="view_class" value="View_Bucket" />
-				<!--
 				<param key="options">
 					<value>
+						<data key="custom_fields" />
 						<data key="find" />
 						<data key="snippets" />
 						<data key="va_variable" />
 						<data key="workspace" />
 					</value>
 				</param>
-				-->
 			</params>
 		</extension>
 		
@@ -1346,6 +1385,7 @@
 				<param key="view_class" value="View_Message" />
 				<param key="options">
 					<value>
+						<data key="custom_fields" />
 						<data key="snippets" />
 						<data key="va_variable" />
 						<data key="workspace" />
@@ -1395,6 +1435,84 @@
 						<data key="snippets" />
 						<data key="va_variable" />
 						<data key="workspace" />
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.mailbox</id>
+			<name>Mailbox Account</name>
+			<class>
+				<file>api/dao/mailbox.php</file>
+				<name>Context_Mailbox</name>
+			</class>
+			<params>
+				<param key="alias" value="mailbox" />
+				<param key="dao_class" value="DAO_Mailbox" />
+				<param key="view_class" value="View_Mailbox" />
+				<param key="options">
+					<value>
+						<data key="custom_fields" />
+						<!--
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="va_variable" />
+						<data key="workspace" />
+						-->
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.skill</id>
+			<name>Skill</name>
+			<class>
+				<file>api/dao/skill.php</file>
+				<name>Context_Skill</name>
+			</class>
+			<params>
+				<param key="alias" value="skill" />
+				<param key="dao_class" value="DAO_Skill" />
+				<param key="view_class" value="View_Skill" />
+				<param key="options">
+					<value>
+						<data key="custom_fields" />
+						<!--
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="va_variable" />
+						<data key="workspace" />
+						-->
+					</value>
+				</param>
+			</params>
+		</extension>
+		
+		<extension point="devblocks.context">
+			<id>cerberusweb.contexts.skillset</id>
+			<name>Skillset</name>
+			<class>
+				<file>api/dao/skillset.php</file>
+				<name>Context_Skillset</name>
+			</class>
+			<params>
+				<param key="alias" value="skillset" />
+				<param key="dao_class" value="DAO_Skillset" />
+				<param key="view_class" value="View_Skillset" />
+				<param key="options">
+					<value>
+						<data key="custom_fields" />
+						<!--
+						<data key="create" />
+						<data key="find" />
+						<data key="snippets" />
+						<data key="va_variable" />
+						<data key="workspace" />
+						-->
 					</value>
 				</param>
 			</params>
@@ -2292,6 +2410,45 @@
 			</extension>
 			
 			<extension point="cerberusweb.ui.page.section">
+				<id>core.internal.section.recommendations</id>
+				<name>Internal Section Recommendations</name>
+				<class>
+					<file>api/uri/internal/recommendations.php</file>
+					<name>PageSection_InternalRecommendations</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.controller.internal" />
+					<param key="uri" value="recommendations" />
+				</params>
+			</extension>
+
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.internal.section.responsibilities</id>
+				<name>Internal Section Responsibilities</name>
+				<class>
+					<file>api/uri/internal/responsibilities.php</file>
+					<name>PageSection_InternalResponsibilities</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.controller.internal" />
+					<param key="uri" value="responsibilities" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.internal.section.skills</id>
+				<name>Internal Section Skills</name>
+				<class>
+					<file>api/uri/internal/skills.php</file>
+					<name>PageSection_InternalSkills</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.controller.internal" />
+					<param key="uri" value="skills" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
 				<id>core.internal.section.workspaces</id>
 				<name>Internal Section Workspaces</name>
 				<class>
@@ -2640,19 +2797,6 @@
 		</extension>
 
 		<extension point="cerberusweb.page">
-			<id>core.page.groups</id>
-			<name>Groups Page</name>
-			<class>
-				<file>api/uri/groups.php</file>
-				<name>ChGroupsPage</name>
-			</class>
-			<params>
-				<param key="uri" value="groups" />
-				<param key="menutitle" value="" />
-			</params>
-		</extension>
-
-		<extension point="cerberusweb.page">
 			<id>core.page.contacts</id>
 			<name>Contacts Page</name>
 			<class>
@@ -2782,6 +2926,19 @@
 				<params>
 					<param key="page_id" value="core.page.configuration" />
 					<param key="uri" value="fields" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.setup.skills</id>
+				<name>Skills Section</name>
+				<class>
+					<file>api/uri/config/skills.php</file>
+					<name>PageSection_SetupSkills</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.configuration" />
+					<param key="uri" value="skills" />
 				</params>
 			</extension>
 			
@@ -2929,15 +3086,15 @@
 			</extension>
 			
 			<extension point="cerberusweb.ui.page.section">
-				<id>core.page.setup.mail_pop3</id>
-				<name>POP3 Section</name>
+				<id>core.page.setup.mailboxes</id>
+				<name>Mailboxes Section</name>
 				<class>
-					<file>api/uri/config/mail_pop3.php</file>
-					<name>PageSection_SetupMailPop3</name>
+					<file>api/uri/config/mailboxes.php</file>
+					<name>PageSection_SetupMailboxes</name>
 				</class>
 				<params>
 					<param key="page_id" value="core.page.configuration" />
-					<param key="uri" value="mail_pop3" />
+					<param key="uri" value="mailboxes" />
 				</params>
 			</extension>
 			
@@ -3191,6 +3348,19 @@
 			</extension>
 			
 			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.bucket</id>
+				<name>Bucket Section</name>
+				<class>
+					<file>api/uri/profiles/bucket.php</file>
+					<name>PageSection_ProfilesBucket</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="bucket" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
 				<id>core.calendars.page.profiles.calendar</id>
 				<name>Calendar Section</name>
 				<class>
@@ -3282,6 +3452,19 @@
 			</extension>
 			
 			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.mailbox</id>
+				<name>Mailbox Account Section</name>
+				<class>
+					<file>api/uri/profiles/mailbox.php</file>
+					<name>PageSection_ProfilesMailbox</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="mailbox" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
 				<id>core.page.profiles.mail_transport</id>
 				<name>Mail Transport Section</name>
 				<class>
@@ -3304,6 +3487,32 @@
 				<params>
 					<param key="page_id" value="core.page.profiles" />
 					<param key="uri" value="org" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.skill</id>
+				<name>Skill Section</name>
+				<class>
+					<file>api/uri/profiles/skill.php</file>
+					<name>PageSection_ProfilesSkill</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="skill" />
+				</params>
+			</extension>
+			
+			<extension point="cerberusweb.ui.page.section">
+				<id>core.page.profiles.skillset</id>
+				<name>Skillset Section</name>
+				<class>
+					<file>api/uri/profiles/skillset.php</file>
+					<name>PageSection_ProfilesSkillset</name>
+				</class>
+				<params>
+					<param key="page_id" value="core.page.profiles" />
+					<param key="uri" value="skillset" />
 				</params>
 			</extension>
 			
@@ -3620,11 +3829,11 @@
 		<!-- Cron Extensions -->
 		
 		<extension point="cerberusweb.cron">
-			<id>cron.pop3</id>
-			<name>Mailbox (POP3/IMAP) Checker and Email Downloader</name>
+			<id>cron.mailbox</id>
+			<name>Mailbox Checker and Email Downloader</name>
 			<class>
 				<file>api/cron.classes.php</file>
-				<name>Pop3Cron</name>
+				<name>MailboxCron</name>
 			</class>
 			<params />
 		</extension>

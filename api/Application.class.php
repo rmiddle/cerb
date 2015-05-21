@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2015030501);
-define("APP_VERSION", '6.9.3');
+define("APP_BUILD", 2015052101);
+define("APP_VERSION", '7.0.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -153,6 +153,7 @@ class CerberusApplication extends DevblocksApplication {
 				'email' => $worker->email,
 				'title' => $worker->title,
 				'at_mention' => $worker->at_mention_name,
+				'_index' => $worker->getName() . ' ' . $worker->at_mention_name,
 			);
 		}
 
@@ -600,32 +601,10 @@ class CerberusApplication extends DevblocksApplication {
 	}
 
 	/**
-	 * Translates the string version of a group/bucket combo into their
-	 * respective IDs.
-	 *
-	 * @todo This needs a better name and home
-	 */
-	static function translateGroupBucketCode($code) {
-		$t_or_c = substr($code,0,1);
-		$t_or_c_id = intval(substr($code,1));
-
-		if($t_or_c=='c') {
-			$buckets = DAO_Bucket::getAll();
-			$group_id = $buckets[$t_or_c_id]->group_id;
-			$bucket_id = $t_or_c_id;
-		} else {
-			$group_id = $t_or_c_id;
                     if($t_or_c=='a') {
 			$bucket_id = -1;
                     } else {
-			$bucket_id = 0;
                     }
-		}
-
-		return array($group_id, $bucket_id);
-	}
-
-	/**
 	 * Looks up an e-mail address using a revolving cache.  This is helpful
 	 * in situations where you may look up the same e-mail address multiple
 	 * times (reports, audit log, views) and you don't want to waste code
@@ -884,6 +863,7 @@ class CerberusContexts {
 	const CONTEXT_GROUP = 'cerberusweb.contexts.group';
 	const CONTEXT_KB_ARTICLE = 'cerberusweb.contexts.kb_article';
 	const CONTEXT_KB_CATEGORY = 'cerberusweb.contexts.kb_category';
+	const CONTEXT_MAILBOX = 'cerberusweb.contexts.mailbox';
 	const CONTEXT_MAIL_HTML_TEMPLATE = 'cerberusweb.contexts.mail.html_template';
 	const CONTEXT_MAILING_LIST = 'cerberusweb.contexts.mailing_list';
 	const CONTEXT_MAILING_LIST_BROADCAST = 'cerberusweb.contexts.mailing_list.broadcast';
@@ -895,9 +875,12 @@ class CerberusContexts {
 	const CONTEXT_PORTAL = 'cerberusweb.contexts.portal';
 	const CONTEXT_PROJECT = 'cerberusweb.contexts.project';
 	const CONTEXT_PROJECT_ISSUE = 'cerberusweb.contexts.project.issue';
+	const CONTEXT_RECOMMENDATION = 'cerberusweb.contexts.recommendation';
 	const CONTEXT_ROLE = 'cerberusweb.contexts.role';
 	const CONTEXT_SENSOR = 'cerberusweb.contexts.datacenter.sensor';
 	const CONTEXT_SERVER = 'cerberusweb.contexts.datacenter.server';
+	const CONTEXT_SKILL = 'cerberusweb.contexts.skill';
+	const CONTEXT_SKILLSET = 'cerberusweb.contexts.skillset';
 	const CONTEXT_SNIPPET = 'cerberusweb.contexts.snippet';
 	const CONTEXT_TASK = 'cerberusweb.contexts.task';
 	const CONTEXT_TICKET = 'cerberusweb.contexts.ticket';
@@ -1806,22 +1789,19 @@ class CerberusContexts {
 			}
 
 			// Remove dupe watchers
+
 			$watcher_ids = array_unique($watchers);
 
-			$url_writer = DevblocksPlatform::getUrlService();
-
 			// Fire off notifications
+
 			if(is_array($watcher_ids)) {
-				$message = CerberusContexts::formatActivityLogEntry($entry_array, 'plaintext');
-				@$url = reset($entry_array['urls']);
-
-				if(0 == strcasecmp('ctx://',substr($url,0,6))) {
-					$url = self::parseContextUrl($url);
-				} elseif(0 != strcasecmp('http',substr($url,0,4))) {
-					$url = $url_writer->writeNoProxy($url, true);
-				}
-
+				$workers = DAO_Worker::getAllActive();
+				
 				foreach($watcher_ids as $watcher_id) {
+					// Skip inactive workers
+					if(!isset($workers[$watcher_id]))
+						continue;
+					
 					// If not inside a VA
 					if(0 == EventListener_Triggers::getDepth()) {
 						// Skip a watcher if they are the actor
@@ -1846,8 +1826,8 @@ class CerberusContexts {
 						DAO_Notification::CREATED_DATE => time(),
 						DAO_Notification::IS_READ => 0,
 						DAO_Notification::WORKER_ID => $watcher_id,
-						DAO_Notification::MESSAGE => $message,
-						DAO_Notification::URL => $url,
+						DAO_Notification::ACTIVITY_POINT => $activity_point,
+						DAO_Notification::ENTRY_JSON => json_encode($entry_array),
 					));
 				}
 			}

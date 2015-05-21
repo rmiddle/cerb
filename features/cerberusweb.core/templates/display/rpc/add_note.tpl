@@ -14,15 +14,14 @@
 	</tr>
 	<tr>
 		<td>
-			<div class="cerb-form-hint">{'comment.notify.at_mention'|devblocks_translate}</div>
-			<textarea name="content" rows="8" cols="80" id="note_content" class="reply" style="width:98%;border:1px solid rgb(180,180,180);padding:5px;"></textarea>
+			<textarea name="content" rows="8" cols="80" id="note_content" class="reply" style="width:98%;border:1px solid rgb(180,180,180);padding:5px;" placeholder="{'comment.notify.at_mention'|devblocks_translate}"></textarea>
 			<button type="button" onclick="ajax.chooserSnippet('snippets',$('#note_content'), { '{CerberusContexts::CONTEXT_TICKET}':'{$message->ticket_id}', '{CerberusContexts::CONTEXT_MESSAGE}':'{$message->id}', '{CerberusContexts::CONTEXT_WORKER}':'{$active_worker->id}' });">{'common.snippets'|devblocks_translate|capitalize}</button>
 		</td>
 	</tr>
 	<tr>
 		<td nowrap="nowrap" valign="top">
-			<button type="button" onclick="genericAjaxPost('reply{$message->id}_form','{$message->id}notes','c=display&a=doAddNote');$('#reply{$message->id}').html('');"><span class="cerb-sprite2 sprite-tick-circle"></span> Add Note</button>
-			<button type="button" onclick="$('#reply{$message->id}').html('');"><span class="cerb-sprite2 sprite-cross-circle"></span> Cancel</button>
+			<button type="button" onclick="genericAjaxPost('reply{$message->id}_form','{$message->id}notes','c=display&a=doAddNote');$('#reply{$message->id}').html('');"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> Add Note</button>
+			<button type="button" onclick="$('#reply{$message->id}').html('');"><span class="glyphicons glyphicons-circle-remove" style="color:rgb(200,0,0);"></span> Cancel</button>
 		</td>
 	</tr>
 </table>
@@ -51,8 +50,10 @@ $(function() {
 
 	$textarea.atwho({
 		at: '@',
-		{literal}tpl: '<li data-value="@${at_mention}">${name} <small style="margin-left:10px;">${title}</small></li>',{/literal}
+		{literal}displayTpl: '<li>${name} <small style="margin-left:10px;">${title}</small> <small style="margin-left:10px;">@${at_mention}</small></li>',{/literal}
+		{literal}insertTpl: '@${at_mention}',{/literal}
 		data: atwho_workers,
+		searchKey: '_index',
 		limit: 10
 	});
 });

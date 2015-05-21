@@ -533,7 +533,6 @@ switch($step) {
 					case 'cerberusweb.support_center':
 					case 'cerberusweb.simulator':
 					case 'cerberusweb.timetracking':
-					case 'cerberusweb.watchers':
 						$plugin->setEnabled(true);
 						break;
 					
@@ -997,7 +996,7 @@ EOF;
 		if(is_array($crons))
 		foreach($crons as $id => $cron) { /* @var $cron CerberusCronPageExtension */
 			switch($id) {
-				case 'cron.pop3':
+				case 'cron.mailbox':
 					$cron->setParam(CerberusCronPageExtension::PARAM_ENABLED, true);
 					$cron->setParam(CerberusCronPageExtension::PARAM_DURATION, '5');
 					$cron->setParam(CerberusCronPageExtension::PARAM_TERM, 'm');

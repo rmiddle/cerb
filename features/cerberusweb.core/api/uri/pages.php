@@ -25,8 +25,9 @@ class Page_Custom extends CerberusPageExtension {
 	}
 	
 	function handleSectionActionAction() {
-		@$section_uri = DevblocksPlatform::importGPC($_REQUEST['section'],'string','');
-		@$action = DevblocksPlatform::importGPC($_REQUEST['action'],'string','');
+		// GET has precedence over POST
+		@$section_uri = DevblocksPlatform::importGPC(isset($_GET['section']) ? $_GET['section'] : $_REQUEST['section'],'string','');
+		@$action = DevblocksPlatform::importGPC(isset($_GET['action']) ? $_GET['action'] : $_REQUEST['action'],'string','');
 
 		$inst = Extension_PageSection::getExtensionByPageUri($this->manifest->id, $section_uri, true);
 		
@@ -302,57 +303,18 @@ class Page_Custom extends CerberusPageExtension {
 		
 		$list_pos = 0;
 
-		// Workflow: My conversations
+		// Workflow: Open conversations
+		
+			// [TODO] Recommended
 		
 			$context = CerberusContexts::CONTEXT_TICKET;
 			$context_ext = Extension_DevblocksContext::get($context);
 			$view = $context_ext->getChooserView(); /* @var $view C4_AbstractView */
 			
-			$view->name = 'Needs my attention';
-			$view->renderLimit = 5;
-			$view->view_columns = array(
-				SearchFields_Ticket::TICKET_LAST_ACTION_CODE,
-				SearchFields_Ticket::TICKET_UPDATED_DATE,
-				SearchFields_Ticket::TICKET_GROUP_ID,
-				SearchFields_Ticket::TICKET_BUCKET_ID,
-			);
-			$view->renderSubtotals = SearchFields_Ticket::TICKET_GROUP_ID;
-			$view->addParams(array(
-				//new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS, 'in', array('open')),
-			), true);
-			$view->addParamsRequired(array(
-				new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS, 'in', array('open')),
-				new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_OWNER_ID, 'in', array('{{current_worker_id}}')),
-			), true);
-			
-			$view_model = C4_AbstractViewLoader::serializeAbstractView($view);
-			
-			$list_view = new Model_WorkspaceListView();
-			$list_view->title = $view_model->name;
-			$list_view->columns = $view_model->view_columns;
-			$list_view->num_rows = $view_model->renderLimit;
-			$list_view->params = $view_model->paramsEditable;
-			$list_view->params_required = $view_model->paramsRequired;
-			$list_view->sort_by = $view_model->renderSortBy;
-			$list_view->sort_asc = $view_model->renderSortAsc;
-			$list_view->subtotals = $view_model->renderSubtotals;
-			
-			$list_id = DAO_WorkspaceList::create(array(
-				DAO_WorkspaceList::CONTEXT => $context,
-				DAO_WorkspaceList::LIST_POS => $list_pos++,
-				DAO_WorkspaceList::LIST_VIEW => serialize($list_view),
-				DAO_WorkspaceList::WORKSPACE_TAB_ID => $tab_id,
-			));
-			
-		// Workflow: Needs attention from anyone
-			
-			$context = CerberusContexts::CONTEXT_TICKET;
-			$context_ext = Extension_DevblocksContext::get($context);
-			$view = $context_ext->getChooserView(); /* @var $view C4_AbstractView */
-			
-			$view->name = 'Needs attention from anyone';
+			$view->name = 'Needs attention';
 			$view->renderLimit = 10;
 			$view->view_columns = array(
+				SearchFields_Ticket::TICKET_IMPORTANCE,
 				SearchFields_Ticket::TICKET_LAST_ACTION_CODE,
 				SearchFields_Ticket::TICKET_UPDATED_DATE,
 				SearchFields_Ticket::TICKET_GROUP_ID,
@@ -364,9 +326,8 @@ class Page_Custom extends CerberusPageExtension {
 				//new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS, 'in', array('open')),
 			), true);
 			$view->addParamsRequired(array(
+				new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER, '=', '{{current_worker_id}}'),
 				new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_STATUS, 'in', array('open')),
-				new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_OWNER_ID, 'in', array(0)),
-				SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER => new DevblocksSearchCriteria(SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER, '=', '{{current_worker_id}}'),
 			), true);
 			
 			$view_model = C4_AbstractViewLoader::serializeAbstractView($view);
@@ -387,57 +348,7 @@ class Page_Custom extends CerberusPageExtension {
 				DAO_WorkspaceList::LIST_VIEW => serialize($list_view),
 				DAO_WorkspaceList::WORKSPACE_TAB_ID => $tab_id,
 			));
-		
-		// Drafts
-		
-		$tab_id = DAO_WorkspaceTab::create(array(
-			DAO_WorkspaceTab::NAME => 'Drafts',
-			DAO_WorkspaceTab::EXTENSION_ID => 'core.workspace.tab.worklists',
-			DAO_WorkspaceTab::POS => $pos++,
-			DAO_WorkspaceTab::WORKSPACE_PAGE_ID => $page_id,
-		));
-		
-		// Drafts: My drafts
-		
-			$context = CerberusContexts::CONTEXT_DRAFT;
-			$context_ext = Extension_DevblocksContext::get($context);
-			$view = $context_ext->getChooserView(); /* @var $view C4_AbstractView */
 			
-			$view->name = 'My drafts';
-			$view->renderLimit = 10;
-			$view->view_columns = array(
-				SearchFields_MailQueue::HINT_TO,
-				SearchFields_MailQueue::WORKER_ID,
-				SearchFields_MailQueue::TYPE,
-				SearchFields_MailQueue::UPDATED,
-			);
-			$view->addParams(array(
-				//new DevblocksSearchCriteria(SearchFields_MailQueue::VIRTUAL_STATUS, 'in', array('open')),
-			), true);
-			$view->addParamsRequired(array(
-				new DevblocksSearchCriteria(SearchFields_MailQueue::WORKER_ID, 'in', array('{{current_worker_id}}')),
-				//new DevblocksSearchCriteria(SearchFields_MailQueue::IS_QUEUED, '=', 0),
-			), true);
-			
-			$view_model = C4_AbstractViewLoader::serializeAbstractView($view);
-			
-			$list_view = new Model_WorkspaceListView();
-			$list_view->title = $view_model->name;
-			$list_view->columns = $view_model->view_columns;
-			$list_view->num_rows = $view_model->renderLimit;
-			$list_view->params = $view_model->paramsEditable;
-			$list_view->params_required = $view_model->paramsRequired;
-			$list_view->sort_by = $view_model->renderSortBy;
-			$list_view->sort_asc = $view_model->renderSortAsc;
-			$list_view->subtotals = $view_model->renderSubtotals;
-			
-			$list_id = DAO_WorkspaceList::create(array(
-				DAO_WorkspaceList::CONTEXT => $context,
-				DAO_WorkspaceList::LIST_POS => $list_pos++,
-				DAO_WorkspaceList::LIST_VIEW => serialize($list_view),
-				DAO_WorkspaceList::WORKSPACE_TAB_ID => $tab_id,
-			));
-		
 		// Sent
 		
 		$tab_id = DAO_WorkspaceTab::create(array(
@@ -488,8 +399,56 @@ class Page_Custom extends CerberusPageExtension {
 				DAO_WorkspaceList::WORKSPACE_TAB_ID => $tab_id,
 			));	
 
-		// Marquee
+		// Drafts
+		
+		$tab_id = DAO_WorkspaceTab::create(array(
+			DAO_WorkspaceTab::NAME => 'Drafts',
+			DAO_WorkspaceTab::EXTENSION_ID => 'core.workspace.tab.worklists',
+			DAO_WorkspaceTab::POS => $pos++,
+			DAO_WorkspaceTab::WORKSPACE_PAGE_ID => $page_id,
+		));
+		
+		// Drafts: My drafts
+		
+			$context = CerberusContexts::CONTEXT_DRAFT;
+			$context_ext = Extension_DevblocksContext::get($context);
+			$view = $context_ext->getChooserView(); /* @var $view C4_AbstractView */
 			
+			$view->name = 'My drafts';
+			$view->renderLimit = 10;
+			$view->view_columns = array(
+				SearchFields_MailQueue::HINT_TO,
+				SearchFields_MailQueue::WORKER_ID,
+				SearchFields_MailQueue::TYPE,
+				SearchFields_MailQueue::UPDATED,
+			);
+			$view->addParams(array(
+			), true);
+			$view->addParamsRequired(array(
+				new DevblocksSearchCriteria(SearchFields_MailQueue::WORKER_ID, 'in', array('{{current_worker_id}}')),
+			), true);
+			
+			$view_model = C4_AbstractViewLoader::serializeAbstractView($view);
+			
+			$list_view = new Model_WorkspaceListView();
+			$list_view->title = $view_model->name;
+			$list_view->columns = $view_model->view_columns;
+			$list_view->num_rows = $view_model->renderLimit;
+			$list_view->params = $view_model->paramsEditable;
+			$list_view->params_required = $view_model->paramsRequired;
+			$list_view->sort_by = $view_model->renderSortBy;
+			$list_view->sort_asc = $view_model->renderSortAsc;
+			$list_view->subtotals = $view_model->renderSubtotals;
+			
+			$list_id = DAO_WorkspaceList::create(array(
+				DAO_WorkspaceList::CONTEXT => $context,
+				DAO_WorkspaceList::LIST_POS => $list_pos++,
+				DAO_WorkspaceList::LIST_VIEW => serialize($list_view),
+				DAO_WorkspaceList::WORKSPACE_TAB_ID => $tab_id,
+			));
+		
+		// Marquee
+		
 		if(!empty($page_id) && !empty($view_id)) {
 			$url_writer = DevblocksPlatform::getUrlService();
 			C4_AbstractView::setMarquee($view_id, sprintf("New page created: <a href='%s'><b>%s</b></a>",

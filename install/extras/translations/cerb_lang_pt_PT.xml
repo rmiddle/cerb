@@ -523,11 +523,6 @@
 				<seg>%s está a pesquisar tickets</seg>
 			</tuv>
 		</tu>
-		<tu tuid="activity.mail.workflow">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar %s no Workflow</seg>
-			</tuv>
-		</tu>
 		<tu tuid="activity.mail.workspaces">
 			<tuv xml:lang="pt_PT">
 				<seg>%s está a navegar %s nos Workspaces</seg>
@@ -1178,6 +1173,11 @@
 				<seg>GUID</seg>
 			</tuv>
 		</tu>
+		<tu tuid="common.history">
+			<tuv xml:lang="pt_PT">
+				<seg>histórico</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.hours">
 			<tuv xml:lang="pt_PT">
 				<seg>horas</seg>
@@ -1201,6 +1201,11 @@
 		<tu tuid="common.import.upload_csv.tip">
 			<tuv xml:lang="pt_PT">
 				<seg>(qualquer ordem da coluna; o próximo passo permitrá escolher onde será colocados os dados)</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.importance">
+			<tuv xml:lang="pt_PT">
+				<seg></seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.inactive">
@@ -1371,6 +1376,11 @@
 		<tu tuid="common.no">
 			<tuv xml:lang="pt_PT">
 				<seg>não</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.no_thanks">
+			<tuv xml:lang="pt_PT">
+				<seg>não obrigado!</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.nobody">
@@ -1803,12 +1813,12 @@
 				<seg>ID do perfil:</seg>
 			</tuv>
 		</tu>
-		<tu tuid="config.mail.pop3.error_hostname">
+		<tu tuid="config.mailboxes.error_hostname">
 			<tuv xml:lang="pt_PT">
 				<seg>Erro: Hostname não indicado.</seg>
 			</tuv>
 		</tu>
-		<tu tuid="config.mail.pop3.failed">
+		<tu tuid="config.mailboxes.failed">
 			<tuv xml:lang="pt_PT">
 				<seg>Falhou ligação  caixa de correio.</seg>
 			</tuv>
@@ -2768,11 +2778,6 @@
 				<seg>(pasta actual)</seg>
 			</tuv>
 		</tu>
-		<tu tuid="display.reply.next.move.no_thanks">
-			<tuv xml:lang="pt_PT">
-				<seg>não obrigado!</seg>
-			</tuv>
-		</tu>
 		<tu tuid="display.reply.next.owner">
 			<tuv xml:lang="pt_PT">
 				<seg>A quem deverá ser atribuído?</seg>
@@ -2996,11 +3001,6 @@
 		<tu tuid="header.config">
 			<tuv xml:lang="pt_PT">
 				<seg>configuração helpdesk</seg>
-			</tuv>
-		</tu>
-		<tu tuid="header.history">
-			<tuv xml:lang="pt_PT">
-				<seg>histórico</seg>
 			</tuv>
 		</tu>
 		<tu tuid="header.last_viewed">
@@ -3286,11 +3286,6 @@
 		<tu tuid="mail.worklist.draft_in_progress">
 			<tuv xml:lang="pt_PT">
 				<seg></seg>
-			</tuv>
-		</tu>
-		<tu tuid="mail.workflow">
-			<tuv xml:lang="pt_PT">
-				<seg>Fluxos de Trabalho</seg>
 			</tuv>
 		</tu>
 		<tu tuid="mail.workspaces.create">
@@ -4757,11 +4752,6 @@ Por exemplo: *recipiente*</seg>
 				<seg>Tarefas do Ticket</seg>
 			</tuv>
 		</tu>
-		<tu tuid="ticket.assignable">
-			<tuv xml:lang="pt_PT">
-				<seg>Atribuível</seg>
-			</tuv>
-		</tu>
 		<tu tuid="ticket.closed_at">
 			<tuv xml:lang="pt_PT">
 				<seg/>
@@ -4865,11 +4855,6 @@ Por exemplo: *recipiente*</seg>
 		<tu tuid="ticket.spam_training">
 			<tuv xml:lang="pt_PT">
 				<seg>Treino Spam</seg>
-			</tuv>
-		</tu>
-		<tu tuid="ticket.status">
-			<tuv xml:lang="pt_PT">
-				<seg>Estado</seg>
 			</tuv>
 		</tu>
 		<tu tuid="ticket.subject">

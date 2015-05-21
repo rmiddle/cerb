@@ -62,14 +62,34 @@ class DAO_Worker extends Cerb_ORMHelper {
 		$cache->remove(self::CACHE_ALL);
 	}
 	
+	/**
+	 * @return Model_Worker[]
+	 */
 	static function getAllActive() {
 		return self::getAll(false, false);
 	}
 	
+	/**
+	 * @return Model_Worker[]
+	 */
 	static function getAllWithDisabled() {
 		return self::getAll(false, true);
 	}
 	
+	/**
+	 * @return Model_Worker[]
+	 */
+	static function getAllAdmins() {
+		$workers = self::getAllActive();
+		
+		return array_filter($workers, function($worker) {
+			return $worker->is_superuser;
+		});
+	}
+	
+	/**
+	 * @return Model_Worker[]
+	 */
 	static function getAllOnline($idle_limit=600, $idle_kick_limit=0) {
 		$session = DevblocksPlatform::getSessionService();
 
@@ -124,6 +144,12 @@ class DAO_Worker extends Cerb_ORMHelper {
 		return $active_workers;
 	}
 	
+	/**
+	 * 
+	 * @param bool $nocache
+	 * @param bool $with_disabled
+	 * @return Model_Worker[]
+	 */
 	static function getAll($nocache=false, $with_disabled=true) {
 		$cache = DevblocksPlatform::getCacheService();
 		if($nocache || null === ($workers = $cache->load(self::CACHE_ALL))) {
@@ -182,6 +208,24 @@ class DAO_Worker extends Cerb_ORMHelper {
 		}
 		
 		return $workers;
+	}
+	
+	static function getResponsibilities($worker_id) {
+		$db = DevblocksPlatform::getDatabaseService();
+		$responsibilities = array();
+		
+		$results = $db->GetArray(sprintf("SELECT worker_id, bucket_id, responsibility_level FROM worker_to_bucket WHERE worker_id = %d",
+			$worker_id
+		));
+		
+		foreach($results as $row) {
+			if(!isset($responsibilities[$row['bucket_id']]))
+				$responsibilities[$row['bucket_id']] = array();
+			
+			$responsibilities[$row['bucket_id']] = $row['responsibility_level'];
+		}
+		
+		return $responsibilities;
 	}
 	
 	/**
@@ -280,6 +324,39 @@ class DAO_Worker extends Cerb_ORMHelper {
 		}
 
 		return $results;
+	}
+	
+	static function getWorkloads() {
+		$db = DevblocksPlatform::getDatabaseService();
+		$workloads = array();
+		
+		$sql = "SELECT 'cerberusweb.contexts.ticket' AS context, owner_id AS worker_id, COUNT(id) AS hits FROM ticket WHERE is_closed = 0 AND is_waiting = 0 GROUP BY owner_id ".
+			"UNION ALL ".
+			"SELECT 'cerberusweb.contexts.recommendation' AS context, worker_id, COUNT(*) AS hits FROM context_recommendation GROUP BY worker_id ".
+			"UNION ALL ".
+			"SELECT 'cerberusweb.contexts.notification' AS context, worker_id, COUNT(id) AS hits FROM notification WHERE is_read = 0 GROUP BY worker_id ".
+			//"UNION ALL ".
+			//"SELECT 'cerberusweb.contexts.task' AS context, owner_id AS worker_id, COUNT(id) AS hits FROM task WHERE is_completed = 0 GROUP BY worker_id ".
+			""
+			;
+		$results = $db->GetArraySlave($sql);
+		
+		foreach($results as $result) {
+			$context = $result['context'];
+			$worker_id = $result['worker_id'];
+			$hits = $result['hits'];
+			
+			if(!isset($workloads[$worker_id]))
+				$workloads[$worker_id] = array(
+					'total' => 0,
+					'records' => array(),
+				);
+				
+			$workloads[$worker_id]['records'][$context] = $hits;
+			$workloads[$worker_id]['total'] += $hits;
+		}
+		
+		return $workloads;
 	}
 	
 	static function updateWhere($fields, $where) {
@@ -726,7 +803,7 @@ class DAO_Worker extends Cerb_ORMHelper {
 			case SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY:
 				if(!is_array($param->value) || count($param->value) != 3)
 					break;
-
+					
 				$from = $param->value[0];
 				$to = $param->value[1];
 				$is_available = !empty($param->value[2]);
@@ -737,7 +814,7 @@ class DAO_Worker extends Cerb_ORMHelper {
 				$results = array();
 				
 				foreach($workers as $worker_id => $worker) {
-					@$calendar_id = DAO_WorkerPref::get($worker->id, 'calendar_id', 0);
+					@$calendar_id = $worker->calendar_id;
 					
 					if(empty($calendar_id)) {
 						if(!$is_available)
@@ -769,7 +846,7 @@ class DAO_Worker extends Cerb_ORMHelper {
 				if(empty($results))
 					$results[] = '-1';
 				
-				$args['where_sql'] .= sprintf("AND w.id IN (%s) ", implode($results));
+				$args['where_sql'] .= sprintf("AND w.id IN (%s) ", implode(', ', $results));
 				
 				break;
 		}
@@ -1117,6 +1194,63 @@ class Model_Worker {
 		return DAO_Address::getByEmail($this->email);
 	}
 	
+	function getResponsibilities() {
+		return DAO_Worker::getResponsibilities($this->id);
+	}
+	
+	function getAvailability($date_from, $date_to) {
+		$calendar = DAO_Calendar::get($this->calendar_id);
+		
+		// In full (00:00:00 - 23:59:59) days
+		$day_from = strtotime('midnight', $date_from);
+		$day_to = strtotime('23:59:59', $date_to);
+		
+		$calendar_events = $calendar->getEvents($day_from, $day_to);
+		$availability = $calendar->computeAvailability($date_from, $date_to, $calendar_events);
+		
+		return $availability;
+	}
+	
+	function getAvailabilityAsBlocks() {
+		$date_from = time() - (time() % 60);
+		$date_to = strtotime('+24 hours', $date_from);
+		
+		$blocks = array();
+		
+		$availability = $this->getAvailability($date_from, $date_to);
+		$mins = $availability->getMinutes();
+		$ticks = strlen($mins);
+
+		while(0 != strlen($mins)) {
+			$from = 0;
+			$is_available = $mins{$from} == 1;
+			
+			if(false === ($to = strpos($mins, $is_available ? '0' : '1'))) {
+				$to = strlen($mins);
+				$mins = '';
+				
+			} else {
+				$mins = substr($mins, $to);
+			}
+			
+			$pos = $ticks - strlen($mins);
+			
+			$blocks[] = array(
+				'available' => $is_available,
+				'length' => $to,
+				'start' => $date_from + (($pos - $to) * 60),
+				'end' => $date_from + ($pos * 60 - 1),
+			);
+		}
+		
+		return array(
+			'start' => $date_from,
+			'end' => $date_to,
+			'ticks' => $ticks,
+			'blocks' => $blocks,
+		);
+	}
+	
 	function hasPriv($priv_id) {
 		// We don't need to do much work if we're a superuser
 		if($this->is_superuser)
@@ -1135,12 +1269,25 @@ class Model_Worker {
 		return false;
 	}
 	
-	function isGroupManager($group_id) {
+	function isGroupManager($group_id=null) {
 		@$memberships = $this->getMemberships();
 		$groups = DAO_Group::getAll();
+		
+		if($this->is_superuser)
+			return true;
+		
+		if(empty($group_id)) {
+			foreach($groups as $group) {
+				// Is the worker a manager of this group?
+				if(isset($memberships[$group_id]) && $memberships[$group_id]->is_manager)
+					return true;
+			}
+			
+			return false;
+		}
+		
 		if(
-			empty($group_id) // null
-			|| !isset($groups[$group_id]) // doesn't exist
+			!isset($groups[$group_id]) // doesn't exist
 			|| !isset($memberships[$group_id])  // not a member
 			|| (!$memberships[$group_id]->is_manager && !$this->is_superuser) // not a manager or superuser
 		){
@@ -1359,7 +1506,6 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
 					'options' => array('param_key' => SearchFields_Worker::FULLTEXT_WORKER),
-					'options' => array('param_key' => SearchFields_Worker::FULLTEXT_WORKER, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
 				),
 			'email' => 
 				array(
@@ -1375,6 +1521,24 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_BOOL,
 					'options' => array('param_key' => SearchFields_Worker::IS_SUPERUSER),
+				),
+			'isAvailable' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_VIRTUAL,
+					'options' => array('param_key' => SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY),
+					'examples' => array(
+						'(noon to 1pm)',
+						'(now to +15 mins)',
+					),
+				),
+			'isBusy' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_VIRTUAL,
+					'options' => array('param_key' => SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY),
+					'examples' => array(
+						'noon to 1pm',
+						'now to +15 mins',
+					),
 				),
 			'isDisabled' => 
 				array(
@@ -1450,7 +1614,17 @@ class View_Worker extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		if(is_array($fields))
 		foreach($fields as $k => $v) {
 			switch($k) {
-				// ...
+				case 'isAvailable':
+					$param = DevblocksSearchCriteria::getDateParamFromQuery(SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY, $v);
+					$param->value[] = '1';
+					$params[] = $param;
+					break;
+					
+				case 'isBusy':
+					$param = DevblocksSearchCriteria::getDateParamFromQuery(SearchFields_Worker::VIRTUAL_CALENDAR_AVAILABILITY, $v);
+					$param->value[] = '0';
+					$params[] = $param;
+					break;
 			}
 		}
 		

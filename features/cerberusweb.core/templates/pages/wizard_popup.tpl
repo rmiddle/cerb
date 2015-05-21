@@ -20,8 +20,7 @@
 				</ul>
 				
 				<div id="mail_tab1">
-					<div style="margin-bottom:5px;font-weight:bold;color:white;background-color:rgb(100,135,225);padding:5px 10px;border-radius:5px 5px 0px 0px;-moz-border-radius:5px 5px 0px 0px;-webkit-border-radius:5px 5px 0px 0px;">Needs my attention</div>
-					<div style="margin-bottom:5px;font-weight:bold;color:white;background-color:rgb(100,135,225);padding:5px 10px;border-radius:5px 5px 0px 0px;-moz-border-radius:5px 5px 0px 0px;-webkit-border-radius:5px 5px 0px 0px;">Needs attention from anyone</div>
+					<div style="margin-bottom:5px;font-weight:bold;color:white;background-color:rgb(100,135,225);padding:5px 10px;border-radius:5px 5px 0px 0px;-moz-border-radius:5px 5px 0px 0px;-webkit-border-radius:5px 5px 0px 0px;">Needs attention</div>
 				</div>
 				<div id="mail_tab2">
 					<div style="margin-bottom:5px;font-weight:bold;color:white;background-color:rgb(100,135,225);padding:5px 10px;border-radius:5px 5px 0px 0px;-moz-border-radius:5px 5px 0px 0px;-webkit-border-radius:5px 5px 0px 0px;">My drafts</div>
@@ -72,7 +71,7 @@
 </fieldset>
 
 <div>
-	<button type="button" onclick="genericAjaxPopupPostCloseReloadView(null,'frmPageWizard','{$view_id}',false,'page_save');"><span class="cerb-sprite2 sprite-tick-circle"></span> {'common.save_changes'|devblocks_translate}</button>
+	<button type="button" onclick="genericAjaxPopupPostCloseReloadView(null,'frmPageWizard','{$view_id}',false,'page_save');"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_changes'|devblocks_translate}</button>
 </div>
 
 </form>

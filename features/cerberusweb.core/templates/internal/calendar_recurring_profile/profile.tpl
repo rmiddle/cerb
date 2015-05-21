@@ -26,7 +26,7 @@
 		{include file="devblocks:cerberusweb.core::internal/macros/display/button.tpl" context=$page_context context_id=$page_context_id macros=$macros return_url=$return_url}
 		
 		<!-- Edit -->
-		<button type="button" id="btnDisplayCalendarRecurringProfileEdit" title="{'common.edit'|devblocks_translate|capitalize}">&nbsp;<span class="cerb-sprite2 sprite-gear"></span>&nbsp;</button>
+		<button type="button" id="btnDisplayCalendarRecurringProfileEdit" title="{'common.edit'|devblocks_translate|capitalize}"><span class="glyphicons glyphicons-cogwheel"></span></button>
 	</form>
 	
 	{if $pref_keyboard_shortcuts}
@@ -95,7 +95,7 @@ $(function() {
 	
 	$('#btnDisplayCalendarRecurringProfileEdit').bind('click', function() {
 		var $popup = genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$page_context}&context_id={$page_context_id}',null,false,'550');
-		$popup.one('calendar_recurring_profile_save', function(event) {
+		$popup.one('calendar_event_save', function(event) {
 			event.stopPropagation();
 			document.location.reload();
 		});

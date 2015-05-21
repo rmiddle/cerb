@@ -207,7 +207,7 @@ abstract class C4_AbstractView {
 	}
 
 	private function _filterParamsByFieldset($params) {
-		$results = $this->findParam('*_has_fieldset', $this->getParams());
+		$results = $this->findParam('*_has_fieldset', $this->getParams(false));
 		
 		if(!empty($results)) {
 			$fieldset_ids = array();
@@ -241,9 +241,14 @@ abstract class C4_AbstractView {
 		$params = $this->_paramsEditable;
 		
 		// Required should supersede editable
-		if(is_array($this->_paramsRequired))
-		foreach($this->_paramsRequired as $key => $param)
-			$params['req_'.$key] = $param;
+		
+		if(is_array($this->_paramsRequired)) {
+			$params_required = DevblocksPlatform::deepCloneArray($this->_paramsRequired);
+			
+			foreach($params_required as $key => $param) {
+				$params['req_'.$key] = $param;
+			}
+		}
 		
 		if($parse_placeholders) {
 			// Translate snippets in filters
@@ -1179,7 +1184,7 @@ abstract class C4_AbstractView {
 		$fields = $this->getColumnsAvailable();
 		$custom_fields = DAO_CustomField::getAll();
 		
-		$params = $this->getParams();
+		$params = $this->getParams(false);
 		
 		// Parameter sanity check
 		if(is_array($params))
@@ -1379,6 +1384,11 @@ abstract class C4_AbstractView {
 		$tpl->assign('subtotal_fields', $fields);
 		
 		$counts = $this->getSubtotalCounts($this->renderSubtotals);
+		
+		// Unless we're subtotalling by group, limit the results to top 20
+		if($this->renderSubtotals != 't_group_id')
+			$counts = array_slice($counts, 0, 20);
+		
 		$tpl->assign('subtotal_counts', $counts);
 		
 		$tpl->display('devblocks:cerberusweb.core::internal/views/sidebar.tpl');
@@ -1464,7 +1474,7 @@ abstract class C4_AbstractView {
 			$where_sql.
 			"GROUP BY label ".
 			"ORDER BY hits DESC ".
-			"LIMIT 0,20 "
+			"LIMIT 0,250 "
 		;
 		
 		$results = $db->GetArraySlave($sql);
@@ -1657,7 +1667,7 @@ abstract class C4_AbstractView {
 			$where_sql.
 			"GROUP BY watcher_id ".
 			"ORDER BY hits DESC ".
-			"LIMIT 0,20 "
+			"LIMIT 0,250 "
 		;
 		
 		$results = $db->GetArraySlave($sql);
@@ -1778,7 +1788,7 @@ abstract class C4_AbstractView {
 			);
 			
 		} else {
-			$sql = sprintf("SELECT from_context AS link_from_context, from_context_id AS link_from_context_id, count(*) AS hits FROM context_link WHERE to_context = %s AND to_context_id IN (%s) AND from_context = %s GROUP BY from_context_id ORDER BY hits DESC LIMIT 0,20 ",
+			$sql = sprintf("SELECT from_context AS link_from_context, from_context_id AS link_from_context_id, count(*) AS hits FROM context_link WHERE to_context = %s AND to_context_id IN (%s) AND from_context = %s GROUP BY from_context_id ORDER BY hits DESC LIMIT 0,250 ",
 				$db->qstr($context),
 				(
 					sprintf("SELECT %s.id ", $query_parts['primary_table']).
@@ -2399,6 +2409,7 @@ interface IAbstractView_Subtotals {
  * classloading issues (out of the session) from plugins that might have
  * concrete AbstractView implementations.
  */
+if(!class_exists('C4_AbstractViewModel')):
 class C4_AbstractViewModel {
 	public $class_name = '';
 
@@ -2428,6 +2439,7 @@ class C4_AbstractViewModel {
 	public $placeholderLabels = array();
 	public $placeholderValues = array();
 };
+endif;
 
 /**
  * This is essentially an AbstractView Factory
@@ -2479,8 +2491,9 @@ class C4_AbstractViewLoader {
 			$_exit_checksum = sha1(serialize($view));
 			
 			// If the view model is not dirty (we wouldn't end up changing anything in the database)
-			if($_init_checksum == $_exit_checksum)
+			if($_init_checksum == $_exit_checksum) {
 				return;
+			}
 		}
 		
 		$model = self::serializeAbstractView($view);
@@ -2500,7 +2513,7 @@ class C4_AbstractViewLoader {
 	static function serializeAbstractView($view) {
 		if(!$view instanceof C4_AbstractView)
 			return NULL;
-
+		
 		$model = new C4_AbstractViewModel();
 			
 		$model->class_name = get_class($view);
@@ -2588,6 +2601,7 @@ class C4_AbstractViewLoader {
 		// Enforce class restrictions
 		$parent = new $model->class_name;
 		$parent->__auto_persist = false;
+		// [TODO] This is a rather heavy way to accomplish this, these could be static
 		$inst->addColumnsHidden($parent->getColumnsHidden());
 		$inst->addParamsHidden($parent->getParamsHidden());
 		$inst->addParamsRequired($parent->getParamsRequired());
@@ -2664,7 +2678,6 @@ class C4_AbstractViewLoader {
 			$view->addParamsRequired($view_model['params_required'], true);
 		}
 
-		// [TODO] This needs a bit more logic
 		$active_worker = CerberusApplication::getActiveWorker();
 		$view->setPlaceholderValues(array('current_worker_id' => !empty($active_worker) ? $active_worker->id : 0));
 		
