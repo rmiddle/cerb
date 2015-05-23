@@ -1353,6 +1353,35 @@ class DAO_Ticket extends Cerb_ORMHelper {
 		if('*'==substr($sortBy,0,1) || !isset($fields[$sortBy]) || !in_array($sortBy,$columns))
 			$sortBy=null;
 		
+		if(is_string($sortBy))
+		switch($sortBy) {
+			case SearchFields_Ticket::TICKET_IMPORTANCE:
+				$sortBy = array(
+					SearchFields_Ticket::TICKET_IMPORTANCE,
+					SearchFields_Ticket::TICKET_UPDATED_DATE,
+				);
+				
+				$sortAsc = array(
+					$sortAsc,
+					!$sortAsc,
+				);
+				break;
+				
+			case SearchFields_Ticket::BUCKET_RESPONSIBILITY:
+				$sortBy = array(
+					SearchFields_Ticket::BUCKET_RESPONSIBILITY,
+					SearchFields_Ticket::TICKET_IMPORTANCE,
+					SearchFields_Ticket::TICKET_UPDATED_DATE,
+				);
+				
+				$sortAsc = array(
+					$sortAsc,
+					$sortAsc,
+					!$sortAsc,
+				);
+				break;
+		}
+		
 		$ignore_params = array(
 			SearchFields_Ticket::REQUESTER_ID,
 			SearchFields_Ticket::REQUESTER_ADDRESS,
@@ -1442,6 +1471,12 @@ class DAO_Ticket extends Cerb_ORMHelper {
 			(isset($tables['mh']) ? "INNER JOIN message_header mh ON (mh.message_id=t.first_message_id) " : " "). // [TODO] Choose between first message and all?
 			(isset($tables['context_link']) ? "INNER JOIN context_link ON (context_link.to_context = 'cerberusweb.contexts.ticket' AND context_link.to_context_id = t.id) " : " ")
 			;
+		if(isset($tables['wtb'])) {
+			if(false != ($active_worker = CerberusApplication::getActiveWorker())) {
+				$select_sql .= ", wtb.responsibility_level as wtb_responsibility ";
+				$join_sql .= sprintf("INNER JOIN worker_to_bucket wtb ON (wtb.bucket_id=t.bucket_id AND wtb.worker_id=%d) ", $active_worker->id);
+			}
+		}
 			
 		// Org joins
 		if(isset($tables['o'])) {
@@ -1468,7 +1503,7 @@ class DAO_Ticket extends Cerb_ORMHelper {
 		$where_sql = "".
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 			
-		$sort_sql = (!empty($sortBy) ? sprintf("ORDER BY %s %s ",$sortBy,($sortAsc || is_null($sortAsc))?"ASC":"DESC") : " ");
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc);
 
 		// Translate virtual fields
 		
@@ -2013,6 +2048,9 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 	const TICKET_MESSAGE_HEADER = 'mh_header_name';
 	const TICKET_MESSAGE_HEADER_VALUE = 'mh_header_value';
 
+	// Responsibilities
+	const BUCKET_RESPONSIBILITY = 'wtb_responsibility';
+	
 	// Sender
 	const SENDER_ADDRESS = 'a1_address';
 	
@@ -2102,6 +2140,8 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 			SearchFields_Ticket::TICKET_REOPEN_AT => new DevblocksSearchField(SearchFields_Ticket::TICKET_REOPEN_AT, 't', 'reopen_at',$translate->_('ticket.reopen_at'), Model_CustomField::TYPE_DATE),
 			SearchFields_Ticket::TICKET_FIRST_CONTACT_ORG_ID => new DevblocksSearchField(SearchFields_Ticket::TICKET_FIRST_CONTACT_ORG_ID, 'a1', 'contact_org_id'),
 			
+			SearchFields_Ticket::BUCKET_RESPONSIBILITY => new DevblocksSearchField(SearchFields_Ticket::BUCKET_RESPONSIBILITY, 'wtb', 'responsibility_level', mb_convert_case($translate->_('common.responsibility'), MB_CASE_TITLE)),
+				
 			SearchFields_Ticket::REQUESTER_ID => new DevblocksSearchField(SearchFields_Ticket::REQUESTER_ID, 'r', 'address_id', $translate->_('ticket.requester')),
 			
 			SearchFields_Ticket::SENDER_ADDRESS => new DevblocksSearchField(SearchFields_Ticket::SENDER_ADDRESS, 'a1', 'email'),

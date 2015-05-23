@@ -202,6 +202,11 @@ if(!isset($tables['context_recommendation'])) {
 }
 
 // ===========================================================================
+// Remove disabled workers from groups
+
+$db->Execute("DELETE FROM worker_to_group WHERE worker_id IN (SELECT id FROM worker WHERE is_disabled = 1)");
+
+// ===========================================================================
 // Add `importance` field to `ticket`
 
 if(!isset($tables['ticket'])) {
@@ -520,7 +525,12 @@ if(!isset($columns['activity_point'])) {
 	$db->ExecuteMaster("ALTER TABLE notification ADD COLUMN activity_point VARCHAR(255) NOT NULL DEFAULT '', ADD INDEX (activity_point)");
 	
 	// Convert existing notifications to being activity-based using the activity log
-	$db->ExecuteMaster("INSERT INTO notification (created_date, worker_id, is_read, context, context_id, activity_point, entry_json) SELECT n.created_date, n.worker_id, 0, n.context, n.context_id, al.activity_point, al.entry_json FROM notification n INNER JOIN context_activity_log al ON (n.context=al.target_context AND n.context_id=al.target_context_id) WHERE n.is_read = 0 AND al.created BETWEEN CAST(n.created_date-1 AS unsigned) AND CAST(n.created_date+1 AS unsigned)");
+	$db->ExecuteMaster("INSERT INTO notification (created_date, worker_id, is_read, context, context_id, activity_point, entry_json) ".
+		"SELECT n.created_date, n.worker_id, 0, n.context, n.context_id, al.activity_point, al.entry_json ".
+		"FROM notification n ".
+		"INNER JOIN context_activity_log al ON (n.context=al.target_context AND n.context_id=al.target_context_id) ".
+		"WHERE n.is_read = 0 AND al.created = n.created_date"
+	);
 	
 	// Delete the old notifications
 	$db->ExecuteMaster("DELETE FROM notification WHERE activity_point = ''");
@@ -558,6 +568,14 @@ if(isset($tables['pop3_account'])) {
 	$db->ExecuteMaster("REPLACE INTO cerb_property_store VALUES ('cron.mailbox', 'lastrun', '0')");
 	$db->ExecuteMaster("REPLACE INTO cerb_property_store VALUES ('cron.mailbox', 'locked', '0')");
 	$db->ExecuteMaster("REPLACE INTO cerb_property_store VALUES ('cron.mailbox', 'max_messages', '50')");
+}
+
+// ===========================================================================
+// Drop RSS table
+
+if(isset($tables['view_rss'])) {
+	$db->Execute("DROP TABLE view_rss");
+	unset($tables['view_rss']);
 }
 
 // ===========================================================================

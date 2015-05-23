@@ -46,7 +46,7 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2015052101);
+define("APP_BUILD", 2015052201);
 define("APP_VERSION", '7.0.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
@@ -2533,6 +2533,32 @@ class Cerb_ORMHelper extends DevblocksORMHelper {
 		});
 
 		return $exists;
+	}
+	
+	static protected function _buildSortClause($sortBy, $sortAsc) {
+		$sort_sql = null;
+		
+		if(is_string($sortBy)) {
+			$sort_sql = (!empty($sortBy) ? sprintf("ORDER BY %s %s ",$sortBy,($sortAsc || is_null($sortAsc))?"ASC":"DESC") : " ");
+			
+		} elseif(is_array($sortBy) && is_array($sortAsc) && count($sortBy) == count($sortAsc)) {
+			$sorts = array();
+			
+			foreach($sortBy as $idx => $field) {
+				@$asc = $sortAsc[$idx];
+				
+				$sorts[] = sprintf("%s %s",
+					$field,
+					($asc || is_null($asc)) ? "ASC" : "DESC"
+				);
+			}
+			
+			if(!empty($sorts))
+				$sort_sql = sprintf('ORDER BY %s', implode(', ', $sorts));
+			
+		}
+		
+		return $sort_sql;
 	}
 
 	static protected function _getRandom($table, $pkey='id') {

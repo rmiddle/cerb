@@ -21,7 +21,6 @@
 			<a href="javascript:;" title="{'common.export'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('{$view->id}_tips','c=internal&a=viewShowExport&id={$view->id}');toggleDiv('{$view->id}_tips','block');"><span class="glyphicons glyphicons-file-export"></span></a>
 			<a href="javascript:;" title="{'common.copy'|devblocks_translate|capitalize}" onclick="genericAjaxGet('{$view->id}_tips','c=internal&a=viewShowCopy&view_id={$view->id}');toggleDiv('{$view->id}_tips','block');"><span class="glyphicons glyphicons-duplicate"></span></a>
 			<a href="javascript:;" title="{'common.refresh'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('view{$view->id}','c=internal&a=viewRefresh&id={$view->id}');"><span class="glyphicons glyphicons-refresh"></span></a>
-			{if $active_worker->hasPriv('core.rss')}<a href="javascript:;" onclick="genericAjaxGet('{$view->id}_tips','c=tickets&a=showViewRss&view_id={$view->id}&source=core.rss.source.ticket');toggleDiv('{$view->id}_tips','block');"><span class="glyphicons glyphicons-wifi"></span></a>{/if}
 			<input type="checkbox" class="select-all">
 		</td>
 	</tr>
@@ -197,6 +196,12 @@
 		<td>
 			<div style="margin-left:5px;width:40px;height:8px;background-color:rgb(220,220,220);border-radius:8px;">
 				<div style="position:relative;margin-left:-5px;top:-1px;left:{$result.$column}%;width:10px;height:10px;border-radius:10px;background-color:{if $result.$column < 50}rgb(0,200,0);{elseif $result.$column > 50}rgb(230,70,70);{else}rgb(175,175,175);{/if}"></div>
+			</div>
+		</td>
+		{elseif $column=="wtb_responsibility"}
+		<td>
+			<div style="margin-left:5px;width:40px;height:8px;background-color:rgb(220,220,220);border-radius:8px;">
+				<div style="position:relative;margin-left:-5px;top:-1px;left:{$result.$column}%;width:10px;height:10px;border-radius:10px;background-color:{if $result.$column < 50}rgb(230,70,70);{elseif $result.$column > 50}rgb(0,200,0);{else}rgb(175,175,175);{/if}"></div>
 			</div>
 		</td>
 		{else}

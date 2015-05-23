@@ -1072,6 +1072,26 @@
 				<seg>go!</seg>
 			</tuv>
 		</tu>
+		<tu tuid="common.security">
+			<tuv xml:lang="en_US">
+				<seg>security</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.session">
+			<tuv xml:lang="en_US">
+				<seg>session</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.sessions">
+			<tuv xml:lang="en_US">
+				<seg>sessions</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.setting">
+			<tuv xml:lang="en_US">
+				<seg>setting</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.settings">
 			<tuv xml:lang="en_US">
 				<seg>settings</seg>
@@ -1635,14 +1655,6 @@
 		<tu tuid="acl.core.mail.draft.delete_all">
 			<tuv xml:lang="en_US">
 				<seg>[Mail] Can delete drafts owned by other workers</seg>
-			</tuv>
-		</tu>
-
-		<!-- RSS -->
-		
-		<tu tuid="acl.core.rss">
-			<tuv xml:lang="en_US">
-				<seg>[RSS] Can export lists as RSS feeds</seg>
 			</tuv>
 		</tu>
 
@@ -2935,14 +2947,6 @@ If you did not request this, do not click the link above.  The request will expi
 		<tu tuid="prefs.address.invalid">
 			<tuv xml:lang="en_US">
 				<seg>%s is not a valid email address.</seg>
-			</tuv>
-		</tu>
-
-		<!-- RSS -->
-		
-		<tu tuid="rss.bad_feed">
-			<tuv xml:lang="en_US">
-				<seg>Bad feed data.</seg>
 			</tuv>
 		</tu>
 

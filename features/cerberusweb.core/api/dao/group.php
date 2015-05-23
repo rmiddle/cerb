@@ -485,7 +485,7 @@ class DAO_Group extends Cerb_ORMHelper {
 		
 		if(null === ($objects = $cache->load(self::CACHE_ROSTERS))) {
 			$db = DevblocksPlatform::getDatabaseService();
-			$sql = sprintf("SELECT wt.worker_id, wt.group_id, wt.is_manager ".
+			$sql = sprintf("SELECT wt.worker_id, wt.group_id, wt.is_manager, w.is_disabled ".
 				"FROM worker_to_group wt ".
 				"INNER JOIN worker_group g ON (wt.group_id=g.id) ".
 				"INNER JOIN worker w ON (w.id=wt.worker_id) ".
@@ -499,6 +499,10 @@ class DAO_Group extends Cerb_ORMHelper {
 				$worker_id = intval($row['worker_id']);
 				$group_id = intval($row['group_id']);
 				$is_manager = intval($row['is_manager']);
+				$is_disabled = intval($row['is_disabled']);
+				
+				if($is_disabled)
+					continue;
 				
 				if(!isset($objects[$group_id]))
 					$objects[$group_id] = array();
@@ -797,9 +801,11 @@ class Model_Group {
 			
 		} else {
 			
-			$default_bucket = DAO_Bucket::getDefaultForGroup($this->id);
-			return $default_bucket->getReplyTo();
+			if(false != ($default_bucket = DAO_Bucket::getDefaultForGroup($this->id)))
+				return $default_bucket->getReplyTo();
 		}
+		
+		return null;
 	}
 	
 	public function getReplyFrom($bucket_id=0) {
@@ -808,10 +814,11 @@ class Model_Group {
 			
 		} else {
 			
-			$default_bucket = DAO_Bucket::getDefaultForGroup($this->id);
-			return $default_bucket->getReplyFrom();
+			if(false == ($default_bucket = DAO_Bucket::getDefaultForGroup($this->id)))
+				return $default_bucket->getReplyFrom();
 		}
 		
+		return null;
 	}
 	
 	public function getReplyPersonal($bucket_id=0, $worker_model=null) {
@@ -820,9 +827,11 @@ class Model_Group {
 			
 		} else {
 			
-			$default_bucket = DAO_Bucket::getDefaultForGroup($this->id);
-			return $default_bucket->getReplyPersonal($worker_model);
+			if(false != ($default_bucket = DAO_Bucket::getDefaultForGroup($this->id)))
+				return $default_bucket->getReplyPersonal($worker_model);
 		}
+		
+		return null;
 	}
 	
 	public function getReplySignature($bucket_id=0, $worker_model=null) {
@@ -831,9 +840,11 @@ class Model_Group {
 			
 		} else {
 			
-			$default_bucket = DAO_Bucket::getDefaultForGroup($this->id);
-			return $default_bucket->getReplySignature($worker_model);
+			if(false != ($default_bucket = DAO_Bucket::getDefaultForGroup($this->id)))
+				return $default_bucket->getReplySignature($worker_model);
 		}
+		
+		return null;
 	}
 	
 	public function getReplyHtmlTemplate($bucket_id=0) {
@@ -842,10 +853,11 @@ class Model_Group {
 			
 		} else {
 			
-			$default_bucket = DAO_Bucket::getDefaultForGroup($this->id);
-			return $default_bucket->getReplyHtmlTemplate();
+			if(false != ($default_bucket = DAO_Bucket::getDefaultForGroup($this->id)))
+				return $default_bucket->getReplyHtmlTemplate();
 		}
 		
+		return null;
 	}
 };
 
@@ -1678,7 +1690,7 @@ class Context_Group extends Extension_DevblocksContext implements IDevblocksCont
 		
 		// Members
 		
-		$workers = DAO_Worker::getAll();
+		$workers = DAO_Worker::getAllActive();
 		$tpl->assign('workers', $workers);
 		
 		if(isset($group) && $group instanceof Model_Group && false != ($members = $group->getMembers()))
