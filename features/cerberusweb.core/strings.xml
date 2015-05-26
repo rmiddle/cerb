@@ -94,6 +94,16 @@
 				<seg>{{actor}} merged organization {{source}} with organization {{target}}</seg>
 			</tuv>
 		</tu>
+		<tu tuid="activities.record.recommendation.added">
+			<tuv xml:lang="en_US">
+				<seg>{{actor}} recommended {{worker}} for {{target_object}} {{target}}</seg>
+			</tuv>
+		</tu>
+		<tu tuid="activities.record.recommendation.removed">
+			<tuv xml:lang="en_US">
+				<seg>{{actor}} removed the recommendation of {{worker}} on {{target_object}} {{target}}</seg>
+			</tuv>
+		</tu>
 		<tu tuid="activities.task.created">
 			<tuv xml:lang="en_US">
 				<seg>{{actor}} created task {{target}}</seg>
@@ -2332,7 +2342,7 @@ For example: http://www.cerbweb.com/support/</seg>
 		</tu>
 		<tu tuid="dashboard.num_rows">
 			<tuv xml:lang="en_US">
-				<seg>Rows per page</seg>
+				<seg>Records per page</seg>
 			</tuv>
 		</tu>
 		<tu tuid="dashboard.remove_view">
@@ -3538,6 +3548,11 @@ For example: *receipt*</seg>
 		<tu tuid="preferences.account.mail.display.inline_log">
 			<tuv xml:lang="en_US">
 				<seg>Include activity log entries in the timeline</seg>
+			</tuv>
+		</tu>
+		<tu tuid="preferences.account.mail.display.disable_html">
+			<tuv xml:lang="en_US">
+				<seg>Always show plaintext messages (disable HTML)</seg>
 			</tuv>
 		</tu>
 		<tu tuid="preferences.account.mail.readall">

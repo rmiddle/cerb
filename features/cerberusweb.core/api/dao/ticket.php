@@ -2160,7 +2160,7 @@ class SearchFields_Ticket implements IDevblocksSearchFields {
 			SearchFields_Ticket::VIRTUAL_MESSAGE_HEADER => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_MESSAGE_HEADER, '*', 'message_header', $translate->_('message.header')),
 			SearchFields_Ticket::VIRTUAL_ORG_ID => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_ORG_ID, '*', 'org_id', null, null), // org ID
 			SearchFields_Ticket::VIRTUAL_PARTICIPANT_ID => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_PARTICIPANT_ID, '*', 'participant_id', null, null), // participant ID
-			SearchFields_Ticket::VIRTUAL_RECOMMENDATIONS => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_RECOMMENDATIONS, '*', 'recommendations', $translate->_('common.recommendations')),
+			SearchFields_Ticket::VIRTUAL_RECOMMENDATIONS => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_RECOMMENDATIONS, '*', 'recommendations', $translate->_('common.recommended')),
 			SearchFields_Ticket::VIRTUAL_STATUS => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_STATUS, '*', 'status', $translate->_('common.status')),
 			SearchFields_Ticket::VIRTUAL_WATCHERS => new DevblocksSearchField(SearchFields_Ticket::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS'),
 				
@@ -3295,6 +3295,11 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		$tpl->clearAssign('results');
 		$tpl->clearAssign('group_buckets');
 		$tpl->clearAssign('timestamp_now');
+	}
+	
+	function renderCustomizeOptions() {
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->display('devblocks:cerberusweb.core::internal/views/options/ticket.tpl');
 	}
 
 	function renderCriteria($field) {
@@ -4964,24 +4969,6 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 		$comments = DAO_Comment::getByContext(CerberusContexts::CONTEXT_TICKET, $ticket->id);
 		$comments = array_reverse($comments, true);
 		$tpl->assign('comments', $comments);
-		
-		// Recommendations
-
-		$recommendations = DAO_ContextRecommendation::get(CerberusContexts::CONTEXT_TICKET, $ticket->id);
-		
-		// Always include the ticket owner as a recommendation
-		if($ticket->owner_id && !in_array($ticket->owner_id, $recommendations))
-			$recommendations[] = $ticket->owner_id;
-		
-		$tpl->assign('recommended_workers', $recommendations);
-		
-		$recommendation_scores = DAO_ContextRecommendation::prioritize($ticket);
-		$tpl->assign('recommendation_scores', $recommendation_scores);
-		
-		// Workloads
-		
-		$workloads = DAO_Worker::getWorkloads();
-		$tpl->assign('workloads', $workloads);
 		
 		// Template
 		

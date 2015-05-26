@@ -19,6 +19,7 @@ abstract class C4_AbstractView {
 	public $id = 0;
 	public $is_ephemeral = 0;
 	public $name = "";
+	public $options = array();
 	
 	public $view_columns = array();
 	private $_columnsHidden = array();
@@ -161,6 +162,10 @@ abstract class C4_AbstractView {
 		}
 		
 		return $objects;
+	}
+	
+	function isCustom() {
+		return 'cust_' == substr($this->id, 0, 5);
 	}
 
 	function getColumnsAvailable() {
@@ -500,7 +505,11 @@ abstract class C4_AbstractView {
 	function render() {
 		echo ' '; // Expect Override
 	}
-
+	
+	function renderCustomizeOptions() {
+		echo ' '; // Expect Override
+	}
+	
 	function renderCriteria($field) {
 		echo ' '; // Expect Override
 	}
@@ -1315,7 +1324,7 @@ abstract class C4_AbstractView {
 		return array();
 	}
 
-	function doCustomize($columns, $num_rows=10) {
+	function doCustomize($columns, $num_rows=10, $options=array()) {
 		$this->renderLimit = $num_rows;
 
 		$viewColumns = array();
@@ -1326,6 +1335,8 @@ abstract class C4_AbstractView {
 		}
 
 		$this->view_columns = $viewColumns;
+		
+		$this->options = $options;
 	}
 
 	function doSortBy($sortBy) {
@@ -2415,6 +2426,7 @@ class C4_AbstractViewModel {
 
 	public $id = '';
 	public $name = "";
+	public $options = array();
 	public $is_ephemeral = 0;
 	
 	public $view_columns = array();
@@ -2515,20 +2527,28 @@ class C4_AbstractViewLoader {
 			return NULL;
 		
 		$model = new C4_AbstractViewModel();
-			
-		$model->class_name = get_class($view);
+		
+		$class_name = get_class($view);
+		$model->class_name = $class_name;
+		
+		$parent = new $class_name(); /* @var $parent C4_AbstractView */
+		$parent->setAutoPersist(false);
 
 		$model->id = $view->id;
 		$model->is_ephemeral = $view->is_ephemeral ? true : false;
 		$model->name = $view->name;
+		$model->options = $view->options;
 		
 		$model->view_columns = $view->view_columns;
-		$model->columnsHidden = $view->getColumnsHidden();
+		
+		// Only persist hidden columns that are distinct from the parent (so we can inherit parent changes)
+		$model->columnsHidden = array_diff($view->getColumnsHidden(), $parent->getColumnsHidden());
 		
 		$model->paramsEditable = $view->getEditableParams();
 		$model->paramsDefault = $view->getParamsDefault();
 		$model->paramsRequired = $view->getParamsRequired();
-		$model->paramsHidden = $view->getParamsHidden();
+		// Only persist hidden params that are distinct from the parent (so we can inherit parent changes)
+		$model->paramsHidden = array_diff($view->getParamsHidden(), $parent->getParamsHidden());
 		
 		$model->renderPage = intval($view->renderPage);
 		$model->renderLimit = intval($view->renderLimit);
@@ -2563,10 +2583,13 @@ class C4_AbstractViewLoader {
 		if(!empty($model->name))
 			$inst->name = $model->name;
 		
+		if(is_array($model->options) && !empty($model->options))
+			$inst->options = $model->options;
+		
 		if(is_array($model->view_columns) && !empty($model->view_columns))
 			$inst->view_columns = $model->view_columns;
 		if(is_array($model->columnsHidden))
-			$inst->addColumnsHidden($model->columnsHidden, true);
+			$inst->addColumnsHidden($model->columnsHidden, false);
 		
 		if(is_array($model->paramsEditable))
 			$inst->addParams($model->paramsEditable, true);
@@ -2575,7 +2598,7 @@ class C4_AbstractViewLoader {
 		if(is_array($model->paramsRequired))
 			$inst->addParamsRequired($model->paramsRequired, true);
 		if(is_array($model->paramsHidden))
-			$inst->addParamsHidden($model->paramsHidden, true);
+			$inst->addParamsHidden($model->paramsHidden, false);
 
 		if(null !== $model->renderPage)
 			$inst->renderPage = intval($model->renderPage);
@@ -2615,6 +2638,7 @@ class C4_AbstractViewLoader {
 	
 	static function serializeViewToAbstractJson(C4_AbstractView $view, $context=null) {
 		$model = array(
+			'options' => $view->options,
 			'columns' => $view->view_columns,
 			'params' => json_decode(json_encode($view->getEditableParams()), true),
 			'limit' => intval($view->renderLimit),
@@ -2640,6 +2664,9 @@ class C4_AbstractViewLoader {
 		
 		if(null == ($view = $ctx->getChooserView($view_id))) /* @var $view C4_AbstractView */
 			return false;
+		
+		if(isset($view_model['options']))
+			$view->options = $view_model['options'];
 		
 		$view->view_columns = $view_model['columns'];
 		$view->renderLimit = intval($view_model['limit']);
@@ -2704,6 +2731,7 @@ class DAO_WorkerViewModel {
 			'is_ephemeral',
 			'class_name',
 			'title',
+			'options_json',
 			'columns_json',
 			'columns_hidden_json',
 			'params_editable_json',
@@ -2745,6 +2773,7 @@ class DAO_WorkerViewModel {
 			$model->renderTemplate = $row['render_template'];
 			
 			// JSON blocks
+			$model->options = json_decode($row['options_json'], true);
 			$model->view_columns = json_decode($row['columns_json'], true);
 			$model->columnsHidden = json_decode($row['columns_hidden_json'], true);
 			$model->paramsEditable = self::decodeParamsJson($row['params_editable_json']);
@@ -2833,6 +2862,7 @@ class DAO_WorkerViewModel {
 			'is_ephemeral' => !empty($model->is_ephemeral) ? 1 : 0,
 			'class_name' => $db->qstr($model->class_name),
 			'title' => $db->qstr($model->name),
+			'options_json' => $db->qstr(json_encode($model->options)),
 			'columns_json' => $db->qstr(json_encode($model->view_columns)),
 			'columns_hidden_json' => $db->qstr(json_encode($model->columnsHidden)),
 			'params_editable_json' => $db->qstr(json_encode($model->paramsEditable)),

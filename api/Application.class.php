@@ -46,7 +46,7 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2015052201);
+define("APP_BUILD", 2015052601);
 define("APP_VERSION", '7.0.0');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
@@ -117,6 +117,59 @@ class CerberusApplication extends DevblocksApplication {
 		}
 
 		return $workers;
+	}
+	
+	static function getWorkerPickerData($population, $sample, $group_id=0, $bucket_id=0) {
+		// Shared objects
+		
+		$online_workers = DAO_Worker::getAllOnline();
+		$group_responsibilities = DAO_Group::getResponsibilities($group_id);
+		$bucket_responsibilities = @$group_responsibilities[$bucket_id] ?: array();
+		$workloads = DAO_Worker::getWorkloads();
+		
+		// Workers
+		
+		$picker_workers = array(
+			'sample' => array(),
+			'population' => array(),
+		);
+		
+		// Bulk load population statistics
+		foreach($population as $worker) {
+			$worker->__is_selected = isset($sample[$worker->id]);
+			$worker->__is_online = isset($online_workers[$worker->id]);
+			$worker->__availability = $worker->getAvailabilityAsBlocks();
+			$worker->__workload = isset($workloads[$worker->id]) ? $workloads[$worker->id] : array();
+			$worker->__responsibility = isset($bucket_responsibilities[$worker->id]) ? $bucket_responsibilities[$worker->id] : 0;
+		}
+		
+		// Sort population by score
+		uasort($population, function($a, $b) {
+			if($a->__responsibility == $b->__responsibility)
+				return 0;
+			
+			return ($a->__responsibility < $b->__responsibility) ? 1 : -1;
+		});
+		
+		// Set sample
+		foreach($sample as &$worker) {
+			if(!isset($population[$worker->id]))
+				conntinue;
+			
+			$picker_workers['sample'][$worker->id] = $worker;
+			unset($population[$worker->id]);
+		}
+		
+		// Set remaining population
+		foreach($population as &$worker) {
+			$picker_workers['population'][$worker->id] = $worker;
+		}
+		
+		// Return a result object
+		return array(
+			'show_responsibilities' => !empty($group_id),
+			'workers' => $picker_workers,
+		);
 	}
 	
 	static function getFileBundleDictionaryJson() {
@@ -1486,7 +1539,7 @@ class CerberusContexts {
 			DAO_ContextLink::deleteLink($context, $context_id, CerberusContexts::CONTEXT_WORKER, $worker_id);
 	}
 
-	static public function formatActivityLogEntry($entry, $format=null, $scrub_tokens=array()) {
+	static public function formatActivityLogEntry($entry, $format=null, $scrub_tokens=array(), $personalize=false) {
 		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 		$url_writer = DevblocksPlatform::getUrlService();
 		$translate = DevblocksPlatform::getTranslationService();
@@ -1503,10 +1556,41 @@ class CerberusContexts {
 				$entry['message'] = preg_replace('#\s*\{\{'.$token.'\}\}(\s*)#', '\1', $entry['message']);
 			}
 		}
-
+		
 		// Variables
 
 		$vars = $entry['variables'];
+		
+		// Personalize variables
+		if($personalize && is_array($vars)) {
+			if(isset($vars['actor'])) {
+				$active_worker = CerberusApplication::getActiveWorker();
+				$actor_name = $vars['actor'];
+				$actor_self_target = 'themselves';
+				
+				// Replace actor with 'You'
+				if($active_worker) {
+					if($vars['actor'] == $active_worker->getName()) {
+						$actor_name = 'You';
+						$actor_self_target = 'yourself';
+					}
+				}
+				
+				// Handle the actor doing things to 'themselves'
+				foreach($vars as $k => $v) {
+					if($k == 'actor')
+						continue;
+					
+					if($v == $vars['actor'])
+						$vars[$k] = $actor_self_target;
+					elseif($active_worker && $v == $active_worker->getName())
+						$vars[$k] = 'you';
+				}
+				
+				$vars['actor'] = $actor_name;
+			}
+			
+		}
 
 		switch($format) {
 			case 'html':
@@ -1622,7 +1706,7 @@ class CerberusContexts {
 		}
 	}
 
-	static public function logActivity($activity_point, $target_context, $target_context_id, &$entry_array, $actor_context=null, $actor_context_id=null, $also_notify_worker_ids=array()) {
+	static public function logActivity($activity_point, $target_context, $target_context_id, &$entry_array, $actor_context=null, $actor_context_id=null, $also_notify_worker_ids=array(), $also_notify_ignore_self=false) {
 		// Target meta
 		if(!isset($target_meta)) {
 			if(null != ($target_ctx = DevblocksPlatform::getExtension($target_context, true))
@@ -1762,7 +1846,8 @@ class CerberusContexts {
 			// Include the 'also notify' list
 			if(!is_array($also_notify_worker_ids))
 				$also_notify_worker_ids = array();
-
+			
+			// Merge watchers and the notification list
 			$watchers = array_merge(
 				$watchers,
 				$also_notify_worker_ids
@@ -1809,7 +1894,7 @@ class CerberusContexts {
 							&& $actor_context_id == $watcher_id) {
 								// If they explicitly added themselves to the notify, allow it.
 								// Otherwise, don't tell them what they just did.
-								if(!in_array($watcher_id, $also_notify_worker_ids))
+								if($also_notify_ignore_self || !in_array($watcher_id, $also_notify_worker_ids))
 									continue;
 						}
 					}

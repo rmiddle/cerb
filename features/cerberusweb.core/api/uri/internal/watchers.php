@@ -16,10 +16,10 @@
  ***********************************************************************/
 
 if(class_exists('Extension_PageSection')):
-class PageSection_InternalRecommendations extends Extension_PageSection {
+class PageSection_InternalWatchers extends Extension_PageSection {
 	function render() {}
 	
-	function showContextRecommendationsPopupAction() {
+	function showContextWatchersPopupAction() {
 		@$context = DevblocksPlatform::importGPC($_REQUEST['context'], 'string', '');
 		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'], 'integer', 0);
 		@$group_id = DevblocksPlatform::importGPC($_REQUEST['group_id'], 'integer', 0);
@@ -45,7 +45,7 @@ class PageSection_InternalRecommendations extends Extension_PageSection {
 		
 		// Workers
 		
-		$sample = DAO_ContextRecommendation::get($context, $context_id);
+		$sample = CerberusContexts::getWatchers($context, $context_id);
 		$population = DAO_Worker::getAllActive();
 		
 		$worker_picker_data = CerberusApplication::getWorkerPickerData($population, $sample, $group_id, $bucket_id);
@@ -53,10 +53,10 @@ class PageSection_InternalRecommendations extends Extension_PageSection {
 		
 		// Template
 		
-		$tpl->display('devblocks:cerberusweb.core::internal/recommendations/context_recommend_peek.tpl');
+		$tpl->display('devblocks:cerberusweb.core::internal/watchers/context_follow_peek.tpl');
 	}
 	
-	function saveContextRecommendationsPopupJsonAction() {
+	function saveContextWatchersPopupJsonAction() {
 		@$context = DevblocksPlatform::importGPC($_REQUEST['context'], 'string', '');
 		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'], 'integer', 0);
 		@$initial_sample = DevblocksPlatform::sanitizeArray(DevblocksPlatform::importGPC($_REQUEST['initial_sample'], 'array', array()), 'int');
@@ -66,15 +66,11 @@ class PageSection_InternalRecommendations extends Extension_PageSection {
 		
 		// Added
 		$additions = array_diff($current_sample, $initial_sample);
-		
-		foreach($additions as $worker_id)
-			DAO_ContextRecommendation::add($context, $context_id, $worker_id);
+		CerberusContexts::addWatchers($context, $context_id, $additions);
 		
 		// Removed
 		$removals = array_diff($initial_sample, $current_sample);
-		
-		foreach($removals as $worker_id)
-			DAO_ContextRecommendation::remove($context, $context_id, $worker_id);
+		CerberusContexts::removeWatchers($context, $context_id, $removals);
 		
 		// Return JSON data
 		header("Content-Type: application/json; charset=". LANG_CHARSET_CODE);
@@ -86,6 +82,5 @@ class PageSection_InternalRecommendations extends Extension_PageSection {
 			'has_active_worker' => in_array($active_worker->id, $current_sample),
 		));
 	}
-
 }
 endif;

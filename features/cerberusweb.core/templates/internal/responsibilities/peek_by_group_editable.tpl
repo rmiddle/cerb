@@ -7,7 +7,7 @@
 <input type="hidden" name="context_id" value="{$group->id}">
 
 {foreach from=$buckets item=bucket}
-	<fieldset class="peek cerb-delta-slider-container">
+	<fieldset class="peek cerb-delta-slider-container" style="display:inline-block;">
 		<legend>{$bucket->name}</legend>
 	
 		<div style="margin-left:15px;">
@@ -17,7 +17,7 @@
 		{$responsibility = $responsibilities.{$bucket->id}.{$member->id}}
 		
 		{if $worker}
-		<div class="cerb-delta-slider-container">
+		<div class="cerb-delta-slider-container" style="display:block;">
 			<label>{$worker->getName()} <small>{if !empty($worker->title)}({$worker->title}){/if}</small></label>
 			
 			<input type="hidden" name="responsibilities[{$bucket->id}][{$worker->id}]" value="{$responsibility|default:0}"  data-worker-id="{$worker->id}"  data-bucket-id="{$bucket->id}">
@@ -34,6 +34,8 @@
 	
 	</fieldset>
 {/foreach}
+
+<br clear="all">
 
 <button type="button" class="submit"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_changes'|devblocks_translate|capitalize}</button>
 

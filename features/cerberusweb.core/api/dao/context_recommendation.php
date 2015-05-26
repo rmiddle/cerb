@@ -26,6 +26,32 @@ class DAO_ContextRecommendation {
 			$worker_id
 		);
 		$db->ExecuteMaster($sql);
+		
+		if($db->Affected_Rows()) {
+			if(false == ($context_ext = Extension_DevblocksContext::get($context)))
+				continue;
+			
+			if(false == ($meta = $context_ext->getMeta($context_id)))
+				continue;
+			
+			if(false == ($worker = DAO_Worker::get($worker_id)) || $worker->is_disabled)
+				continue;
+			
+			$entry = array(
+				//{{actor}} recommended {{worker}} on {{target_object}} {{target}}
+				'message' => 'activities.record.recommendation.added',
+				'variables' => array(
+					'target_object' => mb_convert_case($context_ext->manifest->name, MB_CASE_LOWER),
+					'target' => $meta['name'],
+					'worker' => $worker->getName(),
+					),
+				'urls' => array(
+					'target' => sprintf("ctx://%s:%d/%s", $context, $context_id, DevblocksPlatform::strToPermalink($meta['name'])),
+					'worker' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_WORKER, $worker->id, DevblocksPlatform::strToPermalink($worker->getName())),
+					)
+			);
+			CerberusContexts::logActivity('record.recommendation.added', $context, $context_id, $entry, null, null, array($worker->id), true);
+		}
 	}
 	
 	static function remove($context, $context_id, $worker_id) {
@@ -37,21 +63,41 @@ class DAO_ContextRecommendation {
 			$worker_id
 		);
 		$db->ExecuteMaster($sql);
-	}
-	
-	static function removeAll($context, $context_id) {
-		$db = DevblocksPlatform::getDatabaseService();
 		
-		$sql = sprintf("DELETE FROM context_recommendation WHERE context = %s AND context_id = %d",
-			$db->qstr($context),
-			$context_id
-		);
-		$db->ExecuteMaster($sql);
+		if($db->Affected_Rows()) {
+			if(false == ($context_ext = Extension_DevblocksContext::get($context)))
+				continue;
+			
+			if(false == ($meta = $context_ext->getMeta($context_id)))
+				continue;
+			
+			if(false == ($worker = DAO_Worker::get($worker_id)) || $worker->is_disabled)
+				continue;
+			
+			$entry = array(
+				//{{actor}} removed the recommendation for {{worker}} on {{target_object}} {{target}}
+				'message' => 'activities.record.recommendation.removed',
+				'variables' => array(
+					'target_object' => mb_convert_case($context_ext->manifest->name, MB_CASE_LOWER),
+					'target' => $meta['name'],
+					'worker' => $worker->getName(),
+					),
+				'urls' => array(
+					'target' => sprintf("ctx://%s:%d/%s", $context, $context_id, DevblocksPlatform::strToPermalink($meta['name'])),
+					'worker' => sprintf("ctx://%s:%d/%s", CerberusContexts::CONTEXT_WORKER, $worker->id, DevblocksPlatform::strToPermalink($worker->getName())),
+					)
+			);
+			CerberusContexts::logActivity('record.recommendation.removed', $context, $context_id, $entry, null, null, array());
+			
+			// Delete any pending record.recommendation.added notifications for the same worker
+			DAO_Notification::deleteByContextActivityAndWorker($context, $context_id, 'record.recommendation.added', $worker->id);
+		}
 	}
 	
 	static function get($context, $context_id) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
+		$workers = DAO_Worker::getAll();
 		$recommendations = array();
 		
 		$results = $db->GetArray(sprintf("SELECT worker_id FROM context_recommendation WHERE context = %s AND context_id = %d",
@@ -60,10 +106,62 @@ class DAO_ContextRecommendation {
 		));
 		
 		foreach($results as $row) {
-			$recommendations[$row['worker_id']] = true;
+			$worker_id = $row['worker_id'];
+			
+			if(!isset($workers[$worker_id]))
+				continue;
+			
+			$recommendations[$worker_id] = $workers[$worker_id];
 		}
 		
-		return array_keys($recommendations);
+		return $recommendations;
+	}
+	
+	static function getByContexts($context, $context_ids) {
+		if(!is_array($context_ids))
+			$context_ids = array($context_ids);
+		
+		$db = DevblocksPlatform::getDatabaseService();
+		
+		$recommendations = array();
+		
+		$context_ids = DevblocksPlatform::sanitizeArray($context_ids, 'int', array('nonzero', 'unique'));
+		
+		if(!empty($context_ids)) {
+			$results = $db->GetArray(sprintf("SELECT context_id, worker_id FROM context_recommendation WHERE context = %s AND context_id IN (%s)",
+				$db->qstr($context),
+				implode(',', $context_ids)
+			));
+			
+			if(is_array($results))
+			foreach($results as $row) {
+				if(!isset($recommendations[$row['context_id']]))
+					$recommendations[$row['context_id']] = array();
+				
+				$recommendations[$row['context_id']][] = $row['worker_id'];
+			}
+		}
+		
+		return $recommendations;
+	}
+	
+	static function deleteByContext($context, $context_ids) {
+		if(!is_array($context_ids))
+			$context_ids = array($context_ids);
+		
+		if(empty($context_ids))
+			return;
+		
+		$context_ids = DevblocksPlatform::sanitizeArray($context_ids, 'int');
+			
+		$db = DevblocksPlatform::getDatabaseService();
+		
+		$db->ExecuteMaster(sprintf("DELETE FROM context_recommendation WHERE context = %s AND context_id IN (%s) ",
+			$db->qstr($context),
+			implode(',', $context_ids)
+		));
+		
+		return true;
 	}
 	
 	private static function _computeSkillQualification($required_competencies, $competencies) {
@@ -169,27 +267,29 @@ class DAO_ContextRecommendation {
 		return $involvements;
 	}
 	
-	static function nominate(Model_Ticket $ticket, $workers=null) {
-		return self::_generateRecommendations($ticket, $workers);
+	// [TODO] This could be implemented per context later, with NN
+	static function nominate($group_id, $bucket_id, $workers=null) {
+		return self::_generateRecommendations($group_id, $bucket_id, $workers);
 	}
 	
-	static function prioritize(Model_Ticket $ticket, $workers=null) {
-		return self::_generateRecommendations($ticket, $workers);
+	// [TODO] This could be implemented per context later, with NN
+	static function prioritize($group_id, $bucket_id, $workers=null) {
+		return self::_generateRecommendations($group_id, $bucket_id, $workers);
 	}
 	
-	private static function _generateRecommendations(Model_Ticket $ticket, $workers=null) {
+	private static function _generateRecommendations($group_id, $bucket_id, $workers=null) {
 		if(!is_array($workers))
 			$workers = DAO_Worker::getAllActive();
 		
 		$ranked = array();
 
-		$group_responsibilities = DAO_Group::getResponsibilities($ticket->group_id);
+		$group_responsibilities = DAO_Group::getResponsibilities($group_id);
 		
 		if(empty($group_responsibilities) || !is_array($group_responsibilities))
 			return $ranked;
 		
-		if(isset($group_responsibilities[$ticket->bucket_id]))
-		foreach($group_responsibilities[$ticket->bucket_id] as $worker_id => $responsibility_level) {
+		if(isset($group_responsibilities[$bucket_id]))
+		foreach($group_responsibilities[$bucket_id] as $worker_id => $responsibility_level) {
 			$ranked[$worker_id] = array(
 				'score' => $responsibility_level,
 				'bits' => array(),

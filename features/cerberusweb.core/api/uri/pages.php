@@ -321,6 +321,9 @@ class Page_Custom extends CerberusPageExtension {
 				SearchFields_Ticket::TICKET_BUCKET_ID,
 				SearchFields_Ticket::TICKET_OWNER_ID,
 			);
+			$view->options = array('disable_watchers' => true);
+			$view->renderSortBy = SearchFields_Ticket::BUCKET_RESPONSIBILITY;
+			$view->renderSortAsc = 0;
 			$view->renderSubtotals = SearchFields_Ticket::TICKET_GROUP_ID;
 			$view->addParams(array(
 			), true);
@@ -333,6 +336,7 @@ class Page_Custom extends CerberusPageExtension {
 			
 			$list_view = new Model_WorkspaceListView();
 			$list_view->title = $view_model->name;
+			$list_view->options = $view_model->options;
 			$list_view->columns = $view_model->view_columns;
 			$list_view->num_rows = $view_model->renderLimit;
 			$list_view->params = $view_model->paramsEditable;
@@ -382,6 +386,7 @@ class Page_Custom extends CerberusPageExtension {
 			
 			$list_view = new Model_WorkspaceListView();
 			$list_view->title = $view_model->name;
+			$list_view->options = $view_model->options;
 			$list_view->columns = $view_model->view_columns;
 			$list_view->num_rows = $view_model->renderLimit;
 			$list_view->params = $view_model->paramsEditable;
@@ -430,6 +435,7 @@ class Page_Custom extends CerberusPageExtension {
 			
 			$list_view = new Model_WorkspaceListView();
 			$list_view->title = $view_model->name;
+			$list_view->options = $view_model->options;
 			$list_view->columns = $view_model->view_columns;
 			$list_view->num_rows = $view_model->renderLimit;
 			$list_view->params = $view_model->paramsEditable;
@@ -731,6 +737,7 @@ class Page_Custom extends CerberusPageExtension {
 				return;
 				
 			$view->name = $list_view->title;
+			$view->options = $list_view->options;
 			$view->renderLimit = $list_view->num_rows;
 			$view->renderPage = 0;
 			$view->is_ephemeral = 0;
