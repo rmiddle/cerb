@@ -66,6 +66,20 @@ class DAO_Calendar extends Cerb_ORMHelper {
 		self::clearCache();
 	}
 	
+	static function getByContext($context, $context_ids) {
+		if(!is_array($context_ids))
+			$context_ids = array($context_ids);
+		
+		$context_ids = DevblocksPlatform::sanitizeArray($context_ids, 'int');
+		
+		return self::getWhere(sprintf("%s = %s AND %s IN (%s)",
+			self::OWNER_CONTEXT,
+			Cerb_ORMHelper::qstr($context),
+			self::OWNER_CONTEXT_ID,
+			implode(',', $context_ids)
+		));
+	}
+	
 	/**
 	 * @param string $where
 	 * @param mixed $sortBy
@@ -204,6 +218,15 @@ class DAO_Calendar extends Cerb_ORMHelper {
 	
 	static function random() {
 		return self::_getRandom('calendar');
+	}
+	
+	static function deleteByContext($context, $context_ids) {
+		$calendars = DAO_Calendar::getByContext($context, $context_ids);
+		
+		if(is_array($calendars) && !empty($calendars))
+			return self::delete(array_keys($calendars));
+		
+		return;
 	}
 	
 	static function delete($ids) {
@@ -1582,10 +1605,10 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 			$view_id = 'chooser_'.str_replace('.','_',$this->id).time().mt_rand(0,9999);
 	
 		// View
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
 		$defaults->is_ephemeral = true;
-		$defaults->class_name = $this->getViewClass();
+		
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Calendar';
 		$view->renderSortBy = SearchFields_Calendar::UPDATED_AT;
@@ -1600,9 +1623,9 @@ class Context_Calendar extends Extension_DevblocksContext implements IDevblocksC
 	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
 		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
-		$defaults->class_name = $this->getViewClass();
+		
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Calendar';
 		

@@ -400,10 +400,14 @@ class DAO_Group extends Cerb_ORMHelper {
 			($is_manager?1:0)
 		));
 		
+		if(1 == $db->Affected_Rows()) { // insert but no delete
+			DAO_Group::setMemberDefaultResponsibilities($group_id, $worker_id);
+		}
+		
 		self::clearCache();
 	}
 	
-	static function addGroupMemberDefaultResponsibilities($group_id, $worker_id) {
+	static function setMemberDefaultResponsibilities($group_id, $worker_id) {
 		if(empty($worker_id) || empty($group_id))
 			return FALSE;
 		
@@ -418,10 +422,10 @@ class DAO_Group extends Cerb_ORMHelper {
 			$responsibilities[$bucket_id] = 50;
 		}
 		
-		self::addGroupMemberResponsibilities($group_id, $worker_id, $responsibilities);
+		self::addMemberResponsibilities($group_id, $worker_id, $responsibilities);
 	}
 	
-	static function addGroupMemberResponsibilities($group_id, $worker_id, $responsibilities) {
+	static function addMemberResponsibilities($group_id, $worker_id, $responsibilities) {
 		if(empty($worker_id) || empty($group_id) || empty($responsibilities) || !is_array($responsibilities))
 			return FALSE;
 		
@@ -430,6 +434,53 @@ class DAO_Group extends Cerb_ORMHelper {
 		$values = array();
 		
 		foreach($responsibilities as $bucket_id => $level) {
+			$values[] = sprintf("(%d,%d,%d)",
+				$worker_id,
+				$bucket_id,
+				$level
+			);
+		}
+		
+		if(empty($values))
+			return;
+		
+		$sql = sprintf("REPLACE INTO worker_to_bucket (worker_id, bucket_id, responsibility_level) VALUES %s",
+			implode(',', $values)
+		);
+		$db->ExecuteMaster($sql);
+		
+		// [TODO] Clear responsibility cache
+	}
+	
+	static function setBucketDefaultResponsibilities($bucket_id) {
+		$responsibilities = array();
+		
+		if(false == ($bucket = DAO_Bucket::get($bucket_id)))
+			return false;
+		
+		if(false == ($group = $bucket->getGroup()))
+			return false;
+		
+		if(false == ($members = $group->getMembers()))
+			return false;
+		
+		if(is_array($members))
+		foreach($members as $worker_id => $member) {
+			$responsibilities[$worker_id] = 50;
+		}
+		
+		self::setBucketResponsibilities($bucket_id, $responsibilities);
+	}
+	
+	static function setBucketResponsibilities($bucket_id, $responsibilities) {
+		if(empty($bucket_id) || empty($responsibilities) || !is_array($responsibilities))
+			return FALSE;
+		
+		$db = DevblocksPlatform::getDatabaseService();
+		
+		$values = array();
+		
+		foreach($responsibilities as $worker_id => $level) {
 			$values[] = sprintf("(%d,%d,%d)",
 				$worker_id,
 				$bucket_id,
@@ -460,7 +511,9 @@ class DAO_Group extends Cerb_ORMHelper {
 		);
 		$db->ExecuteMaster($sql);
 		
-		self::unsetGroupMemberResponsibilities($group_id, $worker_id);
+		if(1 == $db->Affected_Rows()) {
+			self::unsetGroupMemberResponsibilities($group_id, $worker_id);
+		}
 		
 		self::clearCache();
 	}
@@ -1632,10 +1685,10 @@ class Context_Group extends Extension_DevblocksContext implements IDevblocksCont
 			$view_id = 'chooser_'.str_replace('.','_',$this->id).time().mt_rand(0,9999);
 
 		// View
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
 		$defaults->is_ephemeral = true;
-		$defaults->class_name = $this->getViewClass();
+
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Groups';
 		$view->view_columns = array(
@@ -1658,9 +1711,9 @@ class Context_Group extends Extension_DevblocksContext implements IDevblocksCont
 	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
 		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
-		$defaults->class_name = $this->getViewClass();
+
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Groups';
 		

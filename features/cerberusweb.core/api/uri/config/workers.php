@@ -28,9 +28,8 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 		$groups = DAO_Group::getAll();
 		$tpl->assign('groups', $groups);
 		
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass('View_Worker');
 		$defaults->id = 'workers_cfg';
-		$defaults->class_name = 'View_Worker';
 		
 		$view = C4_AbstractViewLoader::getView($defaults->id, $defaults);
 		$tpl->assign('view', $view);
@@ -292,7 +291,6 @@ class PageSection_SetupWorkers extends Extension_PageSection {
 			}
 			
 			// Addresses
-			// [TODO] This can insert dupe rows under some conditions
 			if(null == DAO_AddressToWorker::getByAddress($email)) {
 				DAO_AddressToWorker::assign($email, $id, true);
 			}

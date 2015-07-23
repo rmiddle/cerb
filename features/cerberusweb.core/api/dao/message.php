@@ -797,9 +797,7 @@ class Model_Message {
 				return false;
 		}
 		
-		$fp = DevblocksPlatform::getTempFile();
-		
-		$attachment->getFileContents($fp);
+		$dirty_html = $attachment->getFileContents();
 		
 		// If the 'tidy' extension exists
 		if(extension_loaded('tidy')) {
@@ -809,18 +807,15 @@ class Model_Message {
 				'clean' => true,
 				'indent' => false,
 				'output-xhtml' => true,
+				'word-2000' => true,
 				'wrap' => '0',
 			);
 			
-			if(null != ($fp_filename = DevblocksPlatform::getTempFileInfo($fp))) {
-				file_put_contents($fp_filename, $tidy->repairFile($fp_filename, $config, DB_CHARSET_CODE));
-				fseek($fp, 0);
-			}
+			$dirty_html = $tidy->repairString($dirty_html, $config, DB_CHARSET_CODE);
 		}
 		
-		$clean_html = DevblocksPlatform::purifyHTML($fp, true);
-		
-		return $clean_html;
+		$dirty_html = DevblocksPlatform::purifyHTML($dirty_html, true);
+		return $dirty_html;
 	}
 
 	function getHeaders() {
@@ -2793,10 +2788,10 @@ class Context_Message extends Extension_DevblocksContext {
 			$view_id = 'chooser_'.str_replace('.','_',$this->id).time().mt_rand(0,9999);
 		
 		// View
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
 		$defaults->is_ephemeral = true;
-		$defaults->class_name = $this->getViewClass();
+
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Messages';
 		$view->addParams(array(), true);
@@ -2819,9 +2814,9 @@ class Context_Message extends Extension_DevblocksContext {
 	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
 		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
-		$defaults->class_name = $this->getViewClass();
+		
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Messages';
 		

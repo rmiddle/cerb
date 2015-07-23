@@ -189,19 +189,9 @@ class DAO_Ticket extends Cerb_ORMHelper {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		// Defaults
-		$defaults = new C4_AbstractViewModel();
-		$defaults->class_name = 'View_Ticket';
+		$defaults = C4_AbstractViewModel::loadFromClass('View_Ticket');
 		$defaults->id = $view_id;
 		$defaults->name = $translate->_('addy_book.history.view.title');
-		$defaults->view_columns = array(
-			SearchFields_Ticket::TICKET_LAST_ACTION_CODE,
-			SearchFields_Ticket::TICKET_CREATED_DATE,
-			SearchFields_Ticket::TICKET_GROUP_ID,
-			SearchFields_Ticket::TICKET_BUCKET_ID,
-		);
-		$defaults->renderLimit = 10;
-		$defaults->renderSortBy = SearchFields_Ticket::TICKET_CREATED_DATE;
-		$defaults->renderSortAsc = false;
 		
 		// View
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
@@ -2384,6 +2374,7 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				case SearchFields_Ticket::TICKET_SPAM_TRAINING:
 				case SearchFields_Ticket::TICKET_SUBJECT:
 				case SearchFields_Ticket::TICKET_GROUP_ID:
+				case SearchFields_Ticket::TICKET_BUCKET_ID:
 				case SearchFields_Ticket::TICKET_OWNER_ID:
 					$pass = true;
 					break;
@@ -2461,6 +2452,10 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 				break;
 				
 			case SearchFields_Ticket::TICKET_GROUP_ID:
+				$counts = $this->_getSubtotalCountForBucketsByGroup();
+				break;
+				
+			case SearchFields_Ticket::TICKET_BUCKET_ID:
 				$counts = $this->_getSubtotalCountForBuckets();
 				break;
 				
@@ -2531,7 +2526,8 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 			).
 			$join_sql.
 			$where_sql.
-			"GROUP BY group_id, bucket_id "
+			"GROUP BY group_id, bucket_id ".
+			"ORDER BY hits DESC "
 		;
 		
 		$results = $db->GetArraySlave($sql);
@@ -2548,6 +2544,42 @@ class View_Ticket extends C4_AbstractView implements IAbstractView_Subtotals, IA
 		$groups = DAO_Group::getAll();
 		$buckets = DAO_Bucket::getAll();
 		
+		if(is_array($results))
+		foreach($results as $result) {
+			$group_id = $result['group_id'];
+			$bucket_id = $result['bucket_id'];
+			$hits = $result['hits'];
+
+			if(!isset($counts[$bucket_id])) {
+				$label = sprintf("%s (%s)", $buckets[$bucket_id]->name, $groups[$group_id]->name);
+				
+				$counts[$bucket_id] = array(
+					'hits' => $hits,
+					'label' => $label,
+					'filter' =>
+						array(
+							'field' => SearchFields_Ticket::TICKET_BUCKET_ID,
+							'oper' => DevblocksSearchCriteria::OPER_IN,
+							'values' => array('options[]' => $result['bucket_id']),
+						),
+					'children' => array()
+				);
+			}
+		}
+		
+		return $counts;
+	}
+	
+	private function _getSubtotalCountForBucketsByGroup() {
+		$translate = DevblocksPlatform::getTranslationService();
+		
+		$counts = array();
+		$results = $this->_getSubtotalDataForBuckets();
+		
+		$groups = DAO_Group::getAll();
+		$buckets = DAO_Bucket::getAll();
+		
+		if(is_array($results))
 		foreach($results as $result) {
 			$group_id = $result['group_id'];
 			$bucket_id = $result['bucket_id'];
@@ -4739,10 +4771,13 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 			$view_id = 'chooser_'.str_replace('.','_',$this->id).time().mt_rand(0,9999);
 	
 		// View
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
 		$defaults->is_ephemeral = true;
-		$defaults->class_name = $this->getViewClass();
+		$defaults->options = array(
+			'disable_recommendations' => '1',
+		);
+
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Tickets';
 		$view->view_columns = array(
@@ -4774,9 +4809,9 @@ class Context_Ticket extends Extension_DevblocksContext implements IDevblocksCon
 	function getView($context=null, $context_id=null, $options=array(), $view_id=null) {
 		$view_id = !empty($view_id) ? $view_id : str_replace('.','_',$this->id);
 		
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass($this->getViewClass());
 		$defaults->id = $view_id;
-		$defaults->class_name = $this->getViewClass();
+
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Tickets';
 		

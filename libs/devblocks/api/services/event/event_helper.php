@@ -673,6 +673,8 @@ class DevblocksEventHelper {
 		if(null == ($view = DevblocksEventHelper::getViewFromAbstractJson($token, $params, $trigger, $context)))
 			return;
 		
+		$view->persist();
+		
 		$tpl->assign('context', $context);
 		$tpl->assign('params', $params);
 		$tpl->assign('view', $view);
@@ -948,10 +950,16 @@ class DevblocksEventHelper {
 						
 					// Sequential
 					case 'seq':
-						$key = sprintf("trigger.%d.counter", $trigger->id);
-						
+						$log = EventListener_Triggers::getNodeLog();
+						$node_id = end($log);
+
 						$registry = DevblocksPlatform::getRegistryService();
+
+						$key = sprintf("trigger.%d.action.%d.counter", $trigger->id, $node_id);
+						
 						$count = intval($registry->get($key));
+						
+						$registry->increment($key, 1);
 						
 						$idx = $count % count($possible_workers);
 						
@@ -2416,6 +2424,61 @@ class DevblocksEventHelper {
 	}
 
 	/*
+	 * Action: Set Ticket Importance
+	 */
+	
+	static function renderActionSetTicketImportance($trigger) {
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->display('devblocks:cerberusweb.core::internal/decisions/actions/_set_number.tpl');
+	}
+	
+	static function simulateActionSetTicketImportance($params, DevblocksDictionaryDelegate $dict, $default_on, $key) {
+		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+		@$ticket_id = $dict->$default_on;
+		
+		// Importance
+		
+		@$importance = intval(
+			$tpl_builder->build(
+				DevblocksPlatform::importVar($params['value'], 'string', ''),
+				$dict
+			)
+		);
+		
+		$importance = DevblocksPlatform::intClamp($importance, 0, 100);
+		
+		$out = sprintf(">>> Setting importance to %d\n", $importance);
+
+		// Update dictionary
+		$dict->$key = $importance;
+		
+		return $out;
+	}
+	
+	static function runActionSetTicketImportance($params, DevblocksDictionaryDelegate $dict, $default_on, $key) {
+		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+		@$ticket_id = $dict->$default_on;
+		
+		// Importance
+		
+		@$importance = intval(
+			$tpl_builder->build(
+				DevblocksPlatform::importVar($params['value'], 'string', ''),
+				$dict
+			)
+		);
+		
+		$importance = DevblocksPlatform::intClamp($importance, 0, 100);
+
+		DAO_Ticket::update($ticket_id, array(
+			DAO_Ticket::IMPORTANCE => $importance,
+		));
+		
+		// Update dictionary
+		$dict->$key = $importance;
+	}
+	
+	/*
 	 * Action: Set Ticket Org
 	 */
 	
@@ -3755,6 +3818,19 @@ class DevblocksEventHelper {
 			$content
 		);
 		
+		if(isset($params['bundle_ids']) && is_array($params['bundle_ids'])) {
+			$out = rtrim($out,"\n") . "\n\n>>> Attaching files:\n";
+			
+			$bundles = DAO_FileBundle::getIds($params['bundle_ids']);
+			foreach($bundles as $bundle) {
+				$attachments = $bundle->getAttachments();
+				
+				foreach($attachments as $attachment) {
+					$out .= " * " . $attachment->display_name . "\n";
+				}
+			}
+		}
+		
 		return $out;
 	}
 	
@@ -3858,6 +3934,21 @@ class DevblocksEventHelper {
 				break;
 		}
 		
+		// Attachments
+		
+		$file_ids = array();
+		
+		if(isset($params['bundle_ids']) && is_array($params['bundle_ids'])) {
+			$bundles = DAO_FileBundle::getIds($params['bundle_ids']);
+			foreach($bundles as $bundle) {
+				$attachments = $bundle->getAttachments();
+				
+				foreach($attachments as $attachment) {
+					$file_ids[] = $attachment->id;
+				}
+			}
+		}
+		
 		// Send
 		
 		CerberusMail::quickSend(
@@ -3868,7 +3959,8 @@ class DevblocksEventHelper {
 			$replyto_addresses[$from_address_id]->reply_personal,
 			$headers,
 			$format,
-			$html_template_id
+			$html_template_id,
+			$file_ids
 		);
 	}
 	
@@ -3898,7 +3990,22 @@ class DevblocksEventHelper {
 			(!empty($headers) ? (implode("\n", $headers) . "\n\n") : ''),
 			$content
 		);
+		
+		// Attachments
 
+		if(isset($params['bundle_ids']) && is_array($params['bundle_ids'])) {
+			$out = rtrim($out,"\n") . "\n\n>>> Attaching files:\n";
+			
+			$bundles = DAO_FileBundle::getIds($params['bundle_ids']);
+			foreach($bundles as $bundle) {
+				$attachments = $bundle->getAttachments();
+				
+				foreach($attachments as $attachment) {
+					$out .= " * " . $attachment->display_name . "\n";
+				}
+			}
+		}
+		
 		return $out;
 	}
 

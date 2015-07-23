@@ -925,10 +925,9 @@ class ChInternalController extends DevblocksControllerExtension {
 				break;
 		}
 		
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass('View_ContextActivityLog');
 		$defaults->id = 'context_activity_log_'.str_replace('.','_',$context.'_'.$context_id);
 		$defaults->is_ephemeral = true;
-		$defaults->class_name = 'View_ContextActivityLog';
 		$defaults->view_columns = array(
 			SearchFields_ContextActivityLog::CREATED
 		);
@@ -1832,9 +1831,14 @@ class ChInternalController extends DevblocksControllerExtension {
 
 		if(null != ($preset = DAO_ViewFiltersPreset::get($preset_id))) {
 			$view->addParams($preset->params);
+			
 			if(!is_null($preset->sort_by)) {
-				$view->renderSortBy = $preset->sort_by;
-				$view->renderSortAsc = !empty($preset->sort_asc);
+				$disable_sorting = $view->isCustom() && @$view->options['disable_sorting'];
+				
+				if(!$disable_sorting) {
+					$view->renderSortBy = $preset->sort_by;
+					$view->renderSortAsc = !empty($preset->sort_asc);
+				}
 			}
 		}
 

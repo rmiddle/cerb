@@ -596,7 +596,8 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				'schedule_email_recipients' => array('label' => 'Schedule email to recipients'),
 				'send_email' => array('label' => 'Send email'),
 				'send_email_recipients' => array('label' => 'Send email to recipients'),
-				'set_org' => array('label' =>'Set ticket organization'),
+				'set_importance' => array('label' =>'Set ticket importance'),
+				'set_org' => array('label' =>'Set organization'),
 				'set_owner' => array('label' =>'Set ticket owner'),
 				'set_reopen_date' => array('label' => 'Set ticket reopen date'),
 				'set_spam_training' => array('label' => 'Set ticket spam training'),
@@ -685,6 +686,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				
 			case 'schedule_email_recipients':
 				DevblocksEventHelper::renderActionScheduleTicketReply();
+				break;
+				
+			case 'set_importance':
+				DevblocksEventHelper::renderActionSetTicketImportance($trigger);
 				break;
 				
 			case 'set_org':
@@ -804,6 +809,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				
 			case 'send_email_recipients':
 				return DevblocksEventHelper::simulateActionSendEmailRecipients($params, $dict);
+				break;
+				
+			case 'set_importance':
+				return DevblocksEventHelper::simulateActionSetTicketImportance($params, $dict, 'ticket_id', 'ticket_importance');
 				break;
 				
 			case 'set_org':
@@ -935,7 +944,11 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			case 'schedule_email_recipients':
 				DevblocksEventHelper::runActionScheduleTicketReply($params, $dict, $ticket_id, $message_id);
 				break;
-				
+
+			case 'set_importance':
+				DevblocksEventHelper::runActionSetTicketImportance($params, $dict, 'ticket_id', 'ticket_importance');
+				break;
+
 			case 'send_email':
 				DevblocksEventHelper::runActionSendEmail($params, $dict);
 				break;
@@ -969,6 +982,22 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 						$properties['headers'][trim($header)] = trim($value);
 				}
 
+				// Attachments
+		
+				if(isset($params['bundle_ids']) && is_array($params['bundle_ids'])) {
+					$properties['forward_files'] = array();
+					$properties['link_forward_files'] = true;
+				
+					$bundles = DAO_FileBundle::getIds($params['bundle_ids']);
+					foreach($bundles as $bundle) {
+						$attachments = $bundle->getAttachments();
+						
+						foreach($attachments as $attachment) {
+							$properties['forward_files'][] = $attachment->id;
+						}
+					}
+				}
+				
 				// Options
 				
 				if(isset($params['is_autoreply']) && !empty($params['is_autoreply']))

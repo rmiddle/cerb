@@ -37,14 +37,14 @@
 		<input type="hidden" name="deleted" value="{if $ticket->is_deleted}1{else}0{/if}">
 		<input type="hidden" name="spam" value="0">
 		
-		<span id="spanWatcherToolbar">
-		{$object_watchers = DAO_ContextLink::getContextLinks($page_context, array($page_context_id), CerberusContexts::CONTEXT_WORKER)}
-		{include file="devblocks:cerberusweb.core::internal/watchers/context_follow_button.tpl" context=$page_context context_id=$page_context_id full=true watchers_group_id=$ticket->group_id watchers_bucket_id=$ticket->bucket_id}
-		</span>
-		
 		<span id="spanRecommendToolbar">
 		{$object_recommendations = DAO_ContextRecommendation::getByContexts($page_context, array($page_context_id))}
 		{include file="devblocks:cerberusweb.core::internal/recommendations/context_recommend_button.tpl" context=$page_context context_id=$page_context_id full=true recommend_group_id=$ticket->group_id recommend_bucket_id=$ticket->bucket_id}
+		</span>
+		
+		<span id="spanWatcherToolbar">
+		{$object_watchers = DAO_ContextLink::getContextLinks($page_context, array($page_context_id), CerberusContexts::CONTEXT_WORKER)}
+		{include file="devblocks:cerberusweb.core::internal/watchers/context_follow_button.tpl" context=$page_context context_id=$page_context_id full=true watchers_group_id=$ticket->group_id watchers_bucket_id=$ticket->bucket_id}
 		</span>
 		
 		<!-- Macros -->
@@ -134,6 +134,11 @@
 				{else}
 					{'status.open'|devblocks_translate}
 				{/if} 
+			{elseif $k == 'importance'}
+				<b>{'common.importance'|devblocks_translate|capitalize}:</b>
+				<div style="display:inline-block;margin-left:5px;width:40px;height:8px;background-color:rgb(220,220,220);border-radius:8px;">
+					<div style="position:relative;margin-left:-5px;top:-1px;left:{$ticket->importance}%;width:10px;height:10px;border-radius:10px;background-color:{if $ticket->importance < 50}rgb(0,200,0);{elseif $ticket->importance > 50}rgb(230,70,70);{else}rgb(175,175,175);{/if}"></div>
+				</div>
 			{elseif $k == 'org'}
 				{$ticket_org = $ticket->getOrg()}
 				<b>{'contact_org.name'|devblocks_translate|capitalize}:</b>
@@ -214,7 +219,7 @@ $(function() {
 	// Tabs
 	
 	var tabOptions = Devblocks.getDefaultjQueryUiTabOptions();
-	tabOptions.active = Devblocks.getjQueryUiTabSelected('profileTicketTabs');
+	tabOptions.active = Devblocks.getjQueryUiTabSelected('profileTicketTabs', '{$tab}');
 	
 	var tabs = $("#profileTicketTabs").tabs(tabOptions);
 	

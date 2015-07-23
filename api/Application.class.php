@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2015052601);
-define("APP_VERSION", '7.0.0');
+define("APP_BUILD", 2015072001);
+define("APP_VERSION", '7.0.3');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -119,6 +119,7 @@ class CerberusApplication extends DevblocksApplication {
 		return $workers;
 	}
 	
+	// [TODO] Cache by worker? (esp responsibility + availability + workloads)
 	static function getWorkerPickerData($population, $sample, $group_id=0, $bucket_id=0) {
 		// Shared objects
 		
@@ -126,6 +127,7 @@ class CerberusApplication extends DevblocksApplication {
 		$group_responsibilities = DAO_Group::getResponsibilities($group_id);
 		$bucket_responsibilities = @$group_responsibilities[$bucket_id] ?: array();
 		$workloads = DAO_Worker::getWorkloads();
+		// [TODO] Do availability efficiently 
 		
 		// Workers
 		
@@ -1148,10 +1150,12 @@ class CerberusContexts {
 	 * @return void
 	 */
 	public static function merge($token_prefix, $label_prefix, $src_labels, $src_values, &$dst_labels, &$dst_values) {
+		if(is_array($src_labels))
 		foreach($src_labels as $token => $label) {
 			$dst_labels[$token_prefix.$token] = $label_prefix.$label;
 		}
 
+		if(is_array($src_values))
 		foreach($src_values as $token => $value) {
 			if(in_array($token, array('_labels', '_types'))) {
 
@@ -1958,15 +1962,16 @@ class CerberusContexts {
 
 		$load_ids = array_diff($ids, array_keys(self::$_context_checkpoints[$context]));
 
-		$models = CerberusContexts::getModels($context, $load_ids);
-
-		$values = DAO_CustomFieldValue::getValuesByContextIds($context, $load_ids);
-
-		foreach($models as $model_id => $model) {
-			$model->custom_fields = @$values[$model_id] ?: array();
-
-			self::$_context_checkpoints[$context][$model_id] =
-				json_decode(json_encode($model), true);
+		if(!empty($load_ids)) {
+			$models = CerberusContexts::getModels($context, $load_ids);
+			$values = DAO_CustomFieldValue::getValuesByContextIds($context, $load_ids);
+			
+			foreach($models as $model_id => $model) {
+				$model->custom_fields = @$values[$model_id] ?: array();
+				
+				self::$_context_checkpoints[$context][$model_id] =
+					json_decode(json_encode($model), true);
+			}
 		}
 	}
 
@@ -2249,6 +2254,7 @@ class CerberusSettings {
 	const TICKET_MASK_FORMAT = 'ticket_mask_format';
 	const AUTHORIZED_IPS = 'authorized_ips';
 	const LICENSE = 'license_json';
+	const RELAY_DISABLE = 'relay_disable';
 	const RELAY_DISABLE_AUTH = 'relay_disable_auth';
 	const RELAY_SPOOF_FROM = 'relay_spoof_from';
 	const SESSION_LIFESPAN = 'session_lifespan';
@@ -2256,13 +2262,14 @@ class CerberusSettings {
 };
 
 class CerberusSettingsDefaults {
-	const HELPDESK_TITLE = 'Cerb - a fast and flexible web-based platform for business collaboration and automation.';
+	const HELPDESK_TITLE = 'Cerb - a fast and flexible web-based platform for enterprise collaboration, productivity, and automation.';
 	const ATTACHMENTS_ENABLED = 1;
 	const ATTACHMENTS_MAX_SIZE = 10;
 	const PARSER_AUTO_REQ = 0;
 	const PARSER_AUTO_REQ_EXCLUDE = '';
 	const TICKET_MASK_FORMAT = 'LLL-NNNNN-NNN';
 	const AUTHORIZED_IPS = "127.0.0.1\n::1\n";
+	const RELAY_DISABLE = 0;
 	const RELAY_DISABLE_AUTH = 0;
 	const RELAY_SPOOF_FROM = 0;
 	const SESSION_LIFESPAN = 0;

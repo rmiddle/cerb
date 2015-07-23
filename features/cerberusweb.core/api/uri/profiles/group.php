@@ -36,7 +36,7 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 		$point = 'cerberusweb.profiles.group.' . $group_id;
 
 		if(empty($group_id) || null == ($group = DAO_Group::get($group_id)))
-			throw new Exception();
+			return;
 		
 		$tpl->assign('group', $group);
 		
@@ -208,7 +208,7 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 					
 					// If the worker wasn't previously a member/manager
 					if(!isset($group_members[$member_id])) {
-						DAO_Group::addGroupMemberDefaultResponsibilities($group_id, $member_id);
+						DAO_Group::setMemberDefaultResponsibilities($group_id, $member_id);
 					}
 				}
 			}
@@ -238,10 +238,9 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass('View_Worker');
 		$defaults->id = 'group_members';
 		$defaults->name = 'Members';
-		$defaults->class_name = 'View_Worker';
 		$defaults->renderSubtotals = '';
 		
 		$view = C4_AbstractViewLoader::getView($defaults->id, $defaults);
@@ -263,10 +262,9 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 
-		$defaults = new C4_AbstractViewModel();
+		$defaults = C4_AbstractViewModel::loadFromClass('View_Bucket');
 		$defaults->id = 'group_buckets';
 		$defaults->name = 'Buckets';
-		$defaults->class_name = 'View_Bucket';
 		$defaults->view_columns = array(
 			SearchFields_Bucket::NAME,
 			SearchFields_Bucket::IS_DEFAULT,

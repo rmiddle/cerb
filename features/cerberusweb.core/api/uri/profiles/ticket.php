@@ -60,41 +60,42 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		$tpl->assign('point', $point);
 		
 		@$mail_always_show_all = DAO_WorkerPref::get($active_worker->id,'mail_always_show_all',0);
+
+		if($mail_always_show_all)
+			$tpl->assign('expand_all', true);
 		
-		switch($section) {
-			case 'conversation':
-				@$tab_option = array_shift($stack);
+		if(!empty($section)) {
+			$tpl->assign('tab', $section);
 		
-				if($mail_always_show_all || 0==strcasecmp("read_all",$tab_option)) {
-					$tpl->assign('expand_all', true);
-				}
-				break;
-				
-			case 'comment':
-				@$focus_id = intval(array_shift($stack));
-				
-				if(!empty($focus_id)) {
-					$tpl->assign('convo_focus_ctx', CerberusContexts::CONTEXT_COMMENT);
-					$tpl->assign('convo_focus_ctx_id', $focus_id);
-				}
-				
-				if($mail_always_show_all)
-					$tpl->assign('expand_all', true);
-				
-				break;
-				
-			case 'message':
-				@$focus_id = intval(array_shift($stack));
-				
-				if(!empty($focus_id)) {
-					$tpl->assign('convo_focus_ctx', CerberusContexts::CONTEXT_MESSAGE);
-					$tpl->assign('convo_focus_ctx_id', $focus_id);
-				}
-				
-				if($mail_always_show_all)
-					$tpl->assign('expand_all', true);
-				
-				break;
+			switch($section) {
+				case 'conversation':
+					@$tab_option = array_shift($stack);
+			
+					if($mail_always_show_all || 0==strcasecmp("read_all",$tab_option)) {
+						$tpl->assign('expand_all', true);
+					}
+					break;
+					
+				case 'comment':
+					@$focus_id = intval(array_shift($stack));
+					
+					if(!empty($focus_id)) {
+						$tpl->assign('convo_focus_ctx', CerberusContexts::CONTEXT_COMMENT);
+						$tpl->assign('convo_focus_ctx_id', $focus_id);
+					}
+					
+					break;
+					
+				case 'message':
+					@$focus_id = intval(array_shift($stack));
+					
+					if(!empty($focus_id)) {
+						$tpl->assign('convo_focus_ctx', CerberusContexts::CONTEXT_MESSAGE);
+						$tpl->assign('convo_focus_ctx_id', $focus_id);
+					}
+					
+					break;
+			}
 		}
 		
 		// Properties
@@ -105,6 +106,7 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 			'mask' => null,
 			'bucket' => null,
 			'org' => null,
+			'importance' => null,
 			'created' => array(
 				'label' => ucfirst($translate->_('common.created')),
 				'type' => Model_CustomField::TYPE_DATE,

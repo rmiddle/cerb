@@ -87,8 +87,18 @@ class ChFilesController extends DevblocksControllerExtension {
 			header('Content-Disposition: attachment; filename=' . urlencode($file->display_name));
 		}
 		
+		$handled = false;
+		
 		switch(strtolower($file->mime_type)) {
+			case 'message/feedback-report':
+			case 'message/rfc822':
+				// Render to the browser as text
+				if(!$is_download)
+					$file->mime_type = 'text/plain';
+				break;
+			
 			case 'text/html':
+				$handled = true;
 				header("Content-Type: text/html; charset=" . LANG_CHARSET_CODE);
 				
 				// If we're downloading the HTML, just pass the raw bytes
@@ -99,13 +109,14 @@ class ChFilesController extends DevblocksControllerExtension {
 				// If we're displaying the HTML inline, tidy and purify it first
 				} else {
 					// If the 'tidy' extension exists, and the file size is less than 5MB
-					if(extension_loaded('tidy') && $file_stats['size'] < 1024000 * 5) {
+					if(extension_loaded('tidy') && $file_stats['size'] < 5120000) {
 						$tidy = new tidy();
 						
 						$config = array (
 							'clean' => true,
 							'indent' => false,
 							'output-xhtml' => true,
+							'word-2000' => true,
 							'wrap' => '0',
 						);
 						
@@ -127,10 +138,13 @@ class ChFilesController extends DevblocksControllerExtension {
 				break;
 				
 			default:
-				header("Content-Type: " . $file->mime_type);
-				header("Content-Length: " . $file_stats['size']);
-				fpassthru($fp);
 				break;
+		}
+		
+		if(!$handled) {
+			header("Content-Type: " . $file->mime_type);
+			header("Content-Length: " . $file_stats['size']);
+			fpassthru($fp);
 		}
 		
 		fclose($fp);
