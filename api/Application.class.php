@@ -46,8 +46,8 @@
  \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
  *	 Webgroup Media LLC - Developers of Cerb
  */
-define("APP_BUILD", 2015072001);
-define("APP_VERSION", '7.0.3');
+define("APP_BUILD", 2015091901);
+define("APP_VERSION", '7.0.6');
 
 define("APP_MAIL_PATH", APP_STORAGE_PATH . '/mail/');
 
@@ -156,7 +156,7 @@ class CerberusApplication extends DevblocksApplication {
 		// Set sample
 		foreach($sample as &$worker) {
 			if(!isset($population[$worker->id]))
-				conntinue;
+				continue;
 			
 			$picker_workers['sample'][$worker->id] = $worker;
 			unset($population[$worker->id]);
@@ -1720,7 +1720,7 @@ class CerberusContexts {
 		}
 
 		// Forced actor
-		if(!empty($actor_context) && !empty($actor_context_id)) {
+		if(!empty($actor_context)) {
 			if(null != ($ctx = DevblocksPlatform::getExtension($actor_context, true))
 				&& $ctx instanceof Extension_DevblocksContext) {
 				$meta = $ctx->getMeta($actor_context_id);
@@ -2309,12 +2309,12 @@ class Cerb_DevblocksSessionHandler implements IDevblocksHandler_Session {
 		// [TODO] Allow Cerb to enable user-agent comparisons as setting
 		// [TODO] Limit the IPs a worker can log in from (per-worker?)
 
-		if(null != ($session = $db->GetRowSlave(sprintf("SELECT session_data, refreshed_at, user_ip, user_agent FROM devblocks_session WHERE session_key = %s", $db->qstr($id))))) {
+		if(null != ($session = $db->GetRowSlave(sprintf("SELECT * FROM devblocks_session WHERE session_key = %s", $db->qstr($id))))) {
 			$maxlifetime = DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::SESSION_LIFESPAN, CerberusSettingsDefaults::SESSION_LIFESPAN);
 			$is_ajax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest');
 
-			// Refresh the session cookie (move expiraiton forward) after 5 minutes have elapsed
-			if($maxlifetime && !$is_ajax && (time() - $session['refreshed_at'] >= 300)) {
+			// Refresh the session cookie (move expiration forward) after 5 minutes have elapsed
+			if(isset($session['refreshed_at']) && $maxlifetime && !$is_ajax && (time() - $session['refreshed_at'] >= 300)) {
 				$url_writer = DevblocksPlatform::getUrlService();
 
 				setcookie('Devblocks', $id, time()+$maxlifetime, '/', NULL, $url_writer->isSSL(), true);

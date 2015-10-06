@@ -4,7 +4,7 @@
 	<name>Cerb Core</name>
 	<description>The core functionality of Cerb.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>7.0.3</version>
+	<version>7.0.5</version>
 	<link>http://www.cerbweb.com/</link>
 	
 	<!-- Plugin Dependencies -->
@@ -56,7 +56,7 @@
 		<patch version="6.8.0" revision="1108" file="patches/6.x/6.8.0.php" />
 		<patch version="6.9.0" revision="1115" file="patches/6.x/6.9.0.php" />
 		
-		<patch version="7.0.0" revision="1125" file="patches/7.x/7.0.0.php" />
+		<patch version="7.0.0" revision="1127" file="patches/7.x/7.0.0.php" />
 	</patches>
 
 	<!-- Controller Routing -->
@@ -815,6 +815,11 @@
 		<activity point="worker.logged_out">
 			<param key="label_key" value="Worker Logged Out" />
 			<param key="string_key" value="activities.worker.logged_out" />
+			<param key="options" value="" />
+		</activity>
+		<activity point="worker.seat_expired">
+			<param key="label_key" value="Worker Seat Expired" />
+			<param key="string_key" value="activities.worker.seat_expired" />
 			<param key="options" value="" />
 		</activity>
 	</activity_points>

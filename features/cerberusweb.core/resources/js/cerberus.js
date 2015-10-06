@@ -8,7 +8,7 @@ var markitupPlaintextDefaults = {
 
 var markitupMarkdownDefaults = {
 	resizeHandle: false,
-	previewParserPath:	DevblocksAppPath + 'ajax.php?c=internal&a=transformMarkupToHTML&format=markdown',
+	previewParserPath:	DevblocksAppPath + 'ajax.php?c=internal&a=transformMarkupToHTML&format=markdown&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
 	onShiftEnter:		{keepDefault:false, openWith:'\n\n'},
 	markupSet: [
 		{name:'Heading 1', key:'1', openWith:'# ', placeHolder:'Your title here...', className:'h1' },
@@ -50,7 +50,7 @@ var markitupMarkdownDefaults = {
 var markitupParsedownDefaults = {
 	nameSpace:'markItUpParsedown',
 	resizeHandle: false,
-	previewParserPath:	DevblocksAppPath + 'ajax.php?c=internal&a=transformMarkupToHTML&format=parsedown',
+	previewParserPath:	DevblocksAppPath + 'ajax.php?c=internal&a=transformMarkupToHTML&format=parsedown&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
 	previewAutoRefresh: true,
 	previewInWindow: 'width=800, height=600, titlebar=no, location=no, menubar=no, status=no, toolbar=no, resizable=yes, scrollbars=yes',
 	onShiftEnter:		{keepDefault:false, openWith:'\n\n'},
@@ -86,7 +86,7 @@ var markitupParsedownDefaults = {
 
 var markitupHTMLDefaults = {
 	resizeHandle: false,
-	previewParserPath:	DevblocksAppPath + 'ajax.php?c=internal&a=transformMarkupToHTML&format=html',
+	previewParserPath:	DevblocksAppPath + 'ajax.php?c=internal&a=transformMarkupToHTML&format=html&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
 	onShiftEnter:	{keepDefault:false, replaceWith:'<br />\n'},
 	onCtrlEnter:	{keepDefault:false, openWith:'\n<p>', closeWith:'</p>\n'},
 	onTab:			{keepDefault:false, openWith:'	 '},
@@ -191,15 +191,21 @@ $.fn.cerbDateInputHelper = function(options) {
 					
 					var url = DevblocksAppPath+'ajax.php?c=internal&a=handleSectionAction&section=calendars&action=getDateInputAutoCompleteOptionsJson';
 					
-					$.ajax({
+					var ajax_options = {
 						url: url,
 						dataType: "json",
 						data: request,
 						success: function(data) {
 							response(data);
 						}
-					});
+					};
 					
+					if(null == ajax_options.headers)
+						ajax_options.headers = {};
+
+					ajax_options.headers['X-CSRF-Token'] = $('meta[name="_csrf_token"]').attr('content');
+					
+					$.ajax(ajax_options);
 				},
 				focus: function() {
 					return false;
@@ -391,6 +397,11 @@ var cAjaxCalls = function() {
 		options.cache = false;
 		options.success = cb;
 		
+		if(null == options.headers)
+			options.headers = {};
+		
+		options.headers['X-CSRF-Token'] = $('meta[name="_csrf_token"]').attr('content');
+		
 		$.ajax(options);
 	}
 	
@@ -422,6 +433,11 @@ var cAjaxCalls = function() {
 		options.cache = false;
 		options.success = cb;
 		
+		if(null == options.headers)
+			options.headers = {};
+		
+		options.headers['X-CSRF-Token'] = $('meta[name="_csrf_token"]').attr('content');
+		
 		$.ajax(options);
 	}	
 	
@@ -448,7 +464,7 @@ var cAjaxCalls = function() {
 	}
 
 	this.emailAutoComplete = function(sel, options) {
-		var url = DevblocksAppPath+'ajax.php?c=contacts&a=getEmailAutoCompletions';
+		var url = DevblocksAppPath+'ajax.php?c=contacts&a=getEmailAutoCompletions&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
 		if(null == options) options = { };
 
 		if(null == options.minLength)
@@ -469,14 +485,16 @@ var cAjaxCalls = function() {
 				if(0==request.term.length)
 					return;
 				
-				$.ajax({
+				var ajax_options = {
 					url: url,
 					dataType: "json",
 					data: request,
 					success: function(data) {
 						response(data);
 					}
-				});
+				};
+				
+				$.ajax(ajax_options);
 			}
 			options.select = function(event, ui) {
 				var value = $(this).val();
@@ -507,7 +525,7 @@ var cAjaxCalls = function() {
 	this.orgAutoComplete = function(sel, options) {
 		if(null == options) options = { };
 		
-		options.source = DevblocksAppPath+'ajax.php?c=contacts&a=getOrgsAutoCompletions';
+		options.source = DevblocksAppPath+'ajax.php?c=contacts&a=getOrgsAutoCompletions&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
 		
 		if(null == options.minLength)
 			options.minLength = 1;
@@ -524,7 +542,7 @@ var cAjaxCalls = function() {
 	this.countryAutoComplete = function(sel, options) {
 		if(null == options) options = { };
 		
-		options.source = DevblocksAppPath+'ajax.php?c=contacts&a=getCountryAutoCompletions';
+		options.source = DevblocksAppPath+'ajax.php?c=contacts&a=getCountryAutoCompletions&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
 		
 		if(null == options.minLength)
 			options.minLength = 1;
@@ -585,7 +603,7 @@ var cAjaxCalls = function() {
 			$autocomplete.insertBefore($button);
 			
 			$autocomplete.autocomplete({
-				source: DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=' + context,
+				source: DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=' + context + '&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
 				minLength: 1,
 				focus:function(event, ui) {
 					return false;

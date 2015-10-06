@@ -3,6 +3,7 @@
 <input type="hidden" name="a" value="viewDoExport">
 <input type="hidden" name="view_id" value="{$view_id}">
 <input type="hidden" name="cursor_key" value="">
+<input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
 <div class="export-settings">
 
@@ -16,7 +17,7 @@
 <ul class="bubbles sortable" style="display:block;padding:0;"></ul>
 
 <div style="margin:10px 0px 0px 0px;">
-	<input type="text" size="16" class="input_search filter">
+	<input type="text" size="32" class="input_search filter">
 </div>
 
 <ul class="cerb-popupmenu" style="border:0;margin:0px 0px 15px 0px;display:block;max-height:300px;overflow:auto;">

@@ -6,6 +6,7 @@
 <input type="hidden" name="view_id" value="{$view_id}">
 {if !empty($model) && !empty($model->id)}<input type="hidden" name="id" value="{$model->id}">{/if}
 <input type="hidden" name="do_delete" value="0">
+<input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
 <div id="mailTemplateTabs">
 	<ul>
@@ -281,7 +282,7 @@ $(function() {
 			delete markitupParsedownSettings.previewTemplatePath;
 			delete markitupParsedownSettings.previewInWindow;
 			
-			markitupParsedownSettings.previewParserPath = DevblocksAppPath + 'ajax.php?c=profiles&a=handleSectionAction&section=html_template&action=getSignatureParsedownPreview';
+			markitupParsedownSettings.previewParserPath = DevblocksAppPath + 'ajax.php?c=profiles&a=handleSectionAction&section=html_template&action=getSignatureParsedownPreview&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
 			
 			$content.markItUp(markitupHTMLSettings);
 			$signature.markItUp(markitupParsedownSettings);

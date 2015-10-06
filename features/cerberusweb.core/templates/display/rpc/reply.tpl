@@ -1,6 +1,7 @@
 <div class="block reply_frame" style="width:98%;margin:10px;">
 
 <form id="reply{$message->id}_part1" onsubmit="return false;">
+
 <table cellpadding="2" cellspacing="0" border="0" width="100%">
 	<tr>
 		<td><h2 style="color:rgb(50,50,50);">{if $is_forward}{'display.ui.forward'|devblocks_translate|capitalize}{else}{'display.ui.reply'|devblocks_translate|capitalize}{/if}</h2></td>
@@ -171,6 +172,7 @@
 <input type="hidden" name="cc" value="{$cc}">
 <input type="hidden" name="bcc" value="{$bcc}">
 <input type="hidden" name="subject" value="{$subject}">
+<input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
 {if $is_forward}
 <textarea name="content" id="reply_{$message->id}" class="reply" style="width:98%;height:{$mail_reply_textbox_size_px|default:300}px;border:1px solid rgb(180,180,180);padding:5px;">
@@ -746,7 +748,7 @@
 		draftAutoSaveInterval = setInterval("$('#reply{$message->id}_part1 button[name=saveDraft]').click();", 30000); // and every 30 sec
 
 		$frm.find('input:text.context-snippet').autocomplete({
-			source: DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=cerberusweb.contexts.snippet&contexts[]=cerberusweb.contexts.ticket&contexts[]=cerberusweb.contexts.worker',
+			source: DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=cerberusweb.contexts.snippet&contexts[]=cerberusweb.contexts.ticket&contexts[]=cerberusweb.contexts.worker&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
 			minLength: 1,
 			focus:function(event, ui) {
 				return false;

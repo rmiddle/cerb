@@ -1828,7 +1828,9 @@ class DAO_Ticket extends Cerb_ORMHelper {
 				break;
 				
 			case SearchFields_Ticket::VIRTUAL_GROUPS_OF_WORKER:
-				$member = DAO_Worker::get($param->value);
+				if(null == ($member = DAO_Worker::get($param->value)))
+					break;
+					
 				$all_groups = DAO_Group::getAll();
 				$roster = $member->getMemberships();
 				
@@ -2214,6 +2216,13 @@ class Model_Ticket {
 	private $_org = null;
 
 	function Model_Ticket() {}
+	
+	function isReadableByWorker(Model_Worker $worker) {
+		if(false == ($group = DAO_Group::get($this->group_id)))
+			return false;
+		
+		return $group->isReadableByWorker($worker);
+	}
 
 	function getMessages() {
 		$messages = DAO_Message::getMessagesByTicket($this->id);

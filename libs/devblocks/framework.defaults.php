@@ -59,6 +59,9 @@ if(!defined('DB_CHARSET_CODE'))
 if(!defined('APP_SESSION_NAME'))
 	define('APP_SESSION_NAME', 'Devblocks');
 
+if(!defined('DEVELOPMENT_ARCHIVE_PARSER_MSGSOURCE'))
+	define('DEVELOPMENT_ARCHIVE_PARSER_MSGSOURCE', false);
+
 if(!defined('ONDEMAND_MODE'))
 	define('ONDEMAND_MODE', false);
 
@@ -67,6 +70,9 @@ if(!defined('DEVELOPMENT_MODE'))
 
 if(!defined('DEVELOPMENT_MODE_QUERIES'))
 	define('DEVELOPMENT_MODE_QUERIES', false);
+
+if(!defined('DEVELOPMENT_MODE_ALLOW_CSRF'))
+	define('DEVELOPMENT_MODE_ALLOW_CSRF', false);
 
 // ----
 

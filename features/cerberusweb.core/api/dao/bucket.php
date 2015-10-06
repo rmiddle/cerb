@@ -687,12 +687,13 @@ class Model_Bucket {
 				&& isset($froms[$this->reply_address_id])
 				&& $from = $froms[$this->reply_address_id])
 					$personal = $from->reply_personal;
-		
+				
 		// Cascade to group default bucket
-		if(empty($personal) 
+		if(empty($personal)
 				&& $default_bucket
-				&& $default_bucket->id != $this->id)
-					$personal = $default_bucket->reply_personal;
+				&& $default_bucket->id != $this->id) {
+					$personal = $default_bucket->getReplyPersonal($worker_model);
+		}
 		
 		// Cascade to global
 		if(empty($personal) 
@@ -1025,13 +1026,13 @@ class Context_Bucket extends Extension_DevblocksContext implements IDevblocksCon
 		
 		// Permissions
 		
-		if(empty($context_id) && !$active_worker->isGroupManager()) {
+		if(empty($bucket) && !$active_worker->isGroupManager()) {
 			$tpl->assign('error_message', "You can only create new buckets if you're the manager of at least one group.");
 			$tpl->display('devblocks:cerberusweb.core::internal/peek/peek_error.tpl');
 			return;
 		}
 		
-		if(!empty($context_id) && !$active_worker->isGroupManager($context_id)) {
+		if(!empty($bucket) && !$active_worker->isGroupManager($bucket->group_id)) {
 			$tpl->assign('error_message', "Only group managers can modify this bucket.");
 			$tpl->display('devblocks:cerberusweb.core::internal/peek/peek_error.tpl');
 			return;

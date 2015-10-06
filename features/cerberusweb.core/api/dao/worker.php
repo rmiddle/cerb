@@ -99,6 +99,7 @@ class DAO_Worker extends Cerb_ORMHelper {
 		$workers_to_sessions = array();
 		
 		// Track the active workers based on session data
+		if(is_array($sessions))
 		foreach($sessions as $session_id => $session_data) {
 			$key = $session_data['session_key'];
 			@$worker_id = $session_data['user_id'];
@@ -123,6 +124,7 @@ class DAO_Worker extends Cerb_ORMHelper {
 		DevblocksPlatform::sortObjects($session_workers, 'last_activity_date');
 		
 		// Find active workers from sessions (idle but not logged out)
+		if(is_array($session_workers))
 		foreach($session_workers as $worker_id => $worker) {
 			if($worker->last_activity_date > time() - $idle_limit) {
 				$active_workers[$worker->id] = $worker;
@@ -133,7 +135,21 @@ class DAO_Worker extends Cerb_ORMHelper {
 					foreach($workers_to_sessions[$worker->id] as $session_key => $session_data) {
 						$session->clear($session_key);
 					}
+					
 					$idle_kick_limit--;
+					
+					// Add the session kick to the worker's activity log
+					$entry = array(
+						//{{actor}} logged {{target}} out to free up a license seat.
+						'message' => 'activities.worker.seat_expired',
+						'variables' => array(
+								'target' => $worker->getName(),
+							),
+						'urls' => array(
+								'target' => sprintf("ctx://cerberusweb.contexts.worker:%d/%s", $worker->id, DevblocksPlatform::strToPermalink($worker->getName())),
+							)
+					);
+					CerberusContexts::logActivity('worker.seat_expired', CerberusContexts::CONTEXT_WORKER, $worker->id, $entry, CerberusContexts::CONTEXT_APPLICATION, 0);
 				}
 			}
 		}
@@ -304,6 +320,17 @@ class DAO_Worker extends Cerb_ORMHelper {
 		return null;
 	}
 	
+	static function getNames() {
+		$workers = DAO_Worker::getAllActive();
+		$names = array();
+		
+		foreach($workers as $worker) {
+			$names[$worker->id] = !empty($worker->at_mention_name) ? $worker->at_mention_name : $worker->getName();
+		}
+		
+		return $names;
+	}
+	
 	static function getByString($string) {
 		$workers = DAO_Worker::getAllActive();
 		$patterns = DevblocksPlatform::parseCsvString($string);
@@ -316,9 +343,17 @@ class DAO_Worker extends Cerb_ORMHelper {
 			
 				if(isset($results[$worker_id]))
 					continue;
+
+				// Check @mention
+				if(false !== strcasecmp($worker->at_mention_name, $pattern)) {
+					$results[$worker_id] = $worker;
+					continue;
+				}
 				
+				// Check full name
 				if(false !== stristr($worker_name, $pattern)) {
 					$results[$worker_id] = $worker;
+					continue;
 				}
 			}
 		}
