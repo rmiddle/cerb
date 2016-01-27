@@ -241,10 +241,6 @@ class DAO_Snippet extends Cerb_ORMHelper {
 				break;
 		}
 		
-		// Sanitize
-		if('*'==substr($sortBy,0,1) || !isset($fields[$sortBy]) || !in_array($sortBy, $columns))
-			$sortBy=null;
-		
 		list($tables, $wheres, $null) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
 		
 		$select_sql = sprintf("SELECT ".
@@ -288,7 +284,7 @@ class DAO_Snippet extends Cerb_ORMHelper {
 		$where_sql = ''.
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 		
-		$sort_sql = (!empty($sortBy)) ? sprintf("ORDER BY %s %s ",$sortBy,($sortAsc || is_null($sortAsc))?"ASC":"DESC") : " ";
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields);
 		
 		$args = array(
 			'join_sql' => &$join_sql,
@@ -492,24 +488,24 @@ class SearchFields_Snippet implements IDevblocksSearchFields {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
-			self::ID => new DevblocksSearchField(self::ID, 'snippet', 'id', $translate->_('common.id')),
-			self::TITLE => new DevblocksSearchField(self::TITLE, 'snippet', 'title', $translate->_('common.title'), Model_CustomField::TYPE_SINGLE_LINE),
-			self::CONTEXT => new DevblocksSearchField(self::CONTEXT, 'snippet', 'context', $translate->_('common.type')),
-			self::OWNER_CONTEXT => new DevblocksSearchField(self::OWNER_CONTEXT, 'snippet', 'owner_context', $translate->_('dao.snippet.owner_context')),
-			self::OWNER_CONTEXT_ID => new DevblocksSearchField(self::OWNER_CONTEXT_ID, 'snippet', 'owner_context_id', $translate->_('dao.snippet.owner_context_id')),
-			self::CONTENT => new DevblocksSearchField(self::CONTENT, 'snippet', 'content', $translate->_('common.content'), Model_CustomField::TYPE_MULTI_LINE),
-			self::TOTAL_USES => new DevblocksSearchField(self::TOTAL_USES, 'snippet', 'total_uses', $translate->_('dao.snippet.total_uses'), Model_CustomField::TYPE_NUMBER),
-			self::UPDATED_AT => new DevblocksSearchField(self::UPDATED_AT, 'snippet', 'updated_at', $translate->_('common.updated'), Model_CustomField::TYPE_DATE),
+			self::ID => new DevblocksSearchField(self::ID, 'snippet', 'id', $translate->_('common.id'), null, true),
+			self::TITLE => new DevblocksSearchField(self::TITLE, 'snippet', 'title', $translate->_('common.title'), Model_CustomField::TYPE_SINGLE_LINE, true),
+			self::CONTEXT => new DevblocksSearchField(self::CONTEXT, 'snippet', 'context', $translate->_('common.type'), null, true),
+			self::OWNER_CONTEXT => new DevblocksSearchField(self::OWNER_CONTEXT, 'snippet', 'owner_context', $translate->_('dao.snippet.owner_context'), null, true),
+			self::OWNER_CONTEXT_ID => new DevblocksSearchField(self::OWNER_CONTEXT_ID, 'snippet', 'owner_context_id', $translate->_('dao.snippet.owner_context_id'), null, true),
+			self::CONTENT => new DevblocksSearchField(self::CONTENT, 'snippet', 'content', $translate->_('common.content'), Model_CustomField::TYPE_MULTI_LINE, true),
+			self::TOTAL_USES => new DevblocksSearchField(self::TOTAL_USES, 'snippet', 'total_uses', $translate->_('dao.snippet.total_uses'), Model_CustomField::TYPE_NUMBER, true),
+			self::UPDATED_AT => new DevblocksSearchField(self::UPDATED_AT, 'snippet', 'updated_at', $translate->_('common.updated'), Model_CustomField::TYPE_DATE, true),
 			
-			self::USE_HISTORY_MINE => new DevblocksSearchField(self::USE_HISTORY_MINE, 'snippet_use_history', 'uses', $translate->_('dao.snippet_use_history.uses.mine'), Model_CustomField::TYPE_NUMBER),
+			self::USE_HISTORY_MINE => new DevblocksSearchField(self::USE_HISTORY_MINE, 'snippet_use_history', 'uses', $translate->_('dao.snippet_use_history.uses.mine'), Model_CustomField::TYPE_NUMBER, true),
 			
-			self::CONTEXT_LINK => new DevblocksSearchField(self::CONTEXT_LINK, 'context_link', 'from_context', null),
-			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null),
+			self::CONTEXT_LINK => new DevblocksSearchField(self::CONTEXT_LINK, 'context_link', 'from_context', null, null, false),
+			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null, null, false),
 			
-			self::FULLTEXT_SNIPPET => new DevblocksSearchField(self::FULLTEXT_SNIPPET, 'ft', 'snippet', $translate->_('common.search.fulltext'), 'FT'),
+			self::FULLTEXT_SNIPPET => new DevblocksSearchField(self::FULLTEXT_SNIPPET, 'ft', 'snippet', $translate->_('common.search.fulltext'), 'FT', false),
 				
-			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null),
-			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null),
+			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null, false),
+			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null, false),
 			self::VIRTUAL_OWNER => new DevblocksSearchField(self::VIRTUAL_OWNER, '*', 'owner', $translate->_('common.owner')),
 		);
 		
@@ -886,6 +882,8 @@ class View_Snippet extends C4_AbstractView implements IAbstractView_Subtotals, I
 	// [TODO] My uses? owner?
 	
 	function getQuickSearchFields() {
+		$search_fields = SearchFields_Snippet::getFields();
+		
 		$fields = array(
 			'_fulltext' => 
 				array(
@@ -941,6 +939,10 @@ class View_Snippet extends C4_AbstractView implements IAbstractView_Subtotals, I
 		if(!empty($ft_examples))
 			$fields['_fulltext']['examples'] = $ft_examples;
 		
+		// Add is_sortable
+		
+		$fields = self::_setSortableQuickSearchFields($fields, $search_fields);
+		
 		// Sort by keys
 		
 		ksort($fields);
@@ -987,14 +989,11 @@ class View_Snippet extends C4_AbstractView implements IAbstractView_Subtotals, I
 						$oper,
 						array_keys($values)
 					);
-					$params[$field_key] = $param;					
+					$params[$field_key] = $param;
 					break;
 					
 			}
 		}
-		
-		$this->renderPage = 0;
-		$this->addParams($params, true);
 		
 		return $params;
 	}
@@ -1134,7 +1133,7 @@ class View_Snippet extends C4_AbstractView implements IAbstractView_Subtotals, I
 					if(empty($context_id)) {
 						$strings[] = '<b>Plaintext</b>';
 					} elseif(isset($contexts[$context_id])) {
-						$strings[] = '<b>'.$contexts[$context_id]->name.'</b>';
+						$strings[] = '<b>'.DevblocksPlatform::strEscapeHtml($contexts[$context_id]->name).'</b>';
 					}
 				}
 				
@@ -1280,7 +1279,7 @@ class View_Snippet extends C4_AbstractView implements IAbstractView_Subtotals, I
 	}
 };
 
-class Context_Snippet extends Extension_DevblocksContext {
+class Context_Snippet extends Extension_DevblocksContext implements IDevblocksContextAutocomplete {
 	function getRandom() {
 		return DAO_Snippet::random();
 	}
@@ -1293,6 +1292,7 @@ class Context_Snippet extends Extension_DevblocksContext {
 			'id' => $context_id,
 			'name' => $snippet->title,
 			'permalink' => '', //$url_writer->writeNoProxy('c=tasks&action=display&id='.$task->id, true),
+			'updated' => $snippet->updated_at,
 		);
 	}
 	
@@ -1326,6 +1326,84 @@ class Context_Snippet extends Extension_DevblocksContext {
 			'total_uses',
 			'updated_at',
 		);
+	}
+	
+	function autocomplete($term) {
+		$as_worker = CerberusApplication::getActiveWorker();
+		
+		$list = array();
+		
+		$contexts = DevblocksPlatform::getExtensions('devblocks.context', false);
+		
+		$worker_groups = $as_worker->getMemberships();
+		$worker_roles = $as_worker->getRoles();
+		
+		// Restrict owners
+		$param_ownership = array(
+			DevblocksSearchCriteria::GROUP_OR,
+			SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_APPLICATION),
+			array(
+				DevblocksSearchCriteria::GROUP_AND,
+				SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_WORKER),
+				SearchFields_Snippet::OWNER_CONTEXT_ID => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT_ID,DevblocksSearchCriteria::OPER_EQ,$as_worker->id),
+			),
+			array(
+				DevblocksSearchCriteria::GROUP_AND,
+				SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_GROUP),
+				SearchFields_Snippet::OWNER_CONTEXT_ID => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT_ID,DevblocksSearchCriteria::OPER_IN,array_keys($worker_groups)),
+			),
+			array(
+				DevblocksSearchCriteria::GROUP_AND,
+				SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_ROLE),
+				SearchFields_Snippet::OWNER_CONTEXT_ID => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT_ID,DevblocksSearchCriteria::OPER_IN,array_keys($worker_roles)),
+			),
+		);
+		
+		$params = array(
+			new DevblocksSearchCriteria(SearchFields_Snippet::TITLE,DevblocksSearchCriteria::OPER_LIKE,'%'.$term.'%'),
+			$param_ownership,
+		);
+		
+		// [TODO] This needs to be abstracted properly
+		@$context_list = DevblocksPlatform::importGPC($_REQUEST['contexts'],'array',array());
+		if(is_array($context_list))
+		foreach($context_list as $k => $v) {
+			if(!isset($contexts[$v]))
+				unset($context_list[$k]);
+		}
+
+		$context_list[] = ''; // plaintext
+		
+		// Filter contexts
+		$params[SearchFields_Snippet::CONTEXT] =
+			new DevblocksSearchCriteria(SearchFields_Snippet::CONTEXT,DevblocksSearchCriteria::OPER_IN,$context_list)
+			;
+		
+		list($results, $null) = DAO_Snippet::search(
+			array(
+				SearchFields_Snippet::TITLE,
+				SearchFields_Snippet::USE_HISTORY_MINE,
+			),
+			$params,
+			25,
+			0,
+			SearchFields_Snippet::USE_HISTORY_MINE,
+			false,
+			false
+		);
+
+		foreach($results AS $row){
+			$entry = new stdClass();
+			$entry->label = sprintf("%s -- used %s",
+				$row[SearchFields_Snippet::TITLE],
+				((1 != $row[SearchFields_Snippet::USE_HISTORY_MINE]) ? (intval($row[SearchFields_Snippet::USE_HISTORY_MINE]) . ' times') : 'once')
+			);
+			$entry->value = $row[SearchFields_Snippet::ID];
+			$entry->context = $row[SearchFields_Snippet::CONTEXT];
+			$list[] = $entry;
+		}
+		
+		return $list;
 	}
 	
 	function getContext($snippet, &$token_labels, &$token_values, $prefix=null) {

@@ -43,7 +43,25 @@ class DevblocksExtension {
 };
 
 class Exception_Devblocks extends Exception {};
+
 class Exception_DevblocksAjaxError extends Exception_Devblocks {};
+
+class Exception_DevblocksAjaxValidationError extends Exception_Devblocks {
+	private $_field_name = null;
+	
+	function __construct($message=null, $field_name=null) {
+		parent::__construct($message);
+		$this->_field_name = $field_name;
+	}
+	
+	/**
+	 * 
+	 * @return string
+	 */
+	function getFieldName() {
+		return $this->_field_name;
+	}
+};
 
 interface IDevblocksHandler_Session {
 	static function open($save_path, $session_name);
@@ -57,7 +75,7 @@ interface IDevblocksHandler_Session {
 };
 
 interface IDevblocksContextPeek {
-	function renderPeekPopup($context_id=0, $view_id='');
+	function renderPeekPopup($context_id=0, $view_id='', $edit=false);
 }
 
 interface IDevblocksContextImport {
@@ -68,6 +86,10 @@ interface IDevblocksContextImport {
 
 interface IDevblocksContextProfile {
 	function profileGetUrl($context_id);
+}
+
+interface IDevblocksContextAutocomplete {
+	function autocomplete($term);
 }
 
 abstract class Extension_DevblocksContext extends DevblocksExtension {
@@ -134,21 +156,94 @@ abstract class Extension_DevblocksContext extends DevblocksExtension {
 
 		return $contexts;
 	}
-
-	public static function getByAlias($alias, $as_instance=false) {
+	
+	public static function getAliasesForAllContexts() {
+		$cache = DevblocksPlatform::getCacheService();
+		
+		if(null !== ($results = $cache->load(DevblocksPlatform::CACHE_CONTEXT_ALIASES)))
+			return $results;
+		
 		$contexts = self::getAll(false);
-
+		$results = array();
+		
 		if(is_array($contexts))
 		foreach($contexts as $ctx_id => $ctx) { /* @var $ctx DevblocksExtensionManifest */
-			if(isset($ctx->params['alias']) && 0 == strcasecmp($ctx->params['alias'], $alias)) {
-				if($as_instance) {
-					return $ctx->createInstance();
-				} else {
-					return $ctx;
-				}
+			$ctx_aliases = self::getAliasesForContext($ctx);
+			
+			@$uri = $ctx_aliases['uri'];
+			
+			if(isset($ctx_aliases['aliases']) && is_array($ctx_aliases['aliases']))
+			foreach($ctx_aliases['aliases'] as $alias => $meta) {
+				// If this alias is already defined and it's not the priority URI for this context, skip
+				if(isset($results[$alias]) && $alias != $uri)
+					continue;
+				
+				$results[$alias] = $ctx_id;
 			}
 		}
+		
+		$cache->save($results, DevblocksPlatform::CACHE_CONTEXT_ALIASES);
+		return $results;
+	}
 
+	public static function getAliasesForContext(DevblocksExtensionManifest $ctx_manifest) {
+		@$names = $ctx_manifest->params['names'][0];
+		@$uri = $ctx_manifest->params['alias'];
+		
+		$results = array(
+			'singular' => '',
+			'plural' => '',
+			'singular_short' => '',
+			'plural_short' => '',
+			'uri' => $uri,
+			'aliases' => array(),
+		);
+		
+		if(!empty($uri))
+			$results['aliases'][$uri] = array('uri');
+		
+		if(is_array($names) && !empty($names))
+		foreach($names as $name => $meta) {
+			$name = mb_convert_case($name, MB_CASE_LOWER);
+			@$meta = explode(' ', $meta) ?: array();
+			
+			$is_plural = in_array('plural', $meta);
+			$is_short = in_array('short', $meta);
+			
+			if(!$is_plural && !$is_short && empty($results['singular']))
+				$results['singular'] = $name;
+			else if($is_plural && !$is_short && empty($results['plural']))
+				$results['plural'] = $name;
+			else if(!$is_plural && $is_short && empty($results['singular_short']))
+				$results['singular_short'] = $name;
+			else if($is_plural && $is_short && empty($results['plural_short']))
+				$results['plural_short'] = $name;
+			
+			$results['aliases'][$name] = $meta;
+		}
+		
+		if(empty($results['singular']))
+			$results['singular'] = mb_convert_case($ctx_manifest->name, MB_CASE_LOWER);
+		
+		return $results;
+	}
+	
+	/**
+	 * 
+	 * @param string $alias
+	 * @param bool $as_instance
+	 * @return Extension_DevblocksContext|DevblocksExtensionManifest
+	 */
+	public static function getByAlias($alias, $as_instance=false) {
+		$aliases = self::getAliasesForAllContexts();
+		
+		@$ctx_id = $aliases[$alias];
+		
+		// If this is a valid context, return it
+		if($ctx_id && false != ($ctx = DevblocksPlatform::getExtension($ctx_id, $as_instance))) {
+			return $ctx;
+		}
+		
 		return null;
 	}
 
@@ -312,7 +407,7 @@ abstract class Extension_DevblocksContext extends DevblocksExtension {
 	public function getSearchView($view_id=null) {
 		if(empty($view_id)) {
 			$view_id = sprintf("search_%s",
-				str_replace('.','_',DevblocksPlatform::strToPermalink($this->id))
+				str_replace('.','_',DevblocksPlatform::strToPermalink($this->id,'_'))
 			);
 		}
 
@@ -512,6 +607,9 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 	private $_labels = array();
 	private $_types = array();
 	private $_values = array();
+	
+	private $_conditions_cache = array();
+	private $_conditions_extensions_cache = array();
 
 	public static function getAll($as_instances=false) {
 		$events = DevblocksPlatform::getExtensions('devblocks.event', $as_instances);
@@ -719,6 +817,10 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 	function renderEventParams(Model_TriggerEvent $trigger=null) {}
 
 	function getConditions($trigger) {
+		if(isset($this->_conditions_cache[$trigger->id])) {
+			return $this->_conditions_cache[$trigger->id];
+		}
+		
 		$conditions = array(
 			'_calendar_availability' => array('label' => '(Calendar availability)', 'type' => ''),
 			'_custom_script' => array('label' => '(Custom script)', 'type' => ''),
@@ -752,6 +854,7 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 
 		DevblocksPlatform::sortObjects($conditions, '[label]');
 
+		$this->_conditions_cache[$trigger->id] = $conditions;
 		return $conditions;
 	}
 
@@ -855,7 +958,14 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 	function runCondition($token, $trigger, $params, DevblocksDictionaryDelegate $dict) {
 		$logger = DevblocksPlatform::getConsoleLog('Attendant');
 		$conditions = $this->getConditions($trigger);
-		$extensions = $this->getConditionExtensions($trigger);
+		
+		// Cache the extensions
+		if(!isset($this->_conditions_extensions_cache[$trigger->id])) {
+			$this->_conditions_extensions_cache[$trigger->id] = $this->getConditionExtensions($trigger);
+		}
+		
+		$extensions = @$this->_conditions_extensions_cache[$trigger->id] ?: array();
+		
 		$not = false;
 		$pass = true;
 
@@ -1233,7 +1343,7 @@ abstract class Extension_DevblocksEvent extends DevblocksExtension {
 
 	function getActions($trigger) { /* @var $trigger Model_TriggerEvent */
 		$actions = array(
-			'_create_calendar_event' => array('label' => '(Create a calendar event)'),
+			'_create_calendar_event' => array('label' => 'Create calendar event'),
 			'_get_links' => array('label' => '(Get links)'),
 			'_run_behavior' => array('label' => '(Run behavior)'),
 			'_schedule_behavior' => array('label' => '(Schedule behavior)'),
@@ -1945,6 +2055,29 @@ abstract class Extension_DevblocksSearchSchema extends DevblocksExtension {
 	public function getIndexMeta() {
 		$engine = $this->getEngine();
 		return $engine->getIndexMeta($this);
+	}
+	
+	protected function _getDictionariesFromModels(array $models, $context, array $keys=array()) {
+		$dicts = array();
+		
+		if(empty($models)) {
+			return array();
+		}
+		
+		foreach($models as $model_id => $model) {
+			$labels = array();
+			$values = array();
+			CerberusContexts::getContext($context, $model, $labels, $values, null, true, true);
+			$dicts[$model_id] = DevblocksDictionaryDelegate::instance($values);
+		}
+		
+		// Batch load extra keys
+		if(is_array($keys) && !empty($keys))
+		foreach($keys as $key) {
+			DevblocksDictionaryDelegate::bulkLazyLoad($dicts, $key);
+		}
+		
+		return $dicts;
 	}
 
 	abstract function getNamespace();

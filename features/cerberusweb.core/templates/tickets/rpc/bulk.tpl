@@ -33,7 +33,7 @@
 	<table cellspacing="0" cellpadding="2" width="100%">
 		{if $active_worker->hasPriv('core.ticket.actions.move')}
 		<tr>
-			<td width="0%" nowrap="nowrap">Move to:</td>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">Move to:</td>
 			<td width="100%"><select name="do_move">
 				<option value=""></option>
 				{foreach from=$group_buckets item=buckets key=groupId}
@@ -49,7 +49,7 @@
 		{/if}
 		
 		<tr>
-			<td width="0%" nowrap="nowrap" valign="top">Status:</td>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">Status:</td>
 			<td width="100%" valign="top">
 				<select name="do_status" onchange="$val=$(this).val();$waiting=$('#bulk{$view_id}_waiting');if($val==3 || $val==1){ $waiting.show(); } else { $waiting.hide(); }">
 					<option value=""></option>
@@ -82,7 +82,7 @@
 		
 		{if $active_worker->hasPriv('core.ticket.actions.spam')}
 		<tr>
-			<td width="0%" nowrap="nowrap">Spam:</td>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">Spam:</td>
 			<td width="100%"><select name="do_spam">
 				<option value=""></option>
 				<option value="1">Report Spam</option>
@@ -96,42 +96,44 @@
 		
 		{if 1}
 		<tr>
-			<td width="0%" nowrap="nowrap" valign="top">{'common.owner'|devblocks_translate|capitalize}:</td>
-			<td width="100%"><select name="do_owner">
-				<option value=""></option>
-				<option value="0">{'common.nobody'|devblocks_translate|lower}</option>
-				{foreach from=$workers item=owner key=owner_id}
-				<option value="{$owner_id}">{$owner->getName()}</option>
-				{/foreach}
-			</select>
-			<button type="button" onclick="$(this).prev('select[name=do_owner]').val('{$active_worker->id}');">me</button>
-			<button type="button" onclick="$(this).prevAll('select[name=do_owner]').val('0');">nobody</button>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">{'common.owner'|devblocks_translate|capitalize}:</td>
+			<td width="100%">
+				<button type="button" class="chooser-abstract" data-field-name="do_owner" data-context="{CerberusContexts::CONTEXT_WORKER}" data-single="true" data-query="" data-autocomplete="if-null"><span class="glyphicons glyphicons-search"></span></button>
+				<ul class="bubbles chooser-container"></ul>
 			</td>
 		</tr>
 		{/if}
 		
 		{if 1}
 		<tr>
-			<td width="0%" nowrap="nowrap" valign="top">{'contact_org.name'|devblocks_translate|capitalize}:</td>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">{'common.organization'|devblocks_translate|capitalize}:</td>
 			<td width="100%">
-				<input type="text" name="do_org" value="" style="width:98%;">
+				<button type="button" class="chooser-abstract" data-field-name="do_org" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-query="" data-autocomplete="if-null" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+				<ul class="bubbles chooser-container"></ul>
 			</td>
 		</tr>
 		{/if}
 		
-		{if $active_worker->hasPriv('core.watchers.assign') || $active_worker->hasPriv('core.watchers.unassign')}
+		{if $active_worker->hasPriv('core.watchers.assign')}
 		<tr>
-			<td width="0%" nowrap="nowrap" valign="top">{'common.watchers'|devblocks_translate|capitalize}:</td>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">Add watchers:</td>
 			<td width="100%">
-				{if $active_worker->hasPriv('core.watchers.assign')}
-				<button type="button" class="chooser-worker add"><span class="glyphicons glyphicons-search"></span></button>
-				<ul class="bubbles chooser-container" style="display:block;"></ul>
-				{/if}
-
-				{if $active_worker->hasPriv('core.watchers.unassign')}
-				<button type="button" class="chooser-worker remove"><span class="glyphicons glyphicons-search"></span></button>
-				<ul class="bubbles chooser-container" style="display:block;"></ul>
-				{/if}
+				<div>
+					<button type="button" class="chooser-abstract" data-field-name="do_watcher_add_ids[]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-query="isDisabled:n" data-autocomplete="true"><span class="glyphicons glyphicons-search"></span></button>
+					<ul class="bubbles chooser-container" style="display:block;"></ul>
+				</div>
+			</td>
+		</tr>
+		{/if}
+		
+		{if $active_worker->hasPriv('core.watchers.unassign')}
+		<tr>
+			<td width="0%" nowrap="nowrap" align="right" valign="top">Remove watchers:</td>
+			<td width="100%">
+				<div>
+					<button type="button" class="chooser-abstract" data-field-name="do_watcher_remove_ids[]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-query="isDisabled:n" data-autocomplete="true"><span class="glyphicons glyphicons-search"></span></button>
+					<ul class="bubbles chooser-container" style="display:block;"></ul>
+				</div>
 			</td>
 		</tr>
 		{/if}
@@ -187,19 +189,27 @@
 </fieldset>
 {/if}
 	
-<button type="button" onclick="genericAjaxPopupClose('peek');genericAjaxPost('formBatchUpdate','view{$view_id}');"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_changes'|devblocks_translate|capitalize}</button>
+<button type="button" class="submit"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_changes'|devblocks_translate|capitalize}</button>
 <br>
 </form>
 
 <script type="text/javascript">
-	$popup = genericAjaxPopupFetch('peek');
+$(function() {
+	var $popup = genericAjaxPopupFind('#formBatchUpdate');
+	
 	$popup.one('popup_open', function(event,ui) {
 		var $this = $(this);
 		var $frm = $('#formBatchUpdate');
 		
-		$this.dialog('option','title',"{'common.bulk_update'|devblocks_translate|capitalize|escape:'javascript' nofilter}");
+		$popup.dialog('option','title',"{'common.bulk_update'|devblocks_translate|capitalize|escape:'javascript' nofilter}");
 		
-		ajax.orgAutoComplete('#formBatchUpdate input:text[name=do_org]');
+		$popup.find('button.chooser-abstract').cerbChooserTrigger();
+		
+		$popup.find('button.submit').click(function() {
+			genericAjaxPost('formBatchUpdate', 'view{$view_id}', null, function() {
+				genericAjaxPopupClose($popup);
+			});
+		});
 		
 		$frm.find('button.chooser_file').each(function() {
 			ajax.chooserFile(this,'broadcast_file_ids');
@@ -219,16 +229,6 @@
 			$select.val('');
 		});
 		
-		$frm.find('button.chooser-worker').each(function() {
-			var $button = $(this);
-			var context = 'cerberusweb.contexts.worker';
-			
-			if($button.hasClass('remove'))
-				ajax.chooser(this, context, 'do_watcher_remove_ids', { autocomplete: true, autocomplete_class:'input_remove' } );
-			else
-				ajax.chooser(this, context, 'do_watcher_add_ids', { autocomplete: true, autocomplete_class:'input_add'} );
-		});
-		
 		// Text editor
 		
 		var markitupPlaintextSettings = $.extend(true, { }, markitupPlaintextDefaults);
@@ -245,10 +245,10 @@
 				var $li = $('<li style="margin-left:10px;"></li>');
 				
 				var $select = $('<select name="broadcast_html_template_id"></select>');
-				$select.append($('<option value="0"> - {'common.default'|devblocks_translate|lower|escape:'javascript'} -</option>'));
+				$select.append($('<option value="0"/>').text(' - {'common.default'|devblocks_translate|lower|escape:'javascript'} -'));
 				
 				{foreach from=$html_templates item=html_template}
-				var $option = $('<option value="{$html_template->id}">{$html_template->name|escape:'javascript'}</option>');
+				var $option = $('<option/>').attr('value','{$html_template->id}').text('{$html_template->name|escape:'javascript'}');
 				$select.append($option);
 				{/foreach}
 				
@@ -326,4 +326,5 @@
 				console.log(e);
 		}
 	});
+});
 </script>

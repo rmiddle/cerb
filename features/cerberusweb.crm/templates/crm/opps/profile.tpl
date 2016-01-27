@@ -54,22 +54,13 @@
 				<b>{$v.label|capitalize}:</b>
 				{if $v.is_closed}
 					{if $v.is_won}
-						<img src="{devblocks_url}c=resource&p=cerberusweb.crm&f=images/up_plus_gray.gif{/devblocks_url}" align="top" title="Won"> {'crm.opp.status.closed.won'|devblocks_translate}
+						<span style="color:rgb(0,120,0);font-weight:bold;"><span class="glyphicons glyphicons-circle-arrow-top" title="Won"></span> {'crm.opp.status.closed.won'|devblocks_translate}</span>
 					{else}
-						<img src="{devblocks_url}c=resource&p=cerberusweb.crm&f=images/down_minus_gray.gif{/devblocks_url}" align="top" title="Won"> {'crm.opp.status.closed.lost'|devblocks_translate}
+						<span style="color:rgb(150,0,0);font-weight:bold;"><span class="glyphicons glyphicons-circle-arrow-down" title="Lost"></span> {'crm.opp.status.closed.lost'|devblocks_translate}</span>
 					{/if}
 				{else}
 					{'crm.opp.status.open'|devblocks_translate}
 				{/if}
-			{elseif $k == 'lead'}
-				<b>{$v.label|capitalize}:</b>
-				{$v.address->getName()}
-				&lt;<a href="javascript:;" onclick="genericAjaxPopup('peek2','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&email={$v.address->email|escape:'url'}',null,false,'600');">{$v.address->email}</a>&gt;
-				<button id="btnOppAddyPeek" type="button" onclick="genericAjaxPopup('peek2','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&email={$v.address->email|escape:'url'}&view_id=',null,false,'600');" style="visibility:false;display:none;"></button>
-			{elseif $k == 'org'}
-				<b>{$v.label|capitalize}:</b>
-				<a href="javascript:;" onclick="genericAjaxPopup('peek2','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ORG}&context_id={$v.org->id}',null,false,'600');">{$v.org->name}</a>
-				<button id="btnOppOrgPeek" type="button" onclick="genericAjaxPopup('peek2','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ORG}&context_id={$v.org->id}&view_id=',null,false,'600');" style="visibility:false;display:none;"></button>
 			{else}
 				{include file="devblocks:cerberusweb.core::internal/custom_fields/profile_cell_renderer.tpl"}
 			{/if}
@@ -195,11 +186,4 @@ $(document).keypress(function(event) {
 {/if}
 </script>
 
-{$profile_scripts = Extension_ContextProfileScript::getExtensions(true, $page_context)}
-{if !empty($profile_scripts)}
-{foreach from=$profile_scripts item=renderer}
-	{if method_exists($renderer,'renderScript')}
-		{$renderer->renderScript($page_context, $page_context_id)}
-	{/if}
-{/foreach}
-{/if}
+{include file="devblocks:cerberusweb.core::internal/profiles/profile_common_scripts.tpl"}

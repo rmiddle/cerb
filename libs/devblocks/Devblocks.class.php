@@ -6,7 +6,7 @@ include_once(DEVBLOCKS_PATH . "api/services/bootstrap/cache.php");
 include_once(DEVBLOCKS_PATH . "api/services/bootstrap/database.php");
 include_once(DEVBLOCKS_PATH . "api/services/bootstrap/classloader.php");
 
-define('PLATFORM_BUILD', 2014032901);
+define('PLATFORM_BUILD', 2015101601);
 
 /**
  * A platform container for plugin/extension registries.
@@ -386,9 +386,9 @@ class DevblocksPlatform extends DevblocksEngine {
 			$parts = array_slice($parts, 0, $sections);
 		
 		// Pad versions with too few significant places
-		for($ctr=count($parts); $ctr < $sections; $ctr++)
-			array_unshift($parts, '0');
-		
+		while(count($parts) < $sections)
+			array_push($parts, '0');
+			
 		$v = 0;
 		$multiplier = 1;
 		foreach(array_reverse($parts) as $part) {
@@ -430,7 +430,7 @@ class DevblocksPlatform extends DevblocksEngine {
 				break;
 		}
 		
-		return ($not) ? !$pass : $pass;;
+		return ($not) ? !$pass : $pass;
 	}
 	
 	/**
@@ -1130,18 +1130,39 @@ class DevblocksPlatform extends DevblocksEngine {
 		
 		return $feed;
 	}
+	
+	static function strEscapeHtml($string) {
+		if(empty($string))
+			return '';
+		
+		return htmlentities($string, ENT_QUOTES, LANG_CHARSET_CODE);
+	}
 
+	static function strToInitials($string) {
+		$strings = explode(' ', $string);
+		
+		// Two parts max
+		if(count($strings) > 2)
+			$strings = array(reset($strings), end($strings));
+		
+		array_walk($strings, function(&$string) {
+			$string = substr($string,0,1);
+		});
+		
+		return implode('', $strings);
+	}
+	
 	/**
 	 * Returns a string as alphanumerics delimited by underscores.
 	 * For example: "Devs: 1000 Ways to Improve Sales" becomes
-	 * "devs_1000_ways_to_improve_sales", which is suitable for
+	 * "devs-1000-ways-to-improve-sales", which is suitable for
 	 * displaying in a URL of a blog, faq, etc.
 	 *
 	 * @param string $str
 	 * @return string
 	 * @test DevblocksPlatformTest
 	 */
-	static function strToPermalink($string) {
+	static function strToPermalink($string, $spaces_as='-') {
 		if(empty($string))
 			return '';
 		
@@ -1152,12 +1173,12 @@ class DevblocksPlatform extends DevblocksEngine {
 		$string = preg_replace('#[\'\"]#', '', $string);
 		
 		// Strip all punctuation to underscores
-		$string = preg_replace('#[^a-zA-Z0-9\+\.\-_\(\)]#', '_', $string);
+		$string = preg_replace('#[^a-zA-Z0-9\+\.\-_\(\)]#', $spaces_as, $string);
 			
 		// Collapse all underscores to singles
-		$string = preg_replace('#__+#', '_', $string);
+		$string = preg_replace(('#' . $spaces_as . $spaces_as . '+#'), $spaces_as, $string);
 		
-		return rtrim($string,'_');
+		return rtrim($string, $spaces_as);
 	}
 	
 	/**
@@ -1353,6 +1374,9 @@ class DevblocksPlatform extends DevblocksEngine {
 		if(empty($string))
 			return array();
 		
+		if(!$keep_blanks)
+			$string = rtrim($string, ', ');
+		
 		$tokens = explode(',', $string);
 
 		if(!is_array($tokens))
@@ -1534,6 +1558,7 @@ class DevblocksPlatform extends DevblocksEngine {
 			
 		} else { // All
 			$cache->remove(self::CACHE_ACL);
+			$cache->remove(self::CACHE_CONTEXT_ALIASES);
 			$cache->remove(self::CACHE_PLUGINS);
 			$cache->remove(self::CACHE_ACTIVITY_POINTS);
 			$cache->remove(self::CACHE_EVENT_POINTS);
@@ -2250,6 +2275,29 @@ class DevblocksPlatform extends DevblocksEngine {
 		$copy = $array;
 		self::_deepCloneArray($copy);
 		return $copy;
+	}
+	
+	static function extractArrayValues($array, $key, $only_unique=true) {
+		if(empty($key) || !is_array($array))
+			return array();
+		
+		// Convert any nested objects to arrays
+		foreach($array as $k => $v) {
+			if(is_object($v))
+				$array[$k] = json_decode(json_encode($v), true);
+		}
+		
+		$results = array();
+		
+		array_walk_recursive($array, function($v, $k) use ($key, &$results) {
+			if(0 == strcasecmp($key, $k))
+				$results[] = $v;
+		});
+		
+		if($only_unique)
+			$results = array_unique($results);
+		
+		return $results;
 	}
 	
 	/**

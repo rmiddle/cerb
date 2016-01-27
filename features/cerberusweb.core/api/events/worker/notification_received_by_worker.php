@@ -155,7 +155,7 @@ class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
 	function getActionExtensions(Model_TriggerEvent $trigger) {
 		$actions = array(
 			'send_email_owner' => array('label' => 'Send email to notified worker'),
-			'create_task' => array('label' =>'Create a task'),
+			'create_task' => array('label' =>'Create task'),
 			'mark_read' => array('label' =>'Mark read'),
 		);
 		return $actions;
@@ -187,7 +187,6 @@ class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
 				if(false == ($va = $trigger->getVirtualAttendant()))
 					break;
 				
-				// [TODO] Refactor this to a simple email 'To:' input box
 				$addresses = DAO_AddressToWorker::getByWorker($va->owner_context_id);
 				$tpl->assign('addresses', $addresses);
 				

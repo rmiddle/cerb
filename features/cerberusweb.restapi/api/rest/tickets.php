@@ -648,7 +648,7 @@ class ChRest_Tickets extends Extension_RestController implements IExtensionRestC
 		if(null == ($context_ext = Extension_DevblocksContext::get(CerberusContexts::CONTEXT_TICKET)))
 			$this->error(self::ERRNO_CUSTOM, "The ticket context could not be loaded");
 		
-		if(false === $context_ext->authorize($message->id, $worker))
+		if(false === $context_ext->authorize($message->ticket_id, $worker))
 			$this->error(self::ERRNO_CUSTOM, "You do not have write access to this ticket");
 		
 		if(!empty($file_ids))
@@ -779,7 +779,7 @@ class ChRest_Tickets extends Extension_RestController implements IExtensionRestC
 			$this->error(self::ERRNO_ACL, 'Access denied to delete tickets in this group.');
 		
 		// Worker address exists
-		if(null === ($address = CerberusApplication::hashLookupAddress($worker->email,true)))
+		if(null === ($address = $worker->getEmailModel()))
 			$this->error(self::ERRNO_CUSTOM, 'Your worker does not have a valid e-mail address.');
 		
 		// Required fields

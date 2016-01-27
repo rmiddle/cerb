@@ -45,7 +45,7 @@
 			</td>
 		</tr>
 		<tr>
-			<td width="0%" nowrap="nowrap" valign="top" align="right">{'contact_org.name'|devblocks_translate}:&nbsp;</td>
+			<td width="0%" nowrap="nowrap" valign="top" align="right">{'common.organization'|devblocks_translate|capitalize}:&nbsp;</td>
 			<td width="100%">
 				<input type="text" name="org_name" value="{$draft->params.org_name}" style="border:1px solid rgb(180,180,180);padding:2px;width:98%;" placeholder="(optional) Link this ticket to an organization for suggested recipients">
 			</td>
@@ -110,7 +110,7 @@
 #signature
 #cut{/if}</textarea>
 
-				<div class="cerb-form-hint" style="display:block;">(Use #commands to perform additional actions)</div>
+				<b>(Use #commands to perform additional actions)</b>
 			</td>
 		</tr>
 	</table>
@@ -127,9 +127,9 @@
 	</div>
 	
 	<div style="margin-top:10px;">
-		<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+O)"{/if}><input type="radio" name="closed" value="0" class="status_open" {if (empty($draft) && 'open'==$defaults.status) || (!empty($draft) && $draft->params.closed==0)}checked="checked"{/if} onclick="toggleDiv('divComposeClosed{$random}','none');">{'status.open'|devblocks_translate}</label>
-		<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+W)"{/if}><input type="radio" name="closed" value="2" class="status_waiting" {if (empty($draft) && 'waiting'==$defaults.status) || (!empty($draft) && $draft->params.closed==2)}checked="checked"{/if} onclick="toggleDiv('divComposeClosed{$random}','block');">{'status.waiting'|devblocks_translate}</label>
-		{if $active_worker->hasPriv('core.ticket.actions.close')}<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+C)"{/if}><input type="radio" name="closed" value="1" class="status_closed" {if (empty($draft) && 'closed'==$defaults.status) || (!empty($draft) && $draft->params.closed==1)}checked="checked"{/if} onclick="toggleDiv('divComposeClosed{$random}','block');">{'status.closed'|devblocks_translate}</label>{/if}
+		<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+O)"{/if}><input type="radio" name="closed" value="0" class="status_open" {if (empty($draft) && 'open'==$defaults.status) || (!empty($draft) && $draft->params.closed==0)}checked="checked"{/if} onclick="toggleDiv('divComposeClosed{$random}','none');"> {'status.open'|devblocks_translate}</label>
+		<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+W)"{/if}><input type="radio" name="closed" value="2" class="status_waiting" {if (empty($draft) && 'waiting'==$defaults.status) || (!empty($draft) && $draft->params.closed==2)}checked="checked"{/if} onclick="toggleDiv('divComposeClosed{$random}','block');"> {'status.waiting'|devblocks_translate}</label>
+		{if $active_worker->hasPriv('core.ticket.actions.close')}<label {if $pref_keyboard_shortcuts}title="(Ctrl+Shift+C)"{/if}><input type="radio" name="closed" value="1" class="status_closed" {if (empty($draft) && 'closed'==$defaults.status) || (!empty($draft) && $draft->params.closed==1)}checked="checked"{/if} onclick="toggleDiv('divComposeClosed{$random}','block');"> {'status.closed'|devblocks_translate}</label>{/if}
 		
 		<div id="divComposeClosed{$random}" style="display:{if (empty($draft) && 'open'==$defaults.status) || (!empty($draft) && $draft->params.closed==0)}none{else}block{/if};margin-top:5px;margin-left:10px;">
 			<b>{'display.reply.next.resume'|devblocks_translate}</b><br>
@@ -175,7 +175,7 @@
 						<li>
 							<input type="hidden" name="add_watcher_ids[]" value="{$watcher_id}">
 							{$watcher->getName()}
-							<a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a>
+							<a href="javascript:;" onclick="$(this).parent().remove();"><span class="glyphicons glyphicons-circle-remove"></span></a>
 						</li>
 						{/if}
 					{/foreach}
@@ -198,7 +198,7 @@
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/peek_custom_fieldsets.tpl" context=CerberusContexts::CONTEXT_TICKET bulk=false}
 
-<fieldset class="peek">
+<fieldset class="peek compose-attachments">
 	<legend>{'common.attachments'|devblocks_translate|capitalize}</legend>
 	<button type="button" class="chooser_file"><span class="glyphicons glyphicons-paperclip"></span></button>
 	<ul class="bubbles chooser-container">
@@ -206,7 +206,7 @@
 	{foreach from=$draft->params.file_ids item=file_id}
 		{$file = DAO_Attachment::get($file_id)}
 		{if !empty($file)}
-			<li><input type="hidden" name="file_ids[]" value="{$file_id}">{$file->display_name} ({$file->storage_size} bytes) <a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a></li>
+			<li><input type="hidden" name="file_ids[]" value="{$file_id}">{$file->display_name} ({$file->storage_size} bytes) <a href="javascript:;" onclick="$(this).parent().remove();"><span class="glyphicons glyphicons-circle-remove"></span></a></li>
 		{/if} 
 	{/foreach}
 	{/if}
@@ -239,12 +239,17 @@
 		});
 		
 		$frm.find('button.chooser_watcher').each(function() {
-			ajax.chooser(this,'cerberusweb.contexts.worker','add_watcher_ids', { autocomplete:true });
+			ajax.chooser(this,'cerberusweb.contexts.worker','add_watcher_ids[]', { autocomplete:true });
 		});
 		
 		$frm.find('button.chooser_file').each(function() {
 			ajax.chooserFile(this,'file_ids');
 		});
+		
+		// Drag/drop attachments
+		
+		var $attachments = $frm.find('fieldset.compose-attachments');
+		$attachments.cerbAttachmentsDropZone();
 		
 		// Text editor
 		
@@ -267,10 +272,10 @@
 				var $li = $('<li style="margin-left:10px;"></li>');
 				
 				var $select = $('<select name="html_template_id"></select>');
-				$select.append($('<option value="0"> - {'common.default'|devblocks_translate|lower|escape:'javascript'} -</option>'));
+				$select.append($('<option value="0"/>').text(' - {'common.default'|devblocks_translate|lower|escape:'javascript'} -'));
 				
 				{foreach from=$html_templates item=html_template}
-				var $option = $('<option value="{$html_template->id}">{$html_template->name|escape:'javascript'}</option>');
+				var $option = $('<option/>').attr('value','{$html_template->id}').text('{$html_template->name|escape:'javascript'}');
 				{if $draft && $draft->params.html_template_id == $html_template->id}
 				$option.attr('selected', 'selected');
 				{/if}
@@ -769,7 +774,7 @@
 			
 			// If we have a Cc:/Bcc: but no To:
 			if($to.val().length == 0 && ($cc.val().length > 0 || $bcc.val().length > 0)) {
-				$status.html("A 'To:' address is required when using 'Cc:' and 'Bcc:'.").addClass('error').fadeIn();
+				$status.text("A 'To:' address is required when using 'Cc:' and 'Bcc:'.").addClass('error').fadeIn();
 				return false;
 			}
 			

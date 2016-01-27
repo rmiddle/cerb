@@ -1,8 +1,40 @@
 {$page_context = CerberusContexts::CONTEXT_ORG}
 {$page_context_id = $contact->id}
 
+<div style="float:left;margin-right:10px;">
+	<img src="{devblocks_url}c=avatars&context=org&context_id={$contact->id}{/devblocks_url}?v={$contact->updated}" style="height:75px;width:75px;border-radius:5px;">
+</div>
+
 <div style="float:left;">
 	<h1>{$contact->name}</h1>
+	
+	<div class="cerb-profile-toolbar">
+		<form class="toolbar" action="{devblocks_url}{/devblocks_url}" method="post" style="margin-bottom:5px;">
+			<input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
+			
+			<!-- Toolbar -->
+			<span>
+			{$object_watchers = DAO_ContextLink::getContextLinks($page_context, array($page_context_id), CerberusContexts::CONTEXT_WORKER)}
+			{include file="devblocks:cerberusweb.core::internal/watchers/context_follow_button.tpl" context=$page_context context_id=$page_context_id full=true}
+			</span>
+			
+			<!-- Macros -->
+			{devblocks_url assign=return_url full=true}c=profiles&type=org&id={$page_context_id}-{$contact->name|devblocks_permalink}{/devblocks_url}
+			{include file="devblocks:cerberusweb.core::internal/macros/display/button.tpl" context=$page_context context_id=$page_context_id macros=$macros return_url=$return_url}		
+			
+			<!-- Edit -->
+			<button type="button" id="btnDisplayOrgEdit" title="{'common.edit'|devblocks_translate|capitalize} (E)" class="cerb-peek-trigger" data-context="{$page_context}" data-context-id="{$page_context_id}" data-edit="true"><span class="glyphicons glyphicons-cogwheel"></span></button>
+		</form>
+		
+		{if $pref_keyboard_shortcuts}
+		<small>
+			{'common.keyboard'|devblocks_translate|lower}:
+			(<b>e</b>) {'common.edit'|devblocks_translate|lower}
+			{if !empty($macros)}(<b>m</b>) {'common.macros'|devblocks_translate|lower} {/if}
+			(<b>1-9</b>) change tab
+		</small> 
+		{/if}
+	</div>
 </div>
 
 <div style="float:right;">
@@ -10,38 +42,10 @@
 	{include file="devblocks:cerberusweb.core::search/quick_search.tpl" view=$ctx->getSearchView() return_url="{devblocks_url}c=search&context={$ctx->manifest->params.alias}{/devblocks_url}"}
 </div>
 
-<div style="clear:both;"></div>
-
-<div class="cerb-profile-toolbar">
-	<form class="toolbar" action="{devblocks_url}{/devblocks_url}" method="post" style="margin-bottom:5px;">
-		<input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
-		
-		<!-- Toolbar -->
-		<span>
-		{$object_watchers = DAO_ContextLink::getContextLinks($page_context, array($page_context_id), CerberusContexts::CONTEXT_WORKER)}
-		{include file="devblocks:cerberusweb.core::internal/watchers/context_follow_button.tpl" context=$page_context context_id=$page_context_id full=true}
-		</span>
-		
-		<!-- Macros -->
-		{devblocks_url assign=return_url full=true}c=profiles&type=org&id={$page_context_id}-{$contact->name|devblocks_permalink}{/devblocks_url}
-		{include file="devblocks:cerberusweb.core::internal/macros/display/button.tpl" context=$page_context context_id=$page_context_id macros=$macros return_url=$return_url}		
-		
-		<!-- Edit -->
-		<button type="button" id="btnDisplayOrgEdit" title="{'common.edit'|devblocks_translate|capitalize}"><span class="glyphicons glyphicons-cogwheel"></span></button>
-	</form>
-	
-	{if $pref_keyboard_shortcuts}
-	<small>
-		{'common.keyboard'|devblocks_translate|lower}:
-		(<b>e</b>) {'common.edit'|devblocks_translate|lower}
-		{if !empty($macros)}(<b>m</b>) {'common.macros'|devblocks_translate|lower} {/if}
-		(<b>1-9</b>) change tab
-	</small> 
-	{/if}
-</div>
+<div style="clear:both;padding-top:5px;"></div>
 
 <fieldset class="properties">
-	<legend>{'contact_org.name'|devblocks_translate|capitalize}</legend>
+	<legend>{'common.organization'|devblocks_translate|capitalize}</legend>
 	
 	<div style="margin-left:15px;">
 
@@ -61,6 +65,11 @@
 	
 	<br clear="all">
 	</div>
+	
+	<div style="margin-left:15px;margin-top:5px;">
+		<button type="button" class="cerb-search-trigger" data-context="{CerberusContexts::CONTEXT_CONTACT}" data-query="org.id:{$page_context_id}"><div class="badge-count">{$activity_counts.contacts|default:0}</div> {'common.contacts'|devblocks_translate|capitalize}</button>
+		<button type="button" class="cerb-search-trigger" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-query="org.id:{$page_context_id}"><div class="badge-count">{$activity_counts.emails|default:0}</div> {'common.email_addresses'|devblocks_translate|capitalize}</button>
+	</div>
 </fieldset>
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/profile_fieldsets.tpl" properties=$properties_custom_fieldsets}
@@ -77,13 +86,12 @@
 
 <div style="clear:both;" id="profileOrgTabs">
 	<ul>
-		{$tabs = [activity,comments,links,history,people]}
+		{$tabs = [activity,comments,links,history]}
 		
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabActivityLog&scope=target&point={$point}&context={$page_context}&context_id={$page_context_id}{/devblocks_url}">{'common.activity_log'|devblocks_translate|capitalize}</a></li>
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabContextComments&point={$point}&context=cerberusweb.contexts.org&id={$page_context_id}{/devblocks_url}">{'common.comments'|devblocks_translate|capitalize} <div class="tab-badge">{DAO_Comment::count($page_context, $page_context_id)|default:0}</div></a></li>
 		<li><a href="{devblocks_url}ajax.php?c=internal&a=showTabContextLinks&point={$point}&context=cerberusweb.contexts.org&id={$page_context_id}{/devblocks_url}">{'common.links'|devblocks_translate} <div class="tab-badge">{DAO_ContextLink::count($page_context, $page_context_id)|default:0}</div></a></li>
 		<li><a href="{devblocks_url}ajax.php?c=contacts&a=showTabMailHistory&point={$point}&org_id={$page_context_id}{/devblocks_url}">{'addy_book.org.tabs.mail_history'|devblocks_translate}</a></li>
-		<li><a href="{devblocks_url}ajax.php?c=contacts&a=showTabPeople&point={$point}&org={$page_context_id}{/devblocks_url}">{'addy_book.org.tabs.people'|devblocks_translate} <div class="tab-badge">{$people_total}</div></a></li>
 
 		{foreach from=$tab_manifests item=tab_manifest}
 			{$tabs[] = $tab_manifest->params.uri}
@@ -100,13 +108,23 @@ $(function() {
 	
 	var tabs = $("#profileOrgTabs").tabs(tabOptions);
 
-	$('#btnDisplayOrgEdit').bind('click', function() {
-		$popup = genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$page_context}&context_id={$page_context_id}',null,false,'550');
-		$popup.one('org_save', function(event) {
-			event.stopPropagation();
-			document.location.href = '{devblocks_url}c=profiles&type=org&id={$page_context_id}{/devblocks_url}';
-		});
-	})
+	// Edit
+	
+	$('#btnDisplayOrgEdit')
+		.cerbPeekTrigger()
+		.on('cerb-peek-opened', function(e) {
+		})
+		.on('cerb-peek-saved', function(e) {
+			e.stopPropagation();
+			document.location.reload();
+		})
+		.on('cerb-peek-deleted', function(e) {
+			document.location.href = '{devblocks_url}{/devblocks_url}';
+			
+		})
+		.on('cerb-peek-closed', function(e) {
+		})
+		;
 });
 
 {include file="devblocks:cerberusweb.core::internal/macros/display/menu_script.tpl" selector_button=null selector_menu=null}
@@ -162,11 +180,4 @@ $(document).keypress(function(event) {
 {/if}
 </script>
 
-{$profile_scripts = Extension_ContextProfileScript::getExtensions(true, $page_context)}
-{if !empty($profile_scripts)}
-{foreach from=$profile_scripts item=renderer}
-	{if method_exists($renderer,'renderScript')}
-		{$renderer->renderScript($page_context, $page_context_id)}
-	{/if}
-{/foreach}
-{/if}
+{include file="devblocks:cerberusweb.core::internal/profiles/profile_common_scripts.tpl"}

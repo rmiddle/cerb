@@ -4,11 +4,13 @@
   <tbody>
 	<tr>
 	  <td>
-		{$sender_id = $message->address_id}
-		{if isset($message_senders.$sender_id)}
+			{$sender_id = $message->address_id}
+			{if isset($message_senders.$sender_id)}
 			{$sender = $message_senders.$sender_id}
 			{$sender_org_id = $sender->contact_org_id}
 			{$sender_org = $message_sender_orgs.$sender_org_id}
+			{$sender_contact = $sender->getContact()}
+			{$sender_worker = $message->getWorker()}
 			{$is_outgoing = $message->is_outgoing}
 			{$is_not_sent = $message->is_not_sent}
 
@@ -16,56 +18,54 @@
 				<button id="btnMsgMax{$message->id}" style="display:none;visibility:hidden;" onclick="genericAjaxGet('{$message->id}t','c=display&a=getMessage&id={$message->id}');"></button>
 				<button id="btnMsgMin{$message->id}" style="display:none;visibility:hidden;" onclick="genericAjaxGet('{$message->id}t','c=display&a=getMessage&id={$message->id}&hide=1');"></button>
 			{if !$expanded}
-				<a href="javascript:;" onclick="$('#btnMsgMax{$message->id}').click();">{'common.maximize'|devblocks_translate|lower}</a>
+				<button type="button" onclick="$('#btnMsgMax{$message->id}').click();" title="{'common.maximize'|devblocks_translate|lower}"><span class="glyphicons glyphicons-resize-full"></span></button>
 			{else}
-				<a href="javascript:;" onclick="$('#btnMsgMin{$message->id}').click();">{'common.minimize'|devblocks_translate|lower}</a>
+				<button type="button" onclick="$('#btnMsgMin{$message->id}').click();" title="{'common.minimize'|devblocks_translate|lower}"><span class="glyphicons glyphicons-resize-small"></span></button>
 			{/if}
 			</div>
 		
-			<span class="tag" style="{if !$is_outgoing}color:rgb(185,50,40);{else}color:rgb(100,140,25);{/if}">{if $is_outgoing}{if $is_not_sent}{'mail.saved'|devblocks_translate|lower}{else}{'mail.sent'|devblocks_translate|lower}{/if}{else}{'mail.received'|devblocks_translate|lower}{/if}</span>
+			<span class="tag" style="color:white;margin-right:5px;{if !$is_outgoing}background-color:rgb(185,50,40);{else}background-color:rgb(100,140,25);{/if}">{if $is_outgoing}{if $is_not_sent}{'mail.saved'|devblocks_translate|lower}{else}{'mail.sent'|devblocks_translate|lower}{/if}{else}{'mail.received'|devblocks_translate|lower}{/if}</span>
 			
-			{if $expanded}
-			<b style="font-size:1.3em;">
-			{if $message->worker_id && isset($workers.{$message->worker_id})}
-				{$msg_worker = $workers.{$message->worker_id}}
-				<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&email={$msg_worker->email|escape:'url'}', null, false, '500', function() { C4_ReloadMessageOnSave('{$message->id}', {if $expanded}true{else}false{/if}); } );" title="{$sender->email}">{if 0 != strlen($msg_worker->getName())}{$msg_worker->getName()}{else}&lt;{$msg_worker->email}&gt;{/if}</a>
+			{if $sender_worker}
+				<a href="javascript:;" class="cerb-peek-trigger" style="font-weight:bold;{if $expanded}font-size:1.3em;{/if}" data-context="{CerberusContexts::CONTEXT_WORKER}" data-context-id="{$sender_worker->id}">{if 0 != strlen($sender_worker->getName())}{$sender_worker->getName()}{else}&lt;{$sender_worker->getEmailString()}&gt;{/if}</a>
 			{else}
-				<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&context_id={$sender_id}', null, false, '500', function() { C4_ReloadMessageOnSave('{$message->id}', {if $expanded}true{else}false{/if}); } );" title="{$sender->email}">{if 0 != strlen($sender->getName())}{$sender->getName()}{else}&lt;{$sender->email}&gt;{/if}</a>
-			{/if}
-			</b>
-			{else}
-			<b>
-			{if $message->worker_id && isset($workers.{$message->worker_id})}
-				{$msg_worker = $workers.{$message->worker_id}}
-				<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&email={$msg_worker->email|escape:'url'}', null, false, '500', function() { C4_ReloadMessageOnSave('{$message->id}', {if $expanded}true{else}false{/if}); } );">{if 0 != strlen($msg_worker->getName())}{$msg_worker->getName()}{else}&lt;{$msg_worker->email}&gt;{/if}</a>
-			{else}
-				<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&context_id={$sender_id}', null, false, '500', function() { C4_ReloadMessageOnSave('{$message->id}', {if $expanded}true{else}false{/if}); } );">{if 0 != strlen($sender->getName())}{$sender->getName()}{else}&lt;{$sender->email}&gt;{/if}</a>
-			{/if}
-			</b>
-			{/if}
-			
-			&nbsp;
-			
-			{if $sender_org_id}
-				<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ORG}&context_id={$sender_org_id}', null, false, '600', function() { C4_ReloadMessageOnSave('{$message->id}',{if $expanded}true{else}false{/if}); } );">{$sender_org->name}</a>
-			{else}{* No org *}
-				{if $active_worker->hasPriv('core.addybook.addy.actions.update')}<a href="javascript:;" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_ADDRESS}&context_id={$sender_id}', null, false, '500', function() { C4_ReloadMessageOnSave('{$message->id}', {if $expanded}true{else}false{/if}); } );"><span style="background-color:rgb(255,255,194);">{'display.convo.set_org'|devblocks_translate|lower}</span></a>{/if}
+				{if $sender_contact}
+					{$sender_org = $sender_contact->getOrg()}
+					<a href="javascript:;" class="cerb-peek-trigger" style="font-weight:bold;{if $expanded}font-size:1.3em;{/if}" data-context="{CerberusContexts::CONTEXT_CONTACT}" data-context-id="{$sender_contact->id}">{$sender_contact->getName()}</a>
+					&nbsp;
+					{if $sender_contact->title}
+						{$sender_contact->title}
+					{/if}
+					{if $sender_contact->title && $sender_org} at {/if}
+					{if $sender_org}
+						<a href="javascript:;" class="cerb-peek-trigger no-underline" data-context="{CerberusContexts::CONTEXT_ORG}" data-context-id="{$sender_org->id}"><b>{$sender_org->name}</b></a>
+					{/if}
+				{else}
+				<a href="javascript:;" class="cerb-peek-trigger" style="font-weight:bold;{if $expanded}font-size:1.3em;{/if}" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-context-id="{$sender_id}">&lt;{$sender->email}&gt;</a>
+				{/if}
 			{/if}
 			
-			{$extensions = DevblocksPlatform::getExtensions('cerberusweb.message.badge', true)}
-			{foreach from=$extensions item=extension}
-				{$extension->render($message)}
-			{/foreach}
+			<div style="float:left;margin:0px 5px 5px 0px;">
+				{if $sender_worker}
+					<img src="{devblocks_url}c=avatars&context=worker&context_id={$sender_worker->id}{/devblocks_url}?v={$sender_worker->updated}" style="height:64px;width:64px;border-radius:64px;">
+				{else}
+					{if $sender_contact}
+					<img src="{devblocks_url}c=avatars&context=contact&context_id={$sender_contact->id}{/devblocks_url}?v={$sender_contact->updated_at}" style="height:64px;width:64px;border-radius:64px;">
+					{else}
+					<img src="{devblocks_url}c=avatars&context=address&context_id={$sender->id}{/devblocks_url}?v={$sender->updated}" style="height:64px;width:64px;border-radius:64px;">
+					{/if}
+				{/if}
+			</div>
 			
 			<br>
 		{/if}
 	  
-	  <div id="{$message->id}sh" style="display:block;">
+	  <div id="{$message->id}sh" style="display:block;margin-top:2px;">
 	  {if isset($headers.from)}<b>{'message.header.from'|devblocks_translate|capitalize}:</b> {$headers.from|escape|nl2br nofilter}<br>{/if}
 	  {if isset($headers.to)}<b>{'message.header.to'|devblocks_translate|capitalize}:</b> {$headers.to|truncate:255|escape|nl2br nofilter}<br>{/if}
 	  {if isset($headers.cc)}<b>{'message.header.cc'|devblocks_translate|capitalize}:</b> {$headers.cc|truncate:255|escape|nl2br nofilter}<br>{/if}
-	  {if isset($headers.bcc)}<b>{'message.header.bcc'|devblocks_translate|capitalize}:</b> {$headers.bcc|truncate|escape|nl2br nofilter}<br>{/if}	  
-	  {if isset($headers.subject)}<b>{'message.header.subject'|devblocks_translate|capitalize}:</b> {$headers.subject|escape|nl2br nofilter}<br>{/if}
+	  {if isset($headers.bcc)}<b>{'message.header.bcc'|devblocks_translate|capitalize}:</b> {$headers.bcc|truncate|escape|nl2br nofilter}<br>{/if}
+	  {if isset($headers.subject)}<b>{'message.header.subject'|devblocks_translate|capitalize}:</b> {$headers.subject|truncate:255|escape nofilter}<br>{/if}
 
   	<b>{'message.header.date'|devblocks_translate|capitalize}:</b> {$message->created_date|devblocks_date} (<abbr title="{$headers.date}">{$message->created_date|devblocks_prettytime}</abbr>)
 	  	
@@ -86,7 +86,7 @@
 	  
 	  {if $expanded}
 	  <div style="margin:2px;margin-left:10px;">
-	  	 <a href="javascript:;" class="brief" onclick="if($(this).hasClass('brief')) { $('#{$message->id}sh').hide();$('#{$message->id}h').show();$(this).html('{'display.convo.brief_headers'|devblocks_translate|lower}').removeClass('brief'); } else { $('#{$message->id}sh').show();$('#{$message->id}h').hide();$(this).html('{'display.convo.full_headers'|devblocks_translate|lower}').addClass('brief'); } ">{'display.convo.full_headers'|devblocks_translate|lower}</a>
+	  	 <a href="javascript:;" class="brief" onclick="if($(this).hasClass('brief')) { $('#{$message->id}sh').hide();$('#{$message->id}h').show();$(this).text('{'display.convo.brief_headers'|devblocks_translate|lower}').removeClass('brief'); } else { $('#{$message->id}sh').show();$('#{$message->id}h').hide();$(this).text('{'display.convo.full_headers'|devblocks_translate|lower}').addClass('brief'); } ">{'display.convo.full_headers'|devblocks_translate|lower}</a>
 	  	 | <a href="#{$message->id}act">{'display.convo.skip_to_bottom'|devblocks_translate|lower}</a>
 	  	 | <a href="{devblocks_url}c=profiles&type=ticket&mask={$ticket->mask}&jump=message&jump_id={$message->id}{/devblocks_url}">{'common.permalink'|devblocks_translate|lower}</a>
 	  </div>
@@ -136,7 +136,7 @@
 					  	{if $active_worker->hasPriv('core.display.actions.note')}<button type="button" onclick="displayAddNote('{$message->id}');"><span class="glyphicons glyphicons-edit"></span> {'display.ui.sticky_note'|devblocks_translate|capitalize}</button>{/if}
 					  	
 					  	{if $active_worker->hasPriv('core.display.actions.reply')}
-					  	<button type="button" class="edit"><span class="glyphicons glyphicons-cogwheel"></span></button>
+					  	<button type="button" class="edit" data-context="{CerberusContexts::CONTEXT_MESSAGE}" data-context-id="{$message->id}" data-edit="true"><span class="glyphicons glyphicons-cogwheel"></span></button>
 					  	{/if}
 					  	
 				  		<button type="button" onclick="$('#{$message->id}options').toggle();"><span class="glyphicons glyphicons-more"></span></button>
@@ -195,7 +195,30 @@ $('#{$message->id}t').hover(
 
 {if $active_worker->hasPriv('core.display.actions.reply')}
 <script type="text/javascript">
+$(function() {
+var $msg = $('#{$message->id}t');
 var $actions = $('#{$message->id}act');
+
+$msg.find('.cerb-peek-trigger').cerbPeekTrigger();
+
+// Edit
+
+$msg.find('button.edit')
+	.cerbPeekTrigger()
+	.on('cerb-peek-opened', function(e) {
+	})
+	.on('cerb-peek-saved', function(e) {
+		e.stopPropagation();
+		$('#btnMsgMax{$message->id}').click();
+	})
+	.on('cerb-peek-deleted', function(e) {
+		e.stopPropagation();
+		$('#{$message->id}t').remove();
+		
+	})
+	.on('cerb-peek-closed', function(e) {
+	})
+	;
 
 $actions
 	.find('ul.cerb-popupmenu')
@@ -216,29 +239,13 @@ $actions
 ;
 
 $actions
-	.find('button.edit')
-	.click(function() {
-		var $popup = genericAjaxPopup('peek_message','c=display&a=showMessagePeekPopup&id={$message->id}', null, false, '650');
-		
-		// Reload when done
-		$popup.one('message_save', function() {
-			$('#btnMsgMax{$message->id}').click();
-		});
-		
-		// Clear if deleted
-		$popup.one('message_delete', function() {
-			$('#{$message->id}t').remove();
-		});
-	})
-	;
-
-$actions
 	.find('li a.relay')
 	.click(function() {
 		genericAjaxPopup('relay', 'c=display&a=showRelayMessagePopup&id={$message->id}', null, false, '650');
 	})
 	;
 
+});
 </script>
 {/if}
 

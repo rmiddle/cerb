@@ -264,6 +264,12 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 		$types['ticket_watcher_count'] = null;
 		
 		$conditions = $this->_importLabelsTypesAsConditions($labels, $types);
+		
+		// Allow overrides
+		$conditions['ticket_spam_score']['type'] = null;
+		$conditions['ticket_spam_training']['type'] = null;
+		$conditions['ticket_status']['type'] = null;
+		
 		return $conditions;
 	}
 	
@@ -587,12 +593,13 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			array(
 				'add_recipients' => array('label' =>'Add recipients'),
 				'add_watchers' => array('label' =>'Add watchers'),
-				'create_comment' => array('label' =>'Create a comment'),
-				'create_notification' => array('label' =>'Create a notification'),
-				'create_task' => array('label' =>'Create a task'),
-				'create_ticket' => array('label' =>'Create a ticket'),
+				'create_comment' => array('label' =>'Create comment'),
+				'create_notification' => array('label' =>'Create notification'),
+				'create_task' => array('label' =>'Create task'),
+				'create_ticket' => array('label' =>'Create ticket'),
 				'move_to' => array('label' => 'Move to'),
-				'relay_email' => array('label' => 'Relay to worker email'),
+				'relay_email' => array('label' => 'Relay to external email'),
+				'remove_recipients' => array('label' =>'Remove recipients'),
 				'schedule_email_recipients' => array('label' => 'Schedule email to recipients'),
 				'send_email' => array('label' => 'Send email'),
 				'send_email_recipients' => array('label' => 'Send email to recipients'),
@@ -662,6 +669,14 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 					break;
 				
 				switch($va->owner_context) {
+					case CerberusContexts::CONTEXT_APPLICATION:
+						DevblocksEventHelper::renderActionRelayEmail(
+							array_keys(DAO_Worker::getAllActive()),
+							array('owner', 'watchers', 'workers'),
+							'ticket_latest_message_content'
+						);
+						break;
+						
 					case CerberusContexts::CONTEXT_GROUP:
 						// Filter to group members
 						$group = DAO_Group::get($va->owner_context_id);
@@ -682,6 +697,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 						);
 						break;
 				}
+				break;
+				
+			case 'remove_recipients':
+				DevblocksEventHelper::renderActionRemoveRecipients($trigger);
 				break;
 				
 			case 'schedule_email_recipients':
@@ -797,6 +816,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 					$dict->ticket_latest_message_sender_full_name,
 					$dict->ticket_subject
 				);
+				break;
+				
+			case 'remove_recipients':
+				return DevblocksEventHelper::simulateActionRemoveRecipients($params, $dict, 'ticket_id');
 				break;
 				
 			case 'schedule_email_recipients':
@@ -941,6 +964,10 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				);
 				break;
 			
+			case 'remove_recipients':
+				DevblocksEventHelper::runActionRemoveRecipients($params, $dict, 'ticket_id');
+				break;
+				
 			case 'schedule_email_recipients':
 				DevblocksEventHelper::runActionScheduleTicketReply($params, $dict, $ticket_id, $message_id);
 				break;
@@ -968,6 +995,8 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 					'content_format' => $format,
 					'html_template_id' => $html_template_id,
 					'worker_id' => 0, //$worker_id,
+					'forward_files' => array(),
+					'link_forward_files' => true,
 				);
 				
 				// Headers
@@ -983,11 +1012,22 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				}
 
 				// Attachments
+				
+				// Attachment list variables
+		
+				if(isset($params['attachment_vars']) && is_array($params['attachment_vars'])) {
+					foreach($params['attachment_vars'] as $attachment_var) {
+						if(false != ($attachments = $dict->$attachment_var) && is_array($attachments)) {
+							foreach($attachments as $attachment) {
+								$properties['forward_files'][] = $attachment->id;
+							}
+						}
+					}
+				}
+				
+				// File bundles
 		
 				if(isset($params['bundle_ids']) && is_array($params['bundle_ids'])) {
-					$properties['forward_files'] = array();
-					$properties['link_forward_files'] = true;
-				
 					$bundles = DAO_FileBundle::getIds($params['bundle_ids']);
 					foreach($bundles as $bundle) {
 						$attachments = $bundle->getAttachments();

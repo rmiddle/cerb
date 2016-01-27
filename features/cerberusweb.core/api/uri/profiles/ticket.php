@@ -65,8 +65,6 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 			$tpl->assign('expand_all', true);
 		
 		if(!empty($section)) {
-			$tpl->assign('tab', $section);
-		
 			switch($section) {
 				case 'conversation':
 					@$tab_option = array_shift($stack);
@@ -78,6 +76,7 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 					
 				case 'comment':
 					@$focus_id = intval(array_shift($stack));
+					$section = 'conversation';
 					
 					if(!empty($focus_id)) {
 						$tpl->assign('convo_focus_ctx', CerberusContexts::CONTEXT_COMMENT);
@@ -88,6 +87,7 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 					
 				case 'message':
 					@$focus_id = intval(array_shift($stack));
+					$section = 'conversation';
 					
 					if(!empty($focus_id)) {
 						$tpl->assign('convo_focus_ctx', CerberusContexts::CONTEXT_MESSAGE);
@@ -96,16 +96,32 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 					
 					break;
 			}
+			
+			$tpl->assign('tab', $section);
 		}
 		
 		// Properties
 		
 		$properties = array(
 			'status' => null,
-			'owner' => null,
+			'owner' => array(
+				'label' => ucfirst($translate->_('common.owner')),
+				'type' => Model_CustomField::TYPE_LINK,
+				'value' => $ticket->owner_id,
+				'params' => array(
+					'context' => CerberusContexts::CONTEXT_WORKER,
+				),
+			),
 			'mask' => null,
 			'bucket' => null,
-			'org' => null,
+			'org' => array(
+				'label' => ucfirst($translate->_('common.organization')),
+				'type' => Model_CustomField::TYPE_LINK,
+				'value' => $ticket->org_id,
+				'params' => array(
+					'context' => CerberusContexts::CONTEXT_ORG,
+				),
+			),
 			'importance' => null,
 			'created' => array(
 				'label' => ucfirst($translate->_('common.created')),
@@ -120,7 +136,7 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 		);
 		
 		if(!empty($ticket->closed_at)) {
-			$properties['updated'] = array(
+			$properties['closed'] = array(
 				'label' => ucfirst($translate->_('ticket.closed_at')),
 				'type' => Model_CustomField::TYPE_DATE,
 				'value' => $ticket->closed_at,
@@ -291,5 +307,31 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 
 		// Template
 		$tpl->display('devblocks:cerberusweb.core::profiles/ticket.tpl');
+	}
+	
+	function getPeekPreviewAction() {
+		@$context = DevblocksPlatform::importGPC($_REQUEST['context'], 'string', '');
+		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'], 'integer', 0);
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		
+		switch($context) {
+			case CerberusContexts::CONTEXT_MESSAGE:
+				if(false == ($message = DAO_Message::get($context_id)))
+					return;
+				
+				$tpl->assign('message', $message);
+				$tpl->display('devblocks:cerberusweb.core::tickets/peek_preview.tpl');
+				break;
+				
+			case CerberusContexts::CONTEXT_COMMENT:
+				if(false == ($comment = DAO_Comment::get($context_id)))
+					return;
+					
+				$tpl->assign('comment', $comment);
+				$tpl->display('devblocks:cerberusweb.core::tickets/peek_preview.tpl');
+				break;
+		}
+		
 	}
 };

@@ -15,7 +15,7 @@
  |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
  ***********************************************************************/
 
-class DAO_MailToGroupRule extends DevblocksORMHelper {
+class DAO_MailToGroupRule extends Cerb_ORMHelper {
 	const _CACHE_ALL = 'cerb:dao:mail_to_group_rule:all';
 	
 	const ID = 'id';
@@ -324,22 +324,23 @@ class Model_MailToGroupRule {
 					case 'header4':
 					case 'header5':
 						@$header = strtolower($crit['header']);
-
+						@$header_value = is_array($message_headers[$header]) ? implode(" ", $message_headers[$header]) : (string) $message_headers[$header];
+						
 						if(empty($header)) {
 							$passed++;
 							break;
 						}
 						
 						if(empty($value)) { // we're checking for null/blanks
-							if(!isset($message_headers[$header]) || empty($message_headers[$header])) {
+							if(empty($header_value)) {
 								$passed++;
 							}
 							
-						} elseif(isset($message_headers[$header]) && !empty($message_headers[$header])) {
+						} elseif($header_value) {
 							$regexp_header = DevblocksPlatform::strToRegExp($value);
 							
 							// Flatten CRLF
-							if(@preg_match($regexp_header, str_replace(array("\r","\n"),' ',$message_headers[$header]))) {
+							if(@preg_match($regexp_header, $header_value)) {
 								$passed++;
 							}
 						}

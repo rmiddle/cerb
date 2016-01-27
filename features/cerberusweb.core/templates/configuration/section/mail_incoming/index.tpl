@@ -14,14 +14,14 @@
 	<label><input type="checkbox" name="parser_autoreq" value="1" {if $settings->get('cerberusweb.core','parser_autoreq')}checked{/if}> Send helpdesk replies to every recipient (To:/Cc:) on the original message.</label><br>
 	<br>
 
-	<b>Always exclude these addresses as recipients:</b><br>
+	<b>Always exclude these addresses as participants:</b><br>
 	<textarea name="parser_autoreq_exclude" rows="4" cols="76">{$settings->get('cerberusweb.core','parser_autoreq_exclude')}</textarea><br>
 	<i>(one address per line)</i> &nbsp;  
 	<i>use * for wildcards, like: *@do-not-reply.com</i><br>
 	<br>
 
 	<b>Attachments:</b><br>
-	<label><input type="checkbox" name="attachments_enabled" value="1" {if $settings->get('cerberusweb.core','attachments_enabled',CerberusSettingsDefaults::ATTACHMENTS_ENABLED)}checked{/if}> Allow Incoming Attachments</label><br>
+	<label><input type="checkbox" name="attachments_enabled" value="1" {if $settings->get('cerberusweb.core','attachments_enabled',CerberusSettingsDefaults::ATTACHMENTS_ENABLED)}checked{/if}> Allow incoming attachments</label><br>
 	<br>
 	
 	<div style="padding-left:10px;">
@@ -29,6 +29,17 @@
 		<input type="text" name="attachments_max_size" value="{$settings->get('cerberusweb.core','attachments_max_size',CerberusSettingsDefaults::ATTACHMENTS_MAX_SIZE)}" size="5"> MB<br>
 		<i>(attachments larger than this will be ignored)</i><br>
 	</div>
+</fieldset>
+
+<fieldset>
+	<legend>Displaying HTML Messages</legend>
+	
+	<b>When the Tidy extension is enabled:</b>
+	
+	<div style="margin:5px 0px 5px 10px;">
+		<label><input type="checkbox" name="html_no_strip_microsoft" value="1" {if $settings->get('cerberusweb.core',CerberusSettings::HTML_NO_STRIP_MICROSOFT,CerberusSettingsDefaults::HTML_NO_STRIP_MICROSOFT)}checked="checked"{/if}> Don't clean Microsoft Office formatting</label>
+	</div>
+	
 </fieldset>
 
 <fieldset>

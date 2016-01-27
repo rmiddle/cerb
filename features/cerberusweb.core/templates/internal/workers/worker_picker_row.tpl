@@ -5,6 +5,7 @@
 		{else}
 		<div style="display:inline-block;border-radius:10px;width:10px;height:10px;background-color:rgb(230,230,230);margin-right:5px;line-height:10px;"></div>
 		{/if}
+		<img src="{devblocks_url}c=avatars&context=worker&context_id={$worker->id}{/devblocks_url}?v={$worker->updated}" style="height:25px;width:25px;border-radius:25px;" align="middle">
 		<a href="javascript:;" class="item no-underline"><b>{$worker->getName()}</b></a>
 		<small>{$worker->title}</small>
 		{if $worker->__is_selected}
@@ -12,7 +13,7 @@
 		<input type="hidden" name="initial_sample[]" value="{$worker->id}">
 		{/if}
 	</td>
-	<td>
+	<td nowrap="nowrap">
 		<div>
 			<!--
 			{$availability = $worker->__availability}
@@ -39,8 +40,9 @@
 			<span style="display:inline-block;background-color:rgb(200,200,200);height:14px;width:1px;position:absolute;top:-2px;margin-left:1px;left:50%;"></span>
 			<div style="position:relative;margin-left:-6px;top:-2px;left:{$worker->__responsibility}%;width:14px;height:14px;border-radius:14px;background-color:{if $worker->__responsibility < 50}rgb(230,70,70);{elseif $worker->__responsibility > 50}rgb(0,200,0);{else}rgb(175,175,175);{/if}"></div>
 		</div>
-	
-		<a href="javascript:;" class="delete" {if !$worker->__is_selected}style="display:none;"{/if}><span class="glyphicons glyphicons-circle-remove" style="font-size:14px;color:rgb(200,0,0);"></span></a>
 	</td>
 	{/if}
+	<td nowrap="nowrap">
+		<a href="javascript:;" class="delete" {if !$worker->__is_selected}style="display:none;"{/if}><span class="glyphicons glyphicons-circle-remove" style="font-size:14px;color:rgb(200,0,0);"></span></a>
+	</td>
 </tr>

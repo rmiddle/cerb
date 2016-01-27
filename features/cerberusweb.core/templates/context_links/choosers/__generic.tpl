@@ -9,7 +9,7 @@
 <form action="#" method="POST" id="chooser{$view->id}" style="{if $single}display:none;{/if}}">
 	<input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 	<b>Selected:</b>
-	<ul class="buffer bubbles"></ul>
+	<ul class="buffer bubbles chooser-container"></ul>
 	<br>
 	<br>
 	<button type="button" class="submit"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_changes'|devblocks_translate}</button>
@@ -84,7 +84,7 @@ $(function() {
 						$hidden.attr('value', $value);
 						$hidden.appendTo($li);
 						
-						var $a = $('<a href="javascript:;" onclick="$(this).parent().remove();"><span class="ui-icon ui-icon-trash" style="display:inline-block;width:14px;height:14px;"></span></a>');
+						var $a = $('<a href="javascript:;" onclick="$(this).parent().remove();"><span class="glyphicons glyphicons-circle-remove"></span></a>');
 						$a.appendTo($li);
 						
 						$buffer.append($li);

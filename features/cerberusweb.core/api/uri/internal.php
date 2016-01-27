@@ -184,6 +184,7 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$context = DevblocksPlatform::importGPC($_REQUEST['context'],'string','');
 		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'],'integer',0);
 		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string','');
+		@$edit = DevblocksPlatform::importGPC($_REQUEST['edit'], 'string', null);
 		
 		if(null == ($context_ext = Extension_DevblocksContext::get($context)))
 			return;
@@ -202,7 +203,7 @@ class ChInternalController extends DevblocksControllerExtension {
 
 		// Template
 		
-		$context_ext->renderPeekPopup($context_id, $view_id);
+		$context_ext->renderPeekPopup($context_id, $view_id, $edit);
 	}
 
 	/*
@@ -400,13 +401,17 @@ class ChInternalController extends DevblocksControllerExtension {
 				
 				switch($type) {
 					case 'ctx_' . CerberusContexts::CONTEXT_ADDRESS:
-						if(null != ($addy = DAO_Address::lookupAddress($val, true))) {
-							$value = $addy->id;
+						if($is_preview) {
+							$value = $val;
+						} elseif(null != ($addy = DAO_Address::lookupAddress($val, true))) {
+								$value = $addy->id;
 						}
 						break;
 						
 					case 'ctx_' . CerberusContexts::CONTEXT_ORG:
-						if(null != ($org_id = DAO_ContactOrg::lookup($val, true))) {
+						if($is_preview) {
+							$value = $val;
+						} elseif(null != ($org_id = DAO_ContactOrg::lookup($val, true))) {
 							$value = $org_id;
 						}
 						break;
@@ -588,18 +593,27 @@ class ChInternalController extends DevblocksControllerExtension {
 	 */
 	
 	function chooserOpenAction() {
-		@$context = DevblocksPlatform::importGPC($_REQUEST['context'],'string');
-		@$layer = DevblocksPlatform::importGPC($_REQUEST['layer'],'string');
+		@$context = DevblocksPlatform::importGPC($_REQUEST['context'],'string', '');
+		@$layer = DevblocksPlatform::importGPC($_REQUEST['layer'],'string', '');
 		@$single = DevblocksPlatform::importGPC($_REQUEST['single'],'integer',0);
+		@$query = DevblocksPlatform::importGPC($_REQUEST['q'],'string', '');
 
-		if(null != ($context_extension = DevblocksPlatform::getExtension($context, true))) {
-			$tpl = DevblocksPlatform::getTemplateService();
-			$tpl->assign('context', $context_extension);
-			$tpl->assign('layer', $layer);
-			$tpl->assign('view', $context_extension->getChooserView());
-			$tpl->assign('single', $single);
-			$tpl->display('devblocks:cerberusweb.core::context_links/choosers/__generic.tpl');
-		}
+		if(null == ($context_extension = DevblocksPlatform::getExtension($context, true)))
+			return;
+		
+		if(false == ($view = $context_extension->getChooserView()))
+			return;
+		
+		if(!empty($query))
+			$view->addParamsWithQuickSearch($query, true);
+			
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->assign('context', $context_extension);
+		$tpl->assign('layer', $layer);
+		$tpl->assign('view', $view);
+		$tpl->assign('quick_search_query', $query);
+		$tpl->assign('single', $single);
+		$tpl->display('devblocks:cerberusweb.core::context_links/choosers/__generic.tpl');
 	}
 	
 	function chooserOpenSnippetAction() {
@@ -665,6 +679,7 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string');
 		@$layer = DevblocksPlatform::importGPC($_REQUEST['layer'],'string');
 		@$trigger_id = DevblocksPlatform::importGPC($_REQUEST['trigger_id'],'integer',0);
+		@$q = DevblocksPlatform::importGPC($_REQUEST['q'],'string','');
 		
 		// [TODO] This should be able to take a simplified JSON view model
 		
@@ -715,22 +730,21 @@ class ChInternalController extends DevblocksControllerExtension {
 		} elseif(null != $active_worker = CerberusApplication::getActiveWorker()) {
 			$labels = array();
 			$values = array();
-			
-			$labels['current_worker_id'] = array(
-				'label' => 'Current Worker',
-				'context' => CerberusContexts::CONTEXT_WORKER,
-			);
-			
-			$values['current_worker_id'] = $active_worker->id;
+			$active_worker->getPlaceholderLabelsValues($labels, $values);
 			
 			$view->setPlaceholderLabels($labels);
 			$view->setPlaceholderValues($values);
+		}
+		
+		if(!empty($q)) {
+			$view->addParamsWithQuickSearch($q, true);
 		}
 		
 		$tpl = DevblocksPlatform::getTemplateService();
 		$tpl->assign('context', $context);
 		$tpl->assign('layer', $layer);
 		$tpl->assign('view', $view);
+		$tpl->assign('quick_search_query', $q);
 		$tpl->display('devblocks:cerberusweb.core::internal/choosers/__worklist.tpl');
 	}
 	
@@ -842,6 +856,165 @@ class ChInternalController extends DevblocksControllerExtension {
 		
 		echo json_encode($results);
 	}
+	
+	function chooserOpenAvatarAction() {
+		@$context = DevblocksPlatform::importGPC($_REQUEST['context'],'string','');
+		@$context_id = DevblocksPlatform::importGPC($_REQUEST['context_id'],'integer',0);
+		@$defaults_string = DevblocksPlatform::importGPC($_REQUEST['defaults'],'string','');
+		
+		$url_writer = DevblocksPlatform::getUrlService();
+		$tpl = DevblocksPlatform::getTemplateService();
+		
+		$tpl->assign('context', $context);
+		$tpl->assign('context_id', $context_id);
+
+		if(false != ($avatar = DAO_ContextAvatar::getByContext($context, $context_id))) {
+			$contents = 'data:' . $avatar->content_type . ';base64,' . base64_encode(Storage_ContextAvatar::get($avatar));
+			$tpl->assign('imagedata', $contents);
+		}
+
+		$suggested_photos = array();
+		
+		// Suggest more extended content
+		
+		$defaults = array();
+		
+		$tokens = explode(' ', trim($defaults_string));
+		foreach($tokens as $token) {
+			@list($k,$v) = explode(':', $token);
+			$defaults[trim($k)] = trim($v);
+		}
+		
+		// Per context suggestions
+		
+		switch($context) {
+			case CerberusContexts::CONTEXT_CONTACT:
+				// Suggest from the address we're adding to the new contact
+				if(empty($context_id) && isset($defaults['email'])) {
+					$context_id = intval($defaults['email']);
+				}
+				
+				// Suggest from all of the contact's alternate email addys
+				if($context_id && false != ($contact = DAO_Contact::get($context_id))) {
+					$addys = $contact->getEmails();
+					
+					if(is_array($addys))
+					foreach($addys as $addy) {
+						$suggested_photos[] = array(
+							'url' => 'https://gravatar.com/avatar/' . md5($addy->email) . '?s=100&d=404',
+							'title' => 'Gravatar: ' . $addy->email,
+						);
+					}
+				}
+				
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person1.png', true),
+					'title' => 'Silhouette: Male #1',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person3.png', true),
+					'title' => 'Silhouette: Male #2',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person4.png', true),
+					'title' => 'Silhouette: Male #3',
+				);
+				
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person2.png', true),
+					'title' => 'Silhouette: Female #1',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person5.png', true),
+					'title' => 'Silhouette: Female #2',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person6.png', true),
+					'title' => 'Silhouette: Female #3',
+				);
+				
+				break;
+				
+			case CerberusContexts::CONTEXT_ORG:
+				if(false != ($org = DAO_ContactOrg::get($context_id))) {
+					// Suggest from all of the org's top email addys w/o contacts
+					$addys = $org->getEmailsWithoutContacts(10);
+					
+					if(is_array($addys))
+					foreach($addys as $addy) {
+						$suggested_photos[] = array(
+							'url' => 'https://gravatar.com/avatar/' . md5($addy->email) . '?s=100&d=404',
+							'title' => 'Gravatar: ' . $addy->email,
+						);
+					}
+				}
+				
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/building1.png', true),
+					'title' => 'Building #1',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/building2.png', true),
+					'title' => 'Building #2',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/building3.png', true),
+					'title' => 'Building #3',
+				);
+				break;
+				
+			case CerberusContexts::CONTEXT_WORKER:
+				// Suggest from the address we're adding to the new worker
+				if(empty($context_id)) {
+					if(isset($defaults['email']) && false != ($addy = DAO_Address::get($defaults['email']))) {
+						$suggested_photos[] = array(
+							'url' => 'https://gravatar.com/avatar/' . md5($addy->email) . '?s=100&d=404',
+							'title' => 'Gravatar: ' . $addy->email,
+						);
+					}
+					
+				} else if($context_id && false != ($worker = DAO_Worker::get($context_id))) {
+					if(false != ($email = $worker->getEmailString())) {
+						$suggested_photos[] = array(
+							'url' => 'https://gravatar.com/avatar/' . md5($email) . '?s=100&d=404',
+							'title' => 'Gravatar: ' . $email,
+						);
+					}
+				}
+				
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person1.png', true),
+					'title' => 'Silhouette: Male #1',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person3.png', true),
+					'title' => 'Silhouette: Male #2',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person4.png', true),
+					'title' => 'Silhouette: Male #3',
+				);
+
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person2.png', true),
+					'title' => 'Silhouette: Female #1',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person5.png', true),
+					'title' => 'Silhouette: Female #2',
+				);
+				$suggested_photos[] = array(
+					'url' => $url_writer->write('c=resource&p=cerberusweb.core&f=images/avatars/person6.png', true),
+					'title' => 'Silhouette: Female #3',
+				);
+				
+				break;
+		}
+		
+		$tpl->assign('suggested_photos', $suggested_photos);
+		
+		$tpl->display('devblocks:cerberusweb.core::internal/choosers/avatar_chooser_popup.tpl');
+	}
 
 	function contextAddLinksJsonAction() {
 		header('Content-type: application/json');
@@ -875,6 +1048,42 @@ class ChInternalController extends DevblocksControllerExtension {
 		echo json_encode(array(
 			'links_count' => DAO_ContextLink::count($from_context, $from_context_id),
 		));
+	}
+	
+	// Notifications
+	
+	function openNotificationsPopupAction() {
+		if(false == ($active_worker = CerberusApplication::getActiveWorker()))
+			return;
+		
+		if(false == ($context_ext = Extension_DevblocksContext::get(CerberusContexts::CONTEXT_NOTIFICATION)))
+			return;
+		
+		if(false == ($view = $context_ext->getSearchView('my_notifications')) || !($view instanceof IAbstractView_QuickSearch))
+			return;
+		
+		$translate = DevblocksPlatform::getTranslationService();
+		
+		$view->name = vsprintf($translate->_('home.my_notifications.view.title'), $active_worker->getName());
+		
+		$view->addParamsRequired(array(
+			SearchFields_Notification::WORKER_ID => new DevblocksSearchCriteria(SearchFields_Notification::WORKER_ID, DevblocksSearchCriteria::OPER_EQ, $active_worker->id),
+		), true);
+		
+		$view->addParams(array(
+			SearchFields_Notification::IS_READ => new DevblocksSearchCriteria(SearchFields_Notification::IS_READ, DevblocksSearchCriteria::OPER_EQ, 0),
+		), true);
+		
+		$view->renderSubtotals = SearchFields_Notification::ACTIVITY_POINT;
+		$view->renderSortBy = SearchFields_Notification::CREATED_DATE;
+		$view->renderSortAsc = false;
+		$view->renderLimit = 10;
+		
+		$tpl = DevblocksPlatform::getTemplateService();
+		$tpl->assign('popup_title', mb_convert_case($translate->_('common.notifications'), MB_CASE_TITLE));
+		$tpl->assign('view', $view);
+		
+		$tpl->display('devblocks:cerberusweb.core::search/popup.tpl');
 	}
 
 	// Context Activity Log
@@ -964,199 +1173,13 @@ class ChInternalController extends DevblocksControllerExtension {
 		@$term = DevblocksPlatform::importGPC($_REQUEST['term'],'string','');
 
 		$active_worker = CerberusApplication::getActiveWorker();
+		$url_writer = DevblocksPlatform::getUrlService();
 		
 		$list = array();
-
-		// [TODO] This should be handled by the context extension
-		switch($context) {
-			case CerberusContexts::CONTEXT_ADDRESS:
-				list($results, $null) = DAO_Address::search(
-					array(),
-					array(
-						array(
-							DevblocksSearchCriteria::GROUP_OR,
-							new DevblocksSearchCriteria(SearchFields_Address::LAST_NAME,DevblocksSearchCriteria::OPER_LIKE,$term.'%'),
-							new DevblocksSearchCriteria(SearchFields_Address::FIRST_NAME,DevblocksSearchCriteria::OPER_LIKE,$term.'%'),
-							new DevblocksSearchCriteria(SearchFields_Address::EMAIL,DevblocksSearchCriteria::OPER_LIKE,$term.'%'),
-						),
-					),
-					25,
-					0,
-					SearchFields_Address::NUM_NONSPAM,
-					false,
-					false
-				);
-
-				foreach($results AS $row){
-					$entry = new stdClass();
-					$entry->label = trim($row[SearchFields_Address::FIRST_NAME] . ' ' . $row[SearchFields_Address::LAST_NAME] . ' <' .$row[SearchFields_Address::EMAIL] . '>');
-					$entry->value = $row[SearchFields_Address::ID];
-					$list[] = $entry;
-				}
-				break;
-				
-			case CerberusContexts::CONTEXT_FILE_BUNDLE:
-				$bundles = DAO_FileBundle::getAll();
-				
-				$results = array_filter($bundles, function($bundle) use ($active_worker, $term) { /* @var $bundle Model_FileBundle */
-					// Check if the term exists
-					if(false === stristr($bundle->name . ' ' . $bundle->tag, $term))
-						return false;
-					
-					// Check if the record is readable by the actor 
-					if(!CerberusContexts::isReadableByActor($bundle->owner_context, $bundle->owner_context_id, $active_worker))
-						return false;
-					
-					return true;
-				});
-				
-				// [TODO] Rank results?
-				
-				foreach($results as $bundle) { /* @var $bundle Model_FileBundle */
-					$entry = new stdClass();
-					$entry->label = $bundle->name;
-					$entry->value = intval($bundle->id);
-					$list[] = $entry;
-				}
-				
-				break;
-
-			case CerberusContexts::CONTEXT_GROUP:
-				list($results, $null) = DAO_Group::search(
-					array(),
-					array(
-						new DevblocksSearchCriteria(SearchFields_Group::NAME,DevblocksSearchCriteria::OPER_LIKE,$term.'%'),
-					),
-					25,
-					0,
-					DAO_Group::NAME,
-					true,
-					false
-				);
-
-				foreach($results AS $row){
-					$entry = new stdClass();
-					$entry->label = $row[SearchFields_Group::NAME];
-					$entry->value = $row[SearchFields_Group::ID];
-					$list[] = $entry;
-				}
-				break;
-
-			case CerberusContexts::CONTEXT_ORG:
-				list($results, $null) = DAO_ContactOrg::search(
-					array(),
-					array(
-						new DevblocksSearchCriteria(SearchFields_ContactOrg::NAME,DevblocksSearchCriteria::OPER_LIKE,$term.'%'),
-					),
-					25,
-					0,
-					SearchFields_ContactOrg::NAME,
-					true,
-					false
-				);
-
-				foreach($results AS $row){
-					$entry = new stdClass();
-					$entry->label = $row[SearchFields_ContactOrg::NAME];
-					$entry->value = $row[SearchFields_ContactOrg::ID];
-					$list[] = $entry;
-				}
-				break;
-
-			case CerberusContexts::CONTEXT_SNIPPET:
-				$contexts = DevblocksPlatform::getExtensions('devblocks.context', false);
-				
-				$worker_groups = $active_worker->getMemberships();
-				$worker_roles = $active_worker->getRoles();
-				
-				// Restrict owners
-				$param_ownership = array(
-					DevblocksSearchCriteria::GROUP_OR,
-					SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_APPLICATION),
-					array(
-						DevblocksSearchCriteria::GROUP_AND,
-						SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_WORKER),
-						SearchFields_Snippet::OWNER_CONTEXT_ID => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT_ID,DevblocksSearchCriteria::OPER_EQ,$active_worker->id),
-					),
-					array(
-						DevblocksSearchCriteria::GROUP_AND,
-						SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_GROUP),
-						SearchFields_Snippet::OWNER_CONTEXT_ID => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT_ID,DevblocksSearchCriteria::OPER_IN,array_keys($worker_groups)),
-					),
-					array(
-						DevblocksSearchCriteria::GROUP_AND,
-						SearchFields_Snippet::OWNER_CONTEXT => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT,DevblocksSearchCriteria::OPER_EQ,CerberusContexts::CONTEXT_ROLE),
-						SearchFields_Snippet::OWNER_CONTEXT_ID => new DevblocksSearchCriteria(SearchFields_Snippet::OWNER_CONTEXT_ID,DevblocksSearchCriteria::OPER_IN,array_keys($worker_roles)),
-					),
-				);
-				
-				$params = array(
-					new DevblocksSearchCriteria(SearchFields_Snippet::TITLE,DevblocksSearchCriteria::OPER_LIKE,'%'.$term.'%'),
-					$param_ownership,
-				);
-				
-				@$context_list = DevblocksPlatform::importGPC($_REQUEST['contexts'],'array',array());
-				if(is_array($context_list))
-				foreach($context_list as $k => $v) {
-					if(!isset($contexts[$v]))
-						unset($context_list[$k]);
-				}
-
-				$context_list[] = ''; // plaintext
-				
-				// Filter contexts
-				$params[SearchFields_Snippet::CONTEXT] =
-					new DevblocksSearchCriteria(SearchFields_Snippet::CONTEXT,DevblocksSearchCriteria::OPER_IN,$context_list)
-					;
-				
-				list($results, $null) = DAO_Snippet::search(
-					array(
-						SearchFields_Snippet::TITLE,
-						SearchFields_Snippet::USE_HISTORY_MINE,
-					),
-					$params,
-					25,
-					0,
-					SearchFields_Snippet::USE_HISTORY_MINE,
-					false,
-					false
-				);
-
-				foreach($results AS $row){
-					$entry = new stdClass();
-					$entry->label = sprintf("%s -- used %s",
-						$row[SearchFields_Snippet::TITLE],
-						((1 != $row[SearchFields_Snippet::USE_HISTORY_MINE]) ? (intval($row[SearchFields_Snippet::USE_HISTORY_MINE]) . ' times') : 'once')
-					);
-					$entry->value = $row[SearchFields_Snippet::ID];
-					$entry->context = $row[SearchFields_Snippet::CONTEXT];
-					$list[] = $entry;
-				}
-				break;
-
-			case CerberusContexts::CONTEXT_TICKET:
-				$results = DAO_Ticket::autocomplete($term);
-
-				if(is_array($results))
-				foreach($results as $ticket_id => $ticket){
-					$entry = new stdClass();
-					$entry->label = sprintf("[#%s] %s", $ticket->mask, $ticket->subject);
-					$entry->value = sprintf("%d", $ticket_id);
-					$list[] = $entry;
-				}
-				break;
-				
-			case CerberusContexts::CONTEXT_WORKER:
-				$results = DAO_Worker::autocomplete($term);
-
-				if(is_array($results))
-				foreach($results as $worker_id => $worker){
-					$entry = new stdClass();
-					$entry->label = $worker->getName();
-					$entry->value = sprintf("%d", $worker_id);
-					$list[] = $entry;
-				}
-				break;
+		
+		if(false != ($context_ext = Extension_DevblocksContext::get($context))) {
+			if($context_ext instanceof IDevblocksContextAutocomplete)
+				$list = $context_ext->autocomplete($term);
 		}
 
 		echo sprintf("%s%s%s",
@@ -1686,7 +1709,6 @@ class ChInternalController extends DevblocksControllerExtension {
 		}
 		
 		$view->doBulkUpdate($filter, $do, $ids);
-		
 		$view->render();
 		return;
 	}
@@ -3885,7 +3907,7 @@ class ChInternalController extends DevblocksControllerExtension {
 				if(empty($var_labels[$idx]))
 					continue;
 				
-				$var_name = 'var_' . DevblocksPlatform::strAlphaNum(DevblocksPlatform::strToPermalink($v),'_');
+				$var_name = 'var_' . DevblocksPlatform::strAlphaNum(DevblocksPlatform::strToPermalink($v,'_'),'_');
 				$key = strtolower(!empty($var_keys[$idx]) ? $var_keys[$idx] : $var_name);
 				
 				// Variable params
@@ -4239,7 +4261,7 @@ class ChInternalController extends DevblocksControllerExtension {
 							
 						default:
 							// [TODO] Default stylesheet for previews?
-							$output = nl2br(htmlentities($output, ENT_COMPAT, LANG_CHARSET_CODE));
+							$output = nl2br(DevblocksPlatform::strEscapeHtml($output));
 							break;
 					}
 					

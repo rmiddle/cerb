@@ -294,6 +294,11 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		
 		$conditions = $this->_importLabelsTypesAsConditions($labels, $types);
 		
+		// Allow overrides
+		$conditions['ticket_spam_score']['type'] = null;
+		$conditions['ticket_spam_training']['type'] = null;
+		$conditions['ticket_status']['type'] = null;
+		
 		return $conditions;
 	}
 	
@@ -594,13 +599,14 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			array(
 				'add_recipients' => array('label' =>'Add recipients'),
 				'add_watchers' => array('label' =>'Add watchers'),
-				'create_comment' => array('label' =>'Create a comment'),
+				'create_comment' => array('label' =>'Create comment'),
 				'create_notification' => array('label' =>'Send a notification'),
 				'create_message_note' => array('label' =>'Create a message sticky note'),
-				'create_task' => array('label' =>'Create a task'),
-				'create_ticket' => array('label' =>'Create a ticket'),
+				'create_task' => array('label' =>'Create task'),
+				'create_ticket' => array('label' =>'Create ticket'),
 				'move_to' => array('label' => 'Move to'),
 				'relay_email' => array('label' => 'Relay to external email'),
+				'remove_recipients' => array('label' =>'Remove recipients'),
 				'schedule_email_recipients' => array('label' => 'Schedule email to recipients'),
 				'send_email' => array('label' => 'Send email'),
 				'send_email_recipients' => array('label' => 'Send email to recipients'),
@@ -692,6 +698,10 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 						);
 						break;
 				}
+				break;
+				
+			case 'remove_recipients':
+				DevblocksEventHelper::renderActionRemoveRecipients($trigger);
 				break;
 				
 			case 'schedule_email_recipients':
@@ -821,9 +831,12 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				);
 				break;
 				
-			case 'schedule_email_recipients':
+			case 'remove_recipients':
+				return DevblocksEventHelper::simulateActionRemoveRecipients($params, $dict, 'ticket_id');
 				break;
 				
+			case 'schedule_email_recipients':
+				break;
 				
 			case 'set_importance':
 				return DevblocksEventHelper::simulateActionSetTicketImportance($params, $dict, 'ticket_id', 'ticket_importance');
@@ -965,6 +978,10 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				);
 				break;
 				
+			case 'remove_recipients':
+				DevblocksEventHelper::runActionRemoveRecipients($params, $dict, 'ticket_id');
+				break;
+				
 			case 'schedule_email_recipients':
 				DevblocksEventHelper::runActionScheduleTicketReply($params, $dict, $ticket_id, $message_id);
 				break;
@@ -1000,6 +1017,8 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 					'content_format' => $format,
 					'html_template_id' => $html_template_id,
 					'worker_id' => 0,
+					'forward_files' => array(),
+					'link_forward_files' => true,
 				);
 				
 				// Headers
@@ -1017,11 +1036,22 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				@$headers = $tpl_builder->build($params['headers'], $dict);
 
 				// Attachments
+				
+				// Attachment list variables
+		
+				if(isset($params['attachment_vars']) && is_array($params['attachment_vars'])) {
+					foreach($params['attachment_vars'] as $attachment_var) {
+						if(false != ($attachments = $dict->$attachment_var) && is_array($attachments)) {
+							foreach($attachments as $attachment) {
+								$properties['forward_files'][] = $attachment->id;
+							}
+						}
+					}
+				}
+				
+				// File bundles
 
 				if(isset($params['bundle_ids']) && is_array($params['bundle_ids'])) {
-					$properties['forward_files'] = array();
-					$properties['link_forward_files'] = true;
-
 					$bundles = DAO_FileBundle::getIds($params['bundle_ids']);
 					foreach($bundles as $bundle) {
 						$attachments = $bundle->getAttachments();
