@@ -636,10 +636,6 @@ class CerberusApplication extends DevblocksApplication {
 	}
 
 	/**
-                    if($t_or_c=='a') {
-			$bucket_id = -1;
-                    } else {
-                    }
 	 * Looks up an e-mail address using a revolving cache.  This is helpful
 	 * in situations where you may look up the same e-mail address multiple
 	 * times (reports, audit log, views) and you don't want to waste code
