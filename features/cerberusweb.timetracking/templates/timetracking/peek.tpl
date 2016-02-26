@@ -98,7 +98,7 @@
 {if ($active_worker->hasPriv('timetracking.actions.create') && (empty($model->id) || $active_worker->id==$model->worker_id))
 	|| $active_worker->hasPriv('timetracking.actions.update_all')}
 	{if empty($model->id)}
-		<button type="button" onclick="if(0 == this.form.activity_id.value.length) { alert('Activity is a required field.'); } else if(5 > this.form.comment.value.length) { alert('Comments are a required field.'); } else { timeTrackingTimer.finish();genericAjaxPopupPostCloseReloadView(null,'frmTimeEntry','{$view_id}',false,'timetracking_save');"}><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'timetracking.ui.entry_panel.save_finish'|devblocks_translate}</button>
+		<button type="button" onclick="if(0 == this.form.comment.value.length) { alert('Activity is a required field.'); } else if(5 > this.form.comment.value.length) { alert('Comments are a required field.'); } else { timeTrackingTimer.finish();genericAjaxPopupPostCloseReloadView(null,'frmTimeEntry','{$view_id}',false,'timetracking_save');"}><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'timetracking.ui.entry_panel.save_finish'|devblocks_translate}</button>
 		<button type="button" onclick="timeTrackingTimer.play();genericAjaxPopupClose('peek');"><span class="glyphicons glyphicons-play" style="color:rgb(0,180,0);"></span> {'timetracking.ui.entry_panel.resume'|devblocks_translate}</button>
 		<button type="button" onclick="timeTrackingTimer.finish();genericAjaxPopupClose('peek');"><span class="glyphicons glyphicons-stop" style="color:rgb(200,0,0);"></span> {'common.cancel'|devblocks_translate|capitalize}</button>
 	{else}
