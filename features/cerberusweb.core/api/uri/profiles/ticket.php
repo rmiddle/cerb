@@ -197,9 +197,8 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
                     $sql .= sprintf("WHERE context_link.from_context_id =  %d ", $ticket->id);
                     $sql .= "GROUP BY context_link.from_context_id ";
             
-                    $rs = $db->Execute($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); 
-
-                    if($row = mysql_fetch_assoc($rs)) {
+                    $rs = $db->ExecuteSlave($sql);	    
+                    if($row = mysqli_fetch_assoc($rs)) {
 			$total_time_minutes = intval($row['mins']);	
                     } else {
 			$total_time_minutes = 0;			
@@ -208,7 +207,7 @@ class PageSection_ProfilesTicket extends Extension_PageSection {
 			$total_time_hours = (int)($total_time_minutes / 60);
 			$total_time_minutes -= $total_time_hours * 60;
                     }
-                    mysql_free_result($rs);
+                    mysqli_free_result($rs);
                     $tpl->assign('total_time_hours', $total_time_hours);
                     $tpl->assign('total_time_minutes', $total_time_minutes);
                 }
