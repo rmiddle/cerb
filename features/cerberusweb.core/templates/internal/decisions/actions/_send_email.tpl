@@ -2,7 +2,7 @@
 <div style="margin-left:10px;margin-bottom:0.5em;">
 	<select name="{$namePrefix}[from_address_id]">
 		<option value="0">(default)</option>
-		<optgroup label="Reply-to Addresses">
+		<optgroup label="Sender Addresses">
 			{foreach from=$replyto_addresses key=address_id item=replyto}
 			{if !empty($replyto->reply_personal)}
 			<option value="{$address_id}" {if $params.from_address_id==$address_id}selected="selected"{/if}>{if !empty($replyto->reply_personal)}{$replyto->reply_personal} {/if}&lt;{$replyto->email}&gt;</option>
@@ -28,6 +28,30 @@
 	{foreach from=$trigger->variables item=var_data key=var_key}
 		{if $var_data.type == "ctx_{CerberusContexts::CONTEXT_ADDRESS}"}
 			<li><label><input type="checkbox" name="{$namePrefix}[to_var][]" value="{$var_key}" {if is_array($params.to_var) && in_array($var_key, $params.to_var)}checked="checked"{/if}> (variable) {$var_data.label}</label></li>
+		{/if}
+	{/foreach}
+	</ul>
+</div>
+
+<b>{'message.header.cc'|devblocks_translate|capitalize}:</b>
+<div style="margin-left:10px;margin-bottom:0.5em;">
+	<input type="text" name="{$namePrefix}[cc]" value="{$params.cc}" size="45" style="width:100%;" class="placeholders">
+	<ul class="bubbles">
+	{foreach from=$trigger->variables item=var_data key=var_key}
+		{if $var_data.type == "ctx_{CerberusContexts::CONTEXT_ADDRESS}"}
+			<li><label><input type="checkbox" name="{$namePrefix}[cc_var][]" value="{$var_key}" {if is_array($params.cc_var) && in_array($var_key, $params.cc_var)}checked="checked"{/if}> (variable) {$var_data.label}</label></li>
+		{/if}
+	{/foreach}
+	</ul>
+</div>
+
+<b>{'message.header.bcc'|devblocks_translate|capitalize}:</b>
+<div style="margin-left:10px;margin-bottom:0.5em;">
+	<input type="text" name="{$namePrefix}[bcc]" value="{$params.bcc}" size="45" style="width:100%;" class="placeholders">
+	<ul class="bubbles">
+	{foreach from=$trigger->variables item=var_data key=var_key}
+		{if $var_data.type == "ctx_{CerberusContexts::CONTEXT_ADDRESS}"}
+			<li><label><input type="checkbox" name="{$namePrefix}[bcc_var][]" value="{$var_key}" {if is_array($params.bcc_var) && in_array($var_key, $params.bcc_var)}checked="checked"{/if}> (variable) {$var_data.label}</label></li>
 		{/if}
 	{/foreach}
 	</ul>

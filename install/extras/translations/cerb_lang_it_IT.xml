@@ -23,11 +23,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="acl.core.addybook">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="acl.core.addybook.addy.actions.update">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -74,11 +69,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="acl.core.display.actions.attachments.download">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="acl.core.display.actions.comment">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -203,11 +193,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="acl.core.ticket.view.actions.pile_sort">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="acl.core.watchers.assign">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -308,7 +293,7 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="acl.reports.group.virtual_attendants">
+		<tu tuid="acl.reports.group.bots">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -483,56 +468,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="activity.activity">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="activity.address_book">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="activity.config">
-			<tuv xml:lang="it_IT">
-				<seg>%s sta configurando l'helpdesk</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.default">
-			<tuv xml:lang="it_IT">
-				<seg>%s sta navigando l'helpdesk</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.display_ticket">
-			<tuv xml:lang="it_IT">
-				<seg>%s sta visualizzando %s </seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.kb">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="activity.mail.search">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="activity.mail.workspaces">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="activity.simulator">
-			<tuv xml:lang="it_IT">
-				<seg>%s is generating simulated tickets </seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.tickets">
-			<tuv xml:lang="it_IT">
-				<seg>%s sta navigando %s tickets</seg>
-			</tuv>
-		</tu>
 		<tu tuid="address.address">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -638,11 +573,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="attachment.display_name">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="attachment.id">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -673,11 +603,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="attachment.storage_size">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="calls.activity.tab">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -689,11 +614,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="calls.ui.log_call">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="call_entry.model.is_closed">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -773,6 +693,11 @@
 				<seg/>
 			</tuv>
 		</tu>
+		<tu tuid="common.actions">
+			<tuv xml:lang="it_IT">
+				<seg>Azioni</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.active">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -826,6 +751,11 @@
 		<tu tuid="common.attachments">
 			<tuv xml:lang="it_IT">
 				<seg>Allegati</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.author">
+			<tuv xml:lang="it_IT">
+				<seg/>
 			</tuv>
 		</tu>
 		<tu tuid="common.availability">
@@ -1128,11 +1058,6 @@
 				<seg>filtri</seg>
 			</tuv>
 		</tu>
-		<tu tuid="common.fnr">
-			<tuv xml:lang="it_IT">
-				<seg>fetch &amp; retrieve </seg>
-			</tuv>
-		</tu>
 		<tu tuid="common.group">
 			<tuv xml:lang="it_IT">
 				<seg>Gruppo</seg>
@@ -1219,6 +1144,16 @@
 			</tuv>
 		</tu>
 		<tu tuid="common.languages">
+			<tuv xml:lang="it_IT">
+				<seg/>
+			</tuv>
+		</tu>
+		<tu tuid="common.last_activity">
+			<tuv xml:lang="it_IT">
+				<seg/>
+			</tuv>
+		</tu>
+		<tu tuid="common.last_activity_date">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -1753,12 +1688,12 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="common.virtual_attendant">
+		<tu tuid="common.bot">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="common.virtual_attendants">
+		<tu tuid="common.bots">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -2003,11 +1938,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="dao.cerb_plugin.author">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="dao.cerb_plugin.description">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -2109,11 +2039,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="dao.decision_node.node_type">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.decision_node.params">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -2289,36 +2214,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="dao.trigger_event.is_disabled">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.trigger_event.owner_context">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.trigger_event.owner_context_id">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.last_synced_at">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.last_synced_msgid">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.oauth_token">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.screen_name">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -2506,11 +2401,6 @@
 		<tu tuid="dashboard">
 			<tuv xml:lang="it_IT">
 				<seg>Dashboard</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dashboard.actions">
-			<tuv xml:lang="it_IT">
-				<seg>Azioni</seg>
 			</tuv>
 		</tu>
 		<tu tuid="dashboard.active_dashboard">
@@ -3243,11 +3133,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="mail_queue.params_json">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="mail_queue.queue_delivery_date">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -3598,32 +3483,12 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="portal.sc.cfg.fnr.choose_resources">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.fnr.info">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.fnr.not_configured">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="portal.sc.cfg.followup_questions_hint">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
 		</tu>
 		<tu tuid="portal.sc.cfg.login_registration">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.open_ticket.allow_custom_subjects">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -4213,7 +4078,7 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="reports.ui.group.virtual_attendant">
+		<tu tuid="reports.ui.group.bot">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -4353,7 +4218,7 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="reports.ui.virtual_attendant.usage">
+		<tu tuid="reports.ui.bot.usage">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -4573,6 +4438,11 @@
 				<seg>Chiuso</seg>
 			</tuv>
 		</tu>
+		<tu tuid="status.completed">
+			<tuv xml:lang="it_IT">
+				<seg/>
+			</tuv>
+		</tu>
 		<tu tuid="status.deleted">
 			<tuv xml:lang="it_IT">
 				<seg>Cancellato</seg>
@@ -4604,11 +4474,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="task.status.active">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="task.status.completed">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>
@@ -4983,16 +4848,6 @@
 				<seg>Attività</seg>
 			</tuv>
 		</tu>
-		<tu tuid="timetracking_entry.id">
-			<tuv xml:lang="it_IT">
-				<seg>ID</seg>
-			</tuv>
-		</tu>
-		<tu tuid="timetracking_entry.is_closed">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="timetracking_entry.log_date">
 			<tuv xml:lang="it_IT">
 				<seg>Logga Data</seg>
@@ -5208,11 +5063,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="whos_online.heading">
-			<tuv xml:lang="it_IT">
-				<seg>%s Utenti Loggati:</seg>
-			</tuv>
-		</tu>
 		<tu tuid="worker.at_mention_name">
 			<tuv xml:lang="it_IT">
 				<seg/>
@@ -5224,16 +5074,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="worker.is_superuser">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="worker.last_activity">
-			<tuv xml:lang="it_IT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="worker.last_activity_date">
 			<tuv xml:lang="it_IT">
 				<seg/>
 			</tuv>

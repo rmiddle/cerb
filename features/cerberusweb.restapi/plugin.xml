@@ -4,14 +4,14 @@
 	<name>Web Services API (JSON/XML)</name>
 	<description>A RESTful JSON/XML interface for integrating Cerb with other applications and tools.</description>
 	<author>Webgroup Media, LLC.</author>
-	<version>7.1.1</version>
+	<version>7.3.3</version>
 	<link>http://wiki.cerbweb.com/Features:Web_Services_API</link>
 	<image>plugin.png</image>
 
 	<!-- Requirements -->
 
 	<requires>
-		<app_version min="7.1" max="7.1.99" />
+		<app_version min="7.3" max="7.3.99" />
 	</requires>
 
 	<!-- Plugin Dependencies -->
@@ -68,11 +68,23 @@
 			</class>
 			<params>
 				<param key="uri" value="api" />
-				<param key="title" value="webapi.common.api_credentials" />
+				<param key="title" value="Cerb API" />
 			</params>
 		</extension>
 
 		<!-- REST Controllers -->
+		
+		<extension point="cerberusweb.rest.controller">
+			<id>cerberusweb.rest.controller.activity_log</id>
+			<name>Activity Log</name>
+			<class>
+				<file>api/rest/activity_log.php</file>
+				<name>Rest_ActivityLog</name>
+			</class>
+			<params>
+				<param key="uri" value="activity_log" />
+			</params>
+		</extension>
 		
 		<extension point="cerberusweb.rest.controller">
 			<id>cerberusweb.rest.controller.addresses</id>
@@ -119,6 +131,18 @@
 			</class>
 			<params>
 				<param key="uri" value="comments" />
+			</params>
+		</extension>
+		
+		<extension point="cerberusweb.rest.controller">
+			<id>cerberusweb.rest.controller.contacts</id>
+			<name>Contexts</name>
+			<class>
+				<file>api/rest/contacts.php</file>
+				<name>ChRest_Contacts</name>
+			</class>
+			<params>
+				<param key="uri" value="contacts" />
 			</params>
 		</extension>
 		
@@ -243,14 +267,14 @@
 		</extension>
 		
 		<extension point="cerberusweb.rest.controller">
-			<id>cerberusweb.rest.controller.virtual_attendants</id>
-			<name>Virtual Attendants</name>
+			<id>cerberusweb.rest.controller.bots</id>
+			<name>Bots</name>
 			<class>
 				<file>api/rest/va.php</file>
-				<name>ChRest_VirtualAttendants</name>
+				<name>ChRest_Bots</name>
 			</class>
 			<params>
-				<param key="uri" value="va" />
+				<param key="uri" value="bots" />
 			</params>
 		</extension>
 		

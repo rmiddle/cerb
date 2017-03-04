@@ -1,31 +1,21 @@
 <form action="{devblocks_url}{/devblocks_url}" method="POST" id="formBatchUpdate" name="formBatchUpdate" onsubmit="return false;">
-<input type="hidden" name="c" value="tickets">
-<input type="hidden" name="a" value="doBulkUpdate">
+<input type="hidden" name="c" value="profiles">
+<input type="hidden" name="a" value="handleSectionAction">
+<input type="hidden" name="section" value="ticket">
+<input type="hidden" name="action" value="startBulkUpdateJson">
 <input type="hidden" name="view_id" value="{$view_id}">
 <input type="hidden" name="ids" value="{$ids}">
 <input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
 <fieldset class="peek">
 	<legend>{'common.bulk_update.with'|devblocks_translate|capitalize}</legend>
-	<label><input type="radio" name="filter" value="" onclick="toggleDiv('categoryFilterPanelSender','none');toggleDiv('categoryFilterPanelSubject','none');" {if empty($ids)}checked{/if}> {'common.bulk_update.filter.all'|devblocks_translate}</label> 
+	<label><input type="radio" name="filter" value="" {if empty($ids)}checked{/if}> {'common.bulk_update.filter.all'|devblocks_translate}</label> 
 	{if !empty($ids)}
-		<label><input type="radio" name="filter" value="checks" onclick="toggleDiv('categoryFilterPanelSender','none');toggleDiv('categoryFilterPanelSubject','none');" {if !empty($ids)}checked{/if}> {'common.bulk_update.filter.checked'|devblocks_translate}</label> 
+		<label><input type="radio" name="filter" value="checks" {if !empty($ids)}checked{/if}> {'common.bulk_update.filter.checked'|devblocks_translate}</label> 
 	{/if}
-	<label><input type="radio" name="filter" value="sender" onclick="toggleDiv('categoryFilterPanelSender','block');toggleDiv('categoryFilterPanelSubject','none');"> Similar senders</label>
-	<label><input type="radio" name="filter" value="subject" onclick="toggleDiv('categoryFilterPanelSender','none');toggleDiv('categoryFilterPanelSubject','block');"> Similar subjects</label>
 	{if empty($ids)}
-		<label><input type="radio" name="filter" value="sample" onclick="toggleDiv('categoryFilterPanelSender','none');toggleDiv('categoryFilterPanelSubject','none');"> {'common.bulk_update.filter.random'|devblocks_translate} </label><input type="text" name="filter_sample_size" size="5" maxlength="4" value="100" class="input_number">
+		<label><input type="radio" name="filter" value="sample"> {'common.bulk_update.filter.random'|devblocks_translate} </label><input type="text" name="filter_sample_size" size="5" maxlength="4" value="100" class="input_number">
 	{/if}
-	
-	<div style='display:none;' id='categoryFilterPanelSender'>
-	<label><b>When sender matches:</b> (one per line, use * for wildcards)</label><br>
-	<textarea rows='3' cols='45' style='width:95%' name='senders' wrap="off">{foreach from=$unique_senders key=sender item=total name=senders}{$sender}{if !$smarty.foreach.senders.last}{"\n"}{/if}{/foreach}</textarea><br>
-	</div>
-	
-	<div style='display:none;' id='categoryFilterPanelSubject'>
-	<label><b>When subject matches:</b> (one per line, use * for wildcards)</label><br>
-	<textarea rows='3' cols='45' style='width:95%' name='subjects' wrap="off">{foreach from=$unique_subjects key=subject item=total name=subjects}{$subject}{if !$smarty.foreach.subjects.last}{"\n"}{/if}{/foreach}</textarea><br>
-	</div>
 </fieldset>
 
 <fieldset class="peek">
@@ -33,93 +23,148 @@
 	<table cellspacing="0" cellpadding="2" width="100%">
 		{if $active_worker->hasPriv('core.ticket.actions.move')}
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">Move to:</td>
-			<td width="100%"><select name="do_move">
-				<option value=""></option>
-				{foreach from=$group_buckets item=buckets key=groupId}
-					{$group = $groups.$groupId}
-					{foreach from=$buckets item=bucket}
-					{if $bucket->is_default || !empty($active_worker_memberships.$groupId)}
-						<option value="{$bucket->id}">{$group->name}: {$bucket->name}</option>
-					{/if}
-					{/foreach}
-				{/foreach}
-			</select></td>
+			<td width="0%" nowrap="nowrap" align="left" valign="middle">
+				<label>
+					<input type="checkbox" name="actions[]" value="move">
+					Move to:
+				</label>
+			</td>
+			<td width="100%">
+				<div style="display:none;">
+					<select name="params[move][group_id]" class="cerb-moveto-group">
+						<option></option>
+						{foreach from=$groups item=group}
+						<option value="{$group->id}">{$group->name}</option>
+						{/foreach}
+					</select>
+					<select class="cerb-moveto-bucket-options" style="display:none;">
+						{foreach from=$buckets item=bucket}
+						<option value="{$bucket->id}" data-group-id="{$bucket->group_id}">{$bucket->name}</option>
+						{/foreach}
+					</select>
+					<select name="params[move][bucket_id]" class="cerb-moveto-bucket" style="display:none;"></select>
+				</div>
+			</td>
 		</tr>
 		{/if}
 		
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">Status:</td>
+			<td width="0%" nowrap="nowrap" align="left" valign="top">
+				<label>
+					<input type="checkbox" name="actions[]" value="status">
+					{'common.status'|devblocks_translate|capitalize}:
+				</label>
+			</td>
 			<td width="100%" valign="top">
-				<select name="do_status" onchange="$val=$(this).val();$waiting=$('#bulk{$view_id}_waiting');if($val==3 || $val==1){ $waiting.show(); } else { $waiting.hide(); }">
-					<option value=""></option>
-					<option value="0">Open</option>
-					<option value="3">Waiting</option>
-					{if $active_worker->hasPriv('core.ticket.actions.close')}
-					<option value="1">Closed</option>
-					{/if}
-					{if $active_worker->hasPriv('core.ticket.actions.delete')}
-					<option value="2">Deleted</option>
-					{/if}
-				</select>
-				<button type="button" onclick="$(this.form).find('select[name=do_status]').val('0').trigger('change');">open</button>
-				<button type="button" onclick="$(this.form).find('select[name=do_status]').val('3').trigger('change');">waiting</button>
-				{if $active_worker->hasPriv('core.ticket.actions.close')}<button type="button" onclick="$(this.form).find('select[name=do_status]').val('1').trigger('change');">closed</button>{/if}
-				{if $active_worker->hasPriv('core.ticket.actions.delete')}<button type="button" onclick="$(this.form).find('select[name=do_status]').val('2').trigger('change');">deleted</button>{/if}
-				
-				<div id="bulk{$view_id}_waiting" style="display:none;">
-					<b>{'display.reply.next.resume'|devblocks_translate}</b>
-					<br>
-					<i>{'display.reply.next.resume_eg'|devblocks_translate}</i>
-					<br> 
-					<input type="text" name="do_reopen" size="55" value="">
-					<br>
-					{'display.reply.next.resume_blank'|devblocks_translate}
-					<br>
+				<div style="display:none;">
+					<select name="params[status][status_id]" onchange="$val=$(this).val();$waiting=$('#bulk{$view_id}_waiting');if($val=={Model_Ticket::STATUS_WAITING} || $val=={Model_Ticket::STATUS_CLOSED}){ $waiting.show(); } else { $waiting.hide(); }">
+						<option value="{Model_Ticket::STATUS_OPEN}">{'status.open'|devblocks_translate|capitalize}</option>
+						<option value="{Model_Ticket::STATUS_WAITING}">{'status.waiting.abbr'|devblocks_translate|capitalize}</option>
+						{if $active_worker->hasPriv('core.ticket.actions.close')}
+						<option value="{Model_Ticket::STATUS_CLOSED}">{'status.closed'|devblocks_translate|capitalize}</option>
+						{/if}
+						{if $active_worker->hasPriv('core.ticket.actions.delete')}
+						<option value="{Model_Ticket::STATUS_DELETED}">{'status.deleted'|devblocks_translate|capitalize}</option>
+						{/if}
+					</select>
+					
+					<div id="bulk{$view_id}_waiting" style="display:none;">
+						<b>{'display.reply.next.resume'|devblocks_translate}</b>
+						<br>
+						<i>{'display.reply.next.resume_eg'|devblocks_translate}</i>
+						<br> 
+						<input type="text" name="params[status][reopen_at]" size="55" value="">
+						<br>
+						{'display.reply.next.resume_blank'|devblocks_translate}
+						<br>
+					</div>
+				</div>
+			</td>
+		</tr>
+		
+		<tr>
+			<td width="0%" nowrap="nowrap" align="left" valign="middle">
+				<label>
+					<input type="checkbox" name="actions[]" value="importance">
+					{'common.importance'|devblocks_translate|capitalize}:
+				</label>
+			</td>
+			<td width="100%">
+				<div style="display:none;">
+					<div class="cerb-delta-slider-container">
+					<input type="hidden" name="params[importance]" value="50">
+						<div class="cerb-delta-slider cerb-slider-gray">
+							<span class="cerb-delta-slider-midpoint"></span>
+						</div>
+					</div>
 				</div>
 			</td>
 		</tr>
 		
 		{if $active_worker->hasPriv('core.ticket.actions.spam')}
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">Spam:</td>
-			<td width="100%"><select name="do_spam">
-				<option value=""></option>
-				<option value="1">Report Spam</option>
-				<option value="0">Not Spam</option>
-			</select>
-			<button type="button" onclick="this.form.do_spam.selectedIndex = 1;">spam</button>
-			<button type="button" onclick="this.form.do_spam.selectedIndex = 2;">not spam</button>
+			<td width="0%" nowrap="nowrap" align="left" valign="top">
+				<label>
+					<input type="checkbox" name="actions[]" value="spam">
+					{'common.spam'|devblocks_translate|capitalize}:
+				</label>
+			</td>
+			<td width="100%">
+				<div style="display:none;">
+					<select name="params[spam]">
+						<option value="0">{'common.notspam'|devblocks_translate|capitalize}</option>
+						<option value="1">{'common.spam'|devblocks_translate|capitalize}</option>
+					</select>
+				</div>
 			</td>
 		</tr>
 		{/if}
 		
 		{if 1}
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">{'common.owner'|devblocks_translate|capitalize}:</td>
+			<td width="0%" nowrap="nowrap" align="left" valign="top">
+				<label>
+					<input type="checkbox" name="actions[]" value="owner">
+					{'common.owner'|devblocks_translate|capitalize}:
+				</label>
+			</td>
 			<td width="100%">
-				<button type="button" class="chooser-abstract" data-field-name="do_owner" data-context="{CerberusContexts::CONTEXT_WORKER}" data-single="true" data-query="" data-autocomplete="if-null"><span class="glyphicons glyphicons-search"></span></button>
-				<ul class="bubbles chooser-container"></ul>
+				<div style="display:none;">
+					<button type="button" class="chooser-abstract" data-field-name="params[owner]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-single="true" data-query="" data-autocomplete="" data-autocomplete-if-empty="true"><span class="glyphicons glyphicons-search"></span></button>
+					<ul class="bubbles chooser-container"></ul>
+				</div>
 			</td>
 		</tr>
 		{/if}
 		
 		{if 1}
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">{'common.organization'|devblocks_translate|capitalize}:</td>
+			<td width="0%" nowrap="nowrap" align="left" valign="top">
+				<label>
+					<input type="checkbox" name="actions[]" value="org">
+					{'common.organization'|devblocks_translate|capitalize}:
+				</label>
+			</td>
 			<td width="100%">
-				<button type="button" class="chooser-abstract" data-field-name="do_org" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-query="" data-autocomplete="if-null" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
-				<ul class="bubbles chooser-container"></ul>
+				<div style="display:none;">
+					<button type="button" class="chooser-abstract" data-field-name="params[org]" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-query="" data-autocomplete="" data-autocomplete-if-empty="true" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+					<ul class="bubbles chooser-container"></ul>
+				</div>
 			</td>
 		</tr>
 		{/if}
 		
 		{if $active_worker->hasPriv('core.watchers.assign')}
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">Add watchers:</td>
+			<td width="0%" nowrap="nowrap" align="left" valign="top">
+				<label>
+					<input type="checkbox" name="actions[]" value="watchers_add">
+					Add watchers:
+				</label>
+			</td>
 			<td width="100%">
-				<div>
-					<button type="button" class="chooser-abstract" data-field-name="do_watcher_add_ids[]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-query="isDisabled:n" data-autocomplete="true"><span class="glyphicons glyphicons-search"></span></button>
+				<div style="display:none;">
+					<button type="button" class="chooser-abstract" data-field-name="params[watchers_add][]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-query="isDisabled:n" data-autocomplete=""><span class="glyphicons glyphicons-search"></span></button>
 					<ul class="bubbles chooser-container" style="display:block;"></ul>
 				</div>
 			</td>
@@ -128,10 +173,15 @@
 		
 		{if $active_worker->hasPriv('core.watchers.unassign')}
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="top">Remove watchers:</td>
+			<td width="0%" nowrap="nowrap" align="left" valign="top">
+				<label>
+					<input type="checkbox" name="actions[]" value="watchers_remove">
+					Remove watchers:
+				</label>
+			</td>
 			<td width="100%">
-				<div>
-					<button type="button" class="chooser-abstract" data-field-name="do_watcher_remove_ids[]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-query="isDisabled:n" data-autocomplete="true"><span class="glyphicons glyphicons-search"></span></button>
+				<div style="display:none;">
+					<button type="button" class="chooser-abstract" data-field-name="params[watchers_remove][]" data-context="{CerberusContexts::CONTEXT_WORKER}" data-query="isDisabled:n" data-autocomplete=""><span class="glyphicons glyphicons-search"></span></button>
 					<ul class="bubbles chooser-container" style="display:block;"></ul>
 				</div>
 			</td>
@@ -152,41 +202,7 @@
 {include file="devblocks:cerberusweb.core::internal/macros/behavior/bulk.tpl" macros=$macros}
 
 {if $active_worker->hasPriv('core.ticket.view.actions.broadcast_reply')}
-<fieldset class="peek">
-	<legend>Send Broadcast Reply</legend>
-	<label><input type="checkbox" name="do_broadcast" id="chkMassReply" onclick="$('#bulkTicketBroadcast').toggle();"> {'common.enabled'|devblocks_translate|capitalize}</label>
-	<input type="hidden" name="broadcast_format" value="">
-	
-	<blockquote id="bulkTicketBroadcast" style="display:none;margin:10px;">
-		<b>Reply:</b>
-		
-		<div style="margin:0px 0px 5px 10px;">
-			<textarea name="broadcast_message" style="width:100%;height:200px;border:1px solid rgb(180,180,180);padding:2px;"></textarea>
-			<div>
-				<button type="button" onclick="ajax.chooserSnippet('snippets',$('#bulkTicketBroadcast textarea[name=broadcast_message]'), { '{CerberusContexts::CONTEXT_TICKET}':'', '{CerberusContexts::CONTEXT_WORKER}':'{$active_worker->id}' });">{'common.snippets'|devblocks_translate|capitalize}</button>
-				<select class="insert-placeholders">
-					<option value="">-- insert at cursor --</option>
-					{foreach from=$token_labels key=k item=v}
-					<option value="{literal}{{{/literal}{$k}{literal}}}{/literal}">{$v}</option>
-					{/foreach}
-				</select>
-			</div>
-		</div>
-		
-		<b>{'common.attachments'|devblocks_translate|capitalize}:</b><br>
-	
-		<div style="margin:0px 0px 5px 10px;">
-			<button type="button" class="chooser_file"><span class="glyphicons glyphicons-paperclip"></span></button>
-			<ul class="bubbles chooser-container">
-		</div>
-		
-		<b>Then:</b>
-		<div style="margin:0px 0px 5px 10px;">
-			<label><input type="radio" name="broadcast_is_queued" value="0" checked="checked"> Save as drafts</label>
-			<label><input type="radio" name="broadcast_is_queued" value="1"> Send now</label>
-		</div>
-	</blockquote>
-</fieldset>
+{include file="devblocks:cerberusweb.core::internal/views/bulk_broadcast.tpl" context=CerberusContexts::CONTEXT_TICKET is_reply=true}
 {/if}
 	
 <button type="button" class="submit"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_changes'|devblocks_translate|capitalize}</button>
@@ -195,136 +211,95 @@
 
 <script type="text/javascript">
 $(function() {
-	var $popup = genericAjaxPopupFind('#formBatchUpdate');
+	var $frm = $('#formBatchUpdate');
+	var $popup = genericAjaxPopupFind($frm);
 	
 	$popup.one('popup_open', function(event,ui) {
-		var $this = $(this);
-		var $frm = $('#formBatchUpdate');
-		
 		$popup.dialog('option','title',"{'common.bulk_update'|devblocks_translate|capitalize|escape:'javascript' nofilter}");
+		$popup.css('overflow', 'inherit');
 		
 		$popup.find('button.chooser-abstract').cerbChooserTrigger();
 		
 		$popup.find('button.submit').click(function() {
-			genericAjaxPost('formBatchUpdate', 'view{$view_id}', null, function() {
+			genericAjaxPost('formBatchUpdate', '', null, function(json) {
+				if(json.cursor) {
+					// Pull the cursor
+					var $tips = $('#{$view_id}_tips').html('');
+					var $spinner = $('<span class="cerb-ajax-spinner"/>').appendTo($tips);
+					genericAjaxGet($tips, 'c=internal&a=viewBulkUpdateWithCursor&view_id={$view_id}&cursor=' + json.cursor);
+				}
+				
 				genericAjaxPopupClose($popup);
 			});
 		});
 		
-		$frm.find('button.chooser_file').each(function() {
-			ajax.chooserFile(this,'broadcast_file_ids');
+		// Checkboxes
+		
+		$popup.find('input:checkbox[name="actions[]"]').change(function() {
+			$(this).closest('td').next('td').find('> div').toggle();
 		});
 		
-		var $content = $frm.find('textarea[name=broadcast_message]');
+		// Slider
 		
-		$this.find('select.insert-placeholders').change(function(e) {
-			var $select = $(this);
-			var $val = $select.val();
+		$popup.find('div.cerb-delta-slider').each(function() {
+			var $this = $(this);
+			var $input = $this.siblings('input:hidden');
 			
-			if($val.length == 0)
-				return;
-			
-			$content.insertAtCursor($val).focus();
-			
-			$select.val('');
-		});
-		
-		// Text editor
-		
-		var markitupPlaintextSettings = $.extend(true, { }, markitupPlaintextDefaults);
-		var markitupParsedownSettings = $.extend(true, { }, markitupParsedownDefaults);
-		
-		var markitupBroadcastFunctions = {
-			switchToMarkdown: function(markItUp) { 
-				$content.markItUpRemove().markItUp(markitupParsedownSettings);
-				$content.closest('form').find('input:hidden[name=broadcast_format]').val('parsedown');
-				
-				// Template chooser
-				
-				var $ul = $content.closest('.markItUpContainer').find('.markItUpHeader UL');
-				var $li = $('<li style="margin-left:10px;"></li>');
-				
-				var $select = $('<select name="broadcast_html_template_id"></select>');
-				$select.append($('<option value="0"/>').text(' - {'common.default'|devblocks_translate|lower|escape:'javascript'} -'));
-				
-				{foreach from=$html_templates item=html_template}
-				var $option = $('<option/>').attr('value','{$html_template->id}').text('{$html_template->name|escape:'javascript'}');
-				$select.append($option);
-				{/foreach}
-				
-				$li.append($select);
-				$ul.append($li);
-			},
-			
-			switchToPlaintext: function(markItUp) {
-				$content.markItUpRemove().markItUp(markitupPlaintextSettings);
-				$content.closest('form').find('input:hidden[name=broadcast_format]').val('');
-			}
-		};
-		
-		markitupPlaintextSettings.markupSet.unshift(
-			{ name:'Switch to Markdown', openWith: markitupBroadcastFunctions.switchToMarkdown, className:'parsedown' }
-		);
-		
-		markitupPlaintextSettings.markupSet.push(
-			{ separator:' ' },
-			{ name:'Preview', key: 'P', call:'preview', className:"preview" }
-		);
-		
-		var previewParser = function(content) {
-			genericAjaxPost(
-				'formBatchUpdate',
-				'',
-				'c=tickets&a=doBulkUpdateBroadcastTest',
-				function(o) {
-					content = o;
-				},
-				{
-					async: false
-				}
-			);
-			
-			return content;
-		};
-		
-		markitupPlaintextSettings.previewParser = previewParser;
-		markitupPlaintextSettings.previewAutoRefresh = false;
-		
-		markitupParsedownSettings.previewParser = previewParser;
-		markitupParsedownSettings.previewAutoRefresh = false;
-		delete markitupParsedownSettings.previewInWindow;
-		
-		markitupParsedownSettings.markupSet.unshift(
-			{ name:'Switch to Plaintext', openWith: markitupBroadcastFunctions.switchToPlaintext, className:'plaintext' },
-			{ separator:' ' }
-		);
-		
-		markitupParsedownSettings.markupSet.splice(
-			6,
-			0,
-			{ name:'Upload an Image', openWith: 
-				function(markItUp) {
-					$chooser=genericAjaxPopup('chooser','c=internal&a=chooserOpenFile&single=1',null,true,'750');
+			$this.slider({
+				disabled: false,
+				value: 50,
+				min: 0,
+				max: 100,
+				step: 1,
+				range: 'min',
+				slide: function(event, ui) {
+					$this.removeClass('cerb-slider-gray cerb-slider-red cerb-slider-green');
 					
-					$chooser.one('chooser_save', function(event) {
-						if(!event.response || 0 == event.response)
-							return;
-						
-						$content.insertAtCursor("![inline-image](" + event.response[0].url + ")");
-					});
+					if(ui.value < 50) {
+						$this.addClass('cerb-slider-green');
+						$this.slider('option', 'range', 'min');
+					} else if(ui.value > 50) {
+						$this.addClass('cerb-slider-red');
+						$this.slider('option', 'range', 'max');
+					} else {
+						$this.addClass('cerb-slider-gray');
+						$this.slider('option', 'range', false);
+					}
 				},
-				key: 'U',
-				className:'image-inline'
-			}
-		);
+				stop: function(event, ui) {
+					$input.val(ui.value);
+				}
+			});
+		});
 		
-		try {
-			$content.markItUp(markitupPlaintextSettings);
+		// Move to
+		
+		var $select_moveto_group = $popup.find('select.cerb-moveto-group');
+		var $select_moveto_bucket = $popup.find('select.cerb-moveto-bucket');
+		var $select_moveto_bucket_options = $popup.find('select.cerb-moveto-bucket-options');
+		
+		$select_moveto_group.change(function() {
+			var group_id = $(this).val();
 			
-		} catch(e) {
-			if(window.console)
-				console.log(e);
-		}
+			$select_moveto_bucket.find('> option').remove();
+			
+			$('<option/>').appendTo($select_moveto_bucket);
+			
+			if(0 == group_id.length) {
+				$select_moveto_bucket.val('').hide();
+				return;
+			}
+			
+			$select_moveto_bucket_options.find('option').each(function() {
+				var $opt = $(this);
+				if($opt.attr('data-group-id') == group_id)
+					$opt.clone().appendTo($select_moveto_bucket);
+			});
+			
+			$select_moveto_bucket.val('').fadeIn();
+		});
+		
+		{include file="devblocks:cerberusweb.core::internal/views/bulk_broadcast_jquery.tpl"}
 	});
 });
 </script>

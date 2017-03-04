@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class ChFilesController extends DevblocksControllerExtension {
@@ -20,6 +20,7 @@ class ChFilesController extends DevblocksControllerExtension {
 		// The current session must be a logged-in worker to use this page.
 		if(null == ($worker = CerberusApplication::getActiveWorker()))
 			return false;
+		
 		return true;
 	}
 	
@@ -31,51 +32,38 @@ class ChFilesController extends DevblocksControllerExtension {
 		
 		$stack = $request->path; // URLS like: /files/10000/plaintext.txt
 		array_shift($stack); // files
-		$file_guid = array_shift($stack); // GUID
+		$file_id = array_shift($stack); // 123
 		$file_name = array_shift($stack); // plaintext.txt
+		
+		$is_download = isset($request->query['download']) ? true : false;
+		$handled = false;
+		
+		if(40 == strlen($file_id))
+			$file_id = DAO_Attachment::getBySha1Hash($file_id);
 		
 		// Security
 		if(null == ($active_worker = CerberusApplication::getActiveWorker()))
-			die($translate->_('common.access_denied'));
+			DevblocksPlatform::dieWithHttpError($translate->_('common.access_denied'), 403);
 		
-		if(empty($file_guid) || empty($file_name))
-			die($translate->_('files.not_found'));
+		if(empty($file_id) || empty($file_name))
+			DevblocksPlatform::dieWithHttpError($translate->_('files.not_found'), 404);
 		
-		// Are we being asked for the direct SHA1 hash of a file?
-		if(strlen($file_guid) == 40) {
-			if(null == ($file_id = DAO_Attachment::getBySha1Hash($file_guid)))
-				die($translate->_('common.access_denied'));
-			
-			$file = DAO_Attachment::get($file_id);
-			
-		// If not SHA1, then look for a link with this GUID
-		} else {
-			$link = DAO_AttachmentLink::getByGUID($file_guid);
-			
-			if(empty($link))
-				die($translate->_('files.error_link_read'));
-			
-			if(null == ($context = $link->getContext()))
-				die($translate->_('common.access_denied'));
-			
-			// Security
-			if(!$context->authorize($link->context_id, $active_worker))
-				die($translate->_('common.access_denied'));
-			
-			$file = $link->getAttachment();
-		}
+		if(false == ($file = DAO_Attachment::get($file_id)))
+			DevblocksPlatform::dieWithHttpError($translate->_('files.not_found'), 404);
 		
-		if(empty($file))
-			die($translate->_('files.not_found'));
+		if(!Context_Attachment::isDownloadableByActor($file, $active_worker))
+			DevblocksPlatform::dieWithHttpError($translate->_('common.access_denied'), 403);
+		
 		if(false === ($fp = DevblocksPlatform::getTempFile()))
-			die($translate->_('files.error_temp_open'));
+			DevblocksPlatform::dieWithHttpError($translate->_('files.error_temp_open'), 500);
+		
 		if(false === $file->getFileContents($fp))
-			die($translate->_('files.error_resource_read'));
+			DevblocksPlatform::dieWithHttpError($translate->_('files.error_resource_read'), 500);
 			
 		$file_stats = fstat($fp);
+		$mime_type = DevblocksPlatform::strLower($file->mime_type);
+		$size = $file_stats['size'];
 		
-		$is_download = isset($request->query['download']) ? true : false;
-
 		// Set headers
 		header('Pragma: cache');
 		header('Cache-control: max-age=604800', true); // 1 wk // , must-revalidate
@@ -84,21 +72,66 @@ class ChFilesController extends DevblocksControllerExtension {
 // 		header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
 
 		if($is_download) {
-			header('Content-Disposition: attachment; filename=' . urlencode($file->display_name));
+			header('Content-Disposition: attachment; filename=' . urlencode($file->name));
+			
+		} else {
+			@$range = DevblocksPlatform::importGPC($_SERVER['HTTP_RANGE'], 'string', null);
+			
+			if($range) {
+				@list($range_unit, $value) = explode('=', $range, 2);
+				
+				if($range_unit != 'bytes')
+					DevblocksPlatform::dieWithHttpError('Bad Request', 400);
+				
+				@list($range_from, $range_to) = explode('-', $value, 2);
+				
+				if(!$range_to)
+					$range_to = $size - 1;
+				
+				$length = ($range_to - $range_from) + 1;
+				
+				header('HTTP/1.1 206 Partial Content');
+				header("Content-Type: " . $mime_type);
+				header("Content-Length: " . $length);
+				header(sprintf("Content-Range: bytes %d-%d/%d", $range_from, $range_to, $size));
+				
+				flush();
+				
+				$remaining = $length;
+				$block_size = 8192;
+				
+				fseek($fp, $range_from);
+				
+				while(true) {
+					$read_size = min($remaining, $block_size);
+					
+					if($read_size <= 0)
+						break;
+					
+					echo fread($fp, $read_size);
+					$remaining -= $read_size;
+					flush();
+				}
+				
+				$handled = true;
+				fclose($fp);
+			}
 		}
 		
-		$handled = false;
-		
-		switch(strtolower($file->mime_type)) {
+		switch($mime_type) {
+			case 'application/json':
 			case 'message/feedback-report':
 			case 'message/rfc822':
+			case 'text/csv':
+			case 'text/javascript':
+			case 'text/css':
+			case 'text/xml':
 				// Render to the browser as text
 				if(!$is_download)
-					$file->mime_type = 'text/plain';
+					$mime_type = 'text/plain';
 				break;
 			
 			case 'text/html':
-				$handled = true;
 				header("Content-Type: text/html; charset=" . LANG_CHARSET_CODE);
 				
 				// If we're downloading the HTML, just pass the raw bytes
@@ -143,19 +176,18 @@ class ChFilesController extends DevblocksControllerExtension {
 					header("Content-Length: " . strlen($clean_html));
 					echo $clean_html;
 				}
-				break;
 				
-			default:
+				$handled = true;
+				fclose($fp);
 				break;
 		}
 		
 		if(!$handled) {
-			header("Content-Type: " . $file->mime_type);
+			header("Content-Type: " . $mime_type);
 			header("Content-Length: " . $file_stats['size']);
 			fpassthru($fp);
+			fclose($fp);
 		}
-		
-		fclose($fp);
 		
 		exit;
 	}

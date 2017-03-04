@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
@@ -154,6 +154,7 @@ class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
 	
 	function getActionExtensions(Model_TriggerEvent $trigger) {
 		$actions = array(
+			'send_email' => array('label' => 'Send email'),
 			'send_email_owner' => array('label' => 'Send email to notified worker'),
 			'create_task' => array('label' =>'Create task'),
 			'mark_read' => array('label' =>'Mark read'),
@@ -180,11 +181,15 @@ class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
 				echo "The notification will be marked as read.";
 				break;
 				
+			case 'send_email':
+				DevblocksEventHelper::renderActionSendEmail($trigger);
+				break;
+				
 			case 'send_email_owner':
 				$workers = DAO_Worker::getAll();
 				$tpl->assign('workers', $workers);
 				
-				if(false == ($va = $trigger->getVirtualAttendant()))
+				if(false == ($va = $trigger->getBot()))
 					break;
 				
 				$addresses = DAO_AddressToWorker::getByWorker($va->owner_context_id);
@@ -202,6 +207,10 @@ class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
 			return;
 		
 		switch($token) {
+			case 'send_email':
+				return DevblocksEventHelper::simulateActionSendEmail($params, $dict);
+				break;
+			
 			case 'send_email_owner':
 				$to = array();
 				
@@ -262,6 +271,10 @@ class Event_NotificationReceivedByWorker extends Extension_DevblocksEvent {
 				$dict->is_read = 1;
 				break;
 			
+			case 'send_email':
+				DevblocksEventHelper::runActionSendEmail($params, $dict);
+				break;
+				
 			case 'send_email_owner':
 				$to = array();
 				

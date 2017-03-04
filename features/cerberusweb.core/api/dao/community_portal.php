@@ -2,24 +2,31 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class DAO_CommunityTool extends Cerb_ORMHelper {
+	const _CACHE_ALL = 'dao_communitytool_all';
+	
 	const ID = 'id';
 	const NAME = 'name';
 	const CODE = 'code';
 	const EXTENSION_ID = 'extension_id';
+	
+	static function clearCache() {
+		$cache = DevblocksPlatform::getCacheService();
+		$cache->remove(self::_CACHE_ALL);
+	}
 	
 	public static function create($fields) {
 		$db = DevblocksPlatform::getDatabaseService();
@@ -30,7 +37,8 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 		$sql = sprintf("INSERT INTO community_tool () ".
 			"VALUES ()"
 		);
-		$db->ExecuteMaster($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+		if(false == ($db->ExecuteMaster($sql)))
+			return false;
 		$id = $db->LastInsertId();
 		
 		self::update($id, $fields);
@@ -54,6 +62,7 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 	
 	public static function update($id, $fields) {
 		self::_update($id, 'community_tool', $fields);
+		self::clearCache();
 	}
 	
 	/**
@@ -66,12 +75,27 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 		if(empty($id))
 			return null;
 		
-		$items = self::getList(array($id));
+		$portals = self::getAll();
 		
-		if(isset($items[$id]))
-			return $items[$id];
-			
+		if(isset($portals[$id]))
+			return $portals[$id];
+		
 		return NULL;
+	}
+	
+	public static function getAll($nocache=false) {
+		$cache = DevblocksPlatform::getCacheService();
+		
+		if($nocache || null === ($objects = $cache->load(self::_CACHE_ALL))) {
+			$objects = self::getWhere(null, DAO_CommunityTool::NAME, true, null, Cerb_ORMHelper::OPT_GET_MASTER_ONLY);
+			
+			if(!is_array($objects))
+				return false;
+			
+			$cache->save($objects, self::_CACHE_ALL);
+		}
+		
+		return $objects;
 	}
 	
 	/**
@@ -81,16 +105,14 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 	 * @return Model_CommunityTool
 	 */
 	public static function getByCode($code) {
-		if(empty($code)) return NULL;
-		$db = DevblocksPlatform::getDatabaseService();
+		if(empty($code))
+			return NULL;
 		
-		$sql = sprintf("SELECT id FROM community_tool WHERE code = %s",
-			$db->qstr($code)
-		);
-		$id = $db->GetOneSlave($sql);
+		$portals = DAO_CommunityTool::getAll();
 		
-		if(!empty($id)) {
-			return self::get($id);
+		foreach($portals as $portal) {
+			if($portal->code == $code)
+				return $portal;
 		}
 		
 		return NULL;
@@ -102,35 +124,49 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 	 * @param array $ids
 	 * @return Model_CommunityTool[]
 	 */
-	public static function getList($ids=array()) {
-		if(!is_array($ids)) $ids = array($ids);
-		$db = DevblocksPlatform::getDatabaseService();
+	public static function getIds($ids=array()) {
+		if(!is_array($ids))
+			$ids = array($ids);
 		
-		$sql = "SELECT id,name,code,extension_id ".
-			"FROM community_tool ".
-			(!empty($ids) ? sprintf("WHERE id IN (%s) ", implode(',', $ids)) : " ").
-			"ORDER BY name"
-		;
-		$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-
-		return self::_createObjectsFromResultSet($rs);
+		$portals = self::getAll();
+		$ids = array_flip($ids);
+		
+		$portals = array_filter($portals, function($portal) use ($ids) {
+			if(isset($ids[$portal->id]))
+				return true;
+			
+			return false;
+		});
+		
+		return $portals;
 	}
 	
-	static function getWhere($where=null) {
+	static function getWhere($where=null, $sortBy=null, $sortAsc=true, $limit=null, $options=null) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		$sql = "SELECT id,name,code,extension_id ".
+		list($where_sql, $sort_sql, $limit_sql) = self::_getWhereSQL($where, $sortBy, $sortAsc, $limit);
+		
+		$sql = "SELECT id, name, code, extension_id ".
 			"FROM community_tool ".
-			(!empty($where)?sprintf("WHERE %s ",$where):" ").
-			"ORDER BY name "
-			;
-		$rs = $db->ExecuteSlave($sql);
+			$where_sql.
+			$sort_sql.
+			$limit_sql
+		;
+		
+		if($options & Cerb_ORMHelper::OPT_GET_MASTER_ONLY) {
+			$rs = $db->ExecuteMaster($sql, _DevblocksDatabaseManager::OPT_NO_READ_AFTER_WRITE);
+		} else {
+			$rs = $db->ExecuteSlave($sql);
+		}
 		
 		return self::_createObjectsFromResultSet($rs);
 	}
 	
 	static private function _createObjectsFromResultSet($rs) {
 		$objects = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object = new Model_CommunityTool();
@@ -146,36 +182,41 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 		return $objects;
 	}
 	
+	public static function count() {
+		$portals = self::getAll();
+		return count($portals);
+	}
+	
 	public static function delete($ids) {
-		if(!is_array($ids)) $ids = array($ids);
+		if(!is_array($ids))
+			$ids = array($ids);
+		
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		foreach($ids as $id) {
-			@$tool = DAO_CommunityTool::get($id);
-			if(empty($tool)) continue;
-
-			/**
-			 * [TODO] [JAS] Deleting a community tool needs to run a hook first so the
-			 * tool has a chance to clean up its own DB tables abstractly.
-			 *
-			 * e.g. Knowledgebase instances which store data outside the tool property table
-			 *
-			 * After this is done, a future DB patch for those plugins should clean up any
-			 * orphaned data.
-			 */
-			
-			$sql = sprintf("DELETE FROM community_tool WHERE id = %d", $id);
-			$db->ExecuteMaster($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-			
-			$sql = sprintf("DELETE FROM community_tool_property WHERE tool_code = '%s'", $tool->code);
-			$db->ExecuteMaster($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
-		}
+		$ids = DevblocksPlatform::sanitizeArray($ids, 'int');
+		
+		if(empty($ids))
+			return false;
+		
+		$ids_string = implode(',', $ids);
+		
+		// Nuke portals
+		$sql = sprintf("DELETE FROM community_tool WHERE id IN (%s)", $ids_string);
+		if(false == ($db->ExecuteMaster($sql)))
+			return false;
+		
+		// Nuke portal config
+		$sql = "DELETE FROM community_tool_property WHERE tool_code NOT IN (SELECT code FROM community_tool)";
+		if(false == ($db->ExecuteMaster($sql)))
+			return false;
+		
+		self::clearCache();
 	}
 
 	public static function getSearchQueryComponents($columns, $params, $sortBy=null, $sortAsc=null) {
 		$fields = SearchFields_CommunityTool::getFields();
 		
-		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
+		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, 'SearchFields_CommunityTool', $sortBy);
 					
 		$select_sql = sprintf("SELECT ".
 			"ct.id as %s, ".
@@ -190,27 +231,16 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 		
 		$join_sql = "FROM community_tool ct ";
 		
-				
-		// Custom field joins
-		list($select_sql, $join_sql, $has_multiple_values) = self::_appendSelectJoinSqlForCustomFieldTables(
-			$tables,
-			$params,
-			'ct.id',
-			$select_sql,
-			$join_sql
-		);
-				
 		$where_sql = "".
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 			
-		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields);
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields, $select_sql, 'SearchFields_CommunityTool');
 		
 		$result = array(
 			'primary_table' => 'ct',
 			'select' => $select_sql,
 			'join' => $join_sql,
 			'where' => $where_sql,
-			'has_multiple_values' => $has_multiple_values,
 			'sort' => $sort_sql,
 		);
 		
@@ -237,25 +267,28 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
 		$where_sql = $query_parts['where'];
-		$has_multiple_values = $query_parts['has_multiple_values'];
 		$sort_sql = $query_parts['sort'];
 		
 		$sql =
 			$select_sql.
 			$join_sql.
 			$where_sql.
-			($has_multiple_values ? 'GROUP BY ct.id ' : '').
 			$sort_sql;
 			
 		// [TODO] Could push the select logic down a level too
 		if($limit > 0) {
-			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+			if(false == ($rs = $db->SelectLimit($sql,$limit,$page*$limit)))
+				return false;
 		} else {
-			$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+			if(false == ($rs = $db->ExecuteSlave($sql)))
+				return false;
 			$total = mysqli_num_rows($rs);
 		}
 		
 		$results = array();
+
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object_id = intval($row[SearchFields_CommunityTool::ID]);
@@ -268,7 +301,7 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 			// We can skip counting if we have a less-than-full single page
 			if(!(0 == $page && $total < $limit)) {
 				$count_sql =
-					($has_multiple_values ? "SELECT COUNT(DISTINCT ct.id) " : "SELECT COUNT(ct.id) ").
+					"SELECT COUNT(ct.id) ".
 					$join_sql.
 					$where_sql;
 				$total = $db->GetOneSlave($count_sql);
@@ -281,17 +314,47 @@ class DAO_CommunityTool extends Cerb_ORMHelper {
 	}
 };
 
-class SearchFields_CommunityTool implements IDevblocksSearchFields {
+class SearchFields_CommunityTool extends DevblocksSearchFields {
 	// Table
 	const ID = 'ct_id';
 	const NAME = 'ct_name';
 	const CODE = 'ct_code';
 	const EXTENSION_ID = 'ct_extension_id';
 	
+	static private $_fields = null;
+	
+	static function getPrimaryKey() {
+		return 'ct.id';
+	}
+	
+	static function getCustomFieldContextKeys() {
+		return array(
+			CerberusContexts::CONTEXT_PORTAL => new DevblocksSearchFieldContextKeys('ct.id', self::ID),
+		);
+	}
+	
+	static function getWhereSQL(DevblocksSearchCriteria $param) {
+		if('cf_' == substr($param->field, 0, 3)) {
+			return self::_getWhereSQLFromCustomFields($param);
+		} else {
+			return $param->getWhereSQL(self::getFields(), self::getPrimaryKey());
+		}
+	}
+		
 	/**
 	 * @return DevblocksSearchField[]
 	 */
 	static function getFields() {
+		if(is_null(self::$_fields))
+			self::$_fields = self::_getFields();
+		
+		return self::$_fields;
+	}
+	
+	/**
+	 * @return DevblocksSearchField[]
+	 */
+	static function _getFields() {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
@@ -303,9 +366,7 @@ class SearchFields_CommunityTool implements IDevblocksSearchFields {
 		
 		// Custom fields with fieldsets
 		
-		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array(
-			CerberusContexts::CONTEXT_PORTAL,
-		));
+		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array_keys(self::getCustomFieldContextKeys()));
 		
 		if(is_array($custom_columns))
 			$columns = array_merge($columns, $custom_columns);
@@ -337,9 +398,14 @@ class DAO_CommunityToolProperty extends Cerb_ORMHelper {
 				"WHERE tool_code = %s ",
 				$db->qstr($tool_code)
 			);
-			$rs = $db->ExecuteSlave($sql);
+			
+			if(false === ($rs = $db->ExecuteSlave($sql)))
+				return false;
 			
 			$props = array();
+			
+			if(!($rs instanceof mysqli_result))
+				return false;
 			
 			while($row = mysqli_fetch_assoc($rs)) {
 				$k = $row['property_key'];
@@ -583,6 +649,9 @@ class View_CommunityPortal extends C4_AbstractView implements IAbstractView_Quic
 			$this->renderSortAsc,
 			$this->renderTotal
 		);
+		
+		$this->_lazyLoadCustomFieldsIntoObjects($objects, 'SearchFields_CommunityTool');
+		
 		return $objects;
 	}
 	
@@ -594,7 +663,7 @@ class View_CommunityPortal extends C4_AbstractView implements IAbstractView_Quic
 		$search_fields = SearchFields_CommunityTool::getFields();
 		
 		$fields = array(
-			'_fulltext' => 
+			'text' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_CommunityTool::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
@@ -604,7 +673,7 @@ class View_CommunityPortal extends C4_AbstractView implements IAbstractView_Quic
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_CommunityTool::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
 				),
-			'portal' => 
+			'code' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_CommunityTool::CODE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
@@ -620,21 +689,17 @@ class View_CommunityPortal extends C4_AbstractView implements IAbstractView_Quic
 		ksort($fields);
 		
 		return $fields;
-	}	
+	}
 	
-	function getParamsFromQuickSearchFields($fields) {
-		$search_fields = $this->getQuickSearchFields();
-		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
-
-		// Handle virtual fields and overrides
-		if(is_array($fields))
-		foreach($fields as $k => $v) {
-			switch($k) {
-				// ...
-			}
+	function getParamFromQuickSearchFieldTokens($field, $tokens) {
+		switch($field) {
+			default:
+				$search_fields = $this->getQuickSearchFields();
+				return DevblocksSearchCriteria::getParamFromQueryFieldTokens($field, $tokens, $search_fields);
+				break;
 		}
 		
-		return $params;
+		return false;
 	}
 
 	function render() {
@@ -645,7 +710,7 @@ class View_CommunityPortal extends C4_AbstractView implements IAbstractView_Quic
 		$tpl->assign('view', $this);
 
 		// Tool Manifests
-		$tools = DevblocksPlatform::getExtensions('usermeet.tool', false, true);
+		$tools = DevblocksPlatform::getExtensions('usermeet.tool', false);
 		$tpl->assign('tool_extensions', $tools);
 		
 		// Custom fields
@@ -743,71 +808,5 @@ class View_CommunityPortal extends C4_AbstractView implements IAbstractView_Quic
 			$this->addParam($criteria);
 			$this->renderPage = 0;
 		}
-	}
-	
-	function doBulkUpdate($filter, $do, $ids=array()) {
-		@set_time_limit(600); // 10m
-		
-		$change_fields = array();
-		$custom_fields = array();
-
-		// Make sure we have actions
-		if(empty($do))
-			return;
-
-		// Make sure we have checked items if we want a checked list
-		if(0 == strcasecmp($filter,"checks") && empty($ids))
-			return;
-			
-		if(is_array($do))
-		foreach($do as $k => $v) {
-			switch($k) {
-//				case 'status':
-//					if(1==intval($v)) { // completed
-//						$change_fields[DAO_Task::IS_COMPLETED] = 1;
-//						$change_fields[DAO_Task::COMPLETED_DATE] = time();
-//					} else { // active
-//						$change_fields[DAO_Task::IS_COMPLETED] = 0;
-//						$change_fields[DAO_Task::COMPLETED_DATE] = 0;
-//					}
-//					break;
-				default:
-					// Custom fields
-					if(substr($k,0,3)=="cf_") {
-						$custom_fields[substr($k,3)] = $v;
-					}
-			}
-		}
-		
-		$pg = 0;
-
-		if(empty($ids))
-		do {
-			list($objects,$null) = DAO_CommunityTool::search(
-				array(),
-				$this->getParams(),
-				100,
-				$pg++,
-				SearchFields_CommunityTool::ID,
-				true,
-				false
-			);
-			 
-			$ids = array_merge($ids, array_keys($objects));
-			 
-		} while(!empty($objects));
-
-		$batch_total = count($ids);
-		for($x=0;$x<=$batch_total;$x+=100) {
-			$batch_ids = array_slice($ids,$x,100);
-			DAO_CommunityTool::update($batch_ids, $change_fields);
-			
-			// Custom Fields
-			self::_doBulkSetCustomFields(CerberusContexts::CONTEXT_PORTAL, $custom_fields, $batch_ids);
-			
-			unset($batch_ids);
-		}
-
-		unset($ids);
 	}
 };

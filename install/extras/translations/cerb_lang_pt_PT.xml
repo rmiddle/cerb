@@ -23,11 +23,6 @@
 				<seg>[Registo de Chamadas] Pode exportar a lista de chamadas para CSV/XML</seg>
 			</tuv>
 		</tu>
-		<tu tuid="acl.core.addybook">
-			<tuv xml:lang="pt_PT">
-				<seg>[Contactos] Pode navegar pelos contactos</seg>
-			</tuv>
-		</tu>
 		<tu tuid="acl.core.addybook.addy.actions.update">
 			<tuv xml:lang="pt_PT">
 				<seg>[Contactos] Pode alterar os endereços de email dos contactos</seg>
@@ -78,11 +73,6 @@
 				<seg>[Mostrar Ticket] Pode fazer download de anexos dos tickets</seg>
 			</tuv>
 		</tu>
-		<tu tuid="acl.core.display.actions.comment">
-			<tuv xml:lang="pt_PT">
-				<seg>[Mostrar Ticket] Pode comentar tickets</seg>
-			</tuv>
-		</tu>
 		<tu tuid="acl.core.display.actions.forward">
 			<tuv xml:lang="pt_PT">
 				<seg>[Mostrar Ticket] Pode encaminhar tickets para endereços de email de terceiros</seg>
@@ -105,7 +95,7 @@
 		</tu>
 		<tu tuid="acl.core.display.message.actions.delete">
 			<tuv xml:lang="pt_PT">
-				<seg>[Display Ticket] Pode eliminar permanentemente mensagens nos tickets</seg>
+				<seg>[Tickets] Pode eliminar permanentemente mensagens nos tickets</seg>
 			</tuv>
 		</tu>
 		<tu tuid="acl.core.kb.articles.modify">
@@ -201,11 +191,6 @@
 		<tu tuid="acl.core.ticket.view.actions.merge">
 			<tuv xml:lang="pt_PT">
 				<seg>[Tickets] Pode fundir tickets das listagens</seg>
-			</tuv>
-		</tu>
-		<tu tuid="acl.core.ticket.view.actions.pile_sort">
-			<tuv xml:lang="pt_PT">
-				<seg>[Tickets] Pode listar por pilha nas listagens</seg>
 			</tuv>
 		</tu>
 		<tu tuid="acl.core.watchers.assign">
@@ -308,7 +293,7 @@
 				<seg>[Grupo de Relatórios] Pode visualizar o grupo 'Relatórios dos Tickets'</seg>
 			</tuv>
 		</tu>
-		<tu tuid="acl.reports.group.virtual_attendants">
+		<tu tuid="acl.reports.group.bots">
 			<tuv xml:lang="pt_PT">
 				<seg/>
 			</tuv>
@@ -355,7 +340,7 @@
 		</tu>
 		<tu tuid="activities.comment.create">
 			<tuv xml:lang="pt_PT">
-				<seg>{{actor}} comentou {{object}} {{target}}: {{content}}</seg>
+				<seg>{{actor}} {{'common.commented'}} {{object}} {{target}}: {{content}}</seg>
 			</tuv>
 		</tu>
 		<tu tuid="activities.connection.link">
@@ -483,56 +468,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="activity.activity">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar nos logs de actividade</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.address_book">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar nos contactos</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.config">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a configurar o helpdesk</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.default">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar no helpdesk</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.display_ticket">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a ver o ticket número %s</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.kb">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar na knowledgebase</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.mail.search">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a pesquisar tickets</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.mail.workspaces">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar %s nos Workspaces</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.simulator">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a gerar tickets de simulação</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.tickets">
-			<tuv xml:lang="pt_PT">
-				<seg>%s está a navegar %s tickets</seg>
-			</tuv>
-		</tu>
 		<tu tuid="address.address">
 			<tuv xml:lang="pt_PT">
 				<seg>Endereço</seg>
@@ -638,11 +573,6 @@
 				<seg>Contactos Registados</seg>
 			</tuv>
 		</tu>
-		<tu tuid="attachment.display_name">
-			<tuv xml:lang="pt_PT">
-				<seg>Nome do ficheiro</seg>
-			</tuv>
-		</tu>
 		<tu tuid="attachment.id">
 			<tuv xml:lang="pt_PT">
 				<seg>ID do anexo</seg>
@@ -673,11 +603,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="attachment.storage_size">
-			<tuv xml:lang="pt_PT">
-				<seg>Tamanho (bytes)</seg>
-			</tuv>
-		</tu>
 		<tu tuid="calls.activity.tab">
 			<tuv xml:lang="pt_PT">
 				<seg>Chamadas</seg>
@@ -691,11 +616,6 @@
 		<tu tuid="calls.ui.log_call">
 			<tuv xml:lang="pt_PT">
 				<seg>Registo de Chamadas</seg>
-			</tuv>
-		</tu>
-		<tu tuid="call_entry.model.is_closed">
-			<tuv xml:lang="pt_PT">
-				<seg>Está Fechado</seg>
 			</tuv>
 		</tu>
 		<tu tuid="call_entry.model.is_outgoing">
@@ -773,6 +693,11 @@
 				<seg>Acesso negado.</seg>
 			</tuv>
 		</tu>
+		<tu tuid="common.actions">
+			<tuv xml:lang="pt_PT">
+				<seg>Acções</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.active">
 			<tuv xml:lang="pt_PT">
 				<seg/>
@@ -826,6 +751,11 @@
 		<tu tuid="common.attachments">
 			<tuv xml:lang="pt_PT">
 				<seg>Anexos</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.author">
+			<tuv xml:lang="pt_PT">
+				<seg>Autor</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.availability">
@@ -931,6 +861,11 @@
 		<tu tuid="common.comment">
 			<tuv xml:lang="pt_PT">
 				<seg>comentário</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.commented">
+			<tuv xml:lang="pt_PT">
+				<seg>comentou</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.comments">
@@ -1128,11 +1063,6 @@
 				<seg>filtros</seg>
 			</tuv>
 		</tu>
-		<tu tuid="common.fnr">
-			<tuv xml:lang="pt_PT">
-				<seg>obter &amp; importar</seg>
-			</tuv>
-		</tu>
 		<tu tuid="common.group">
 			<tuv xml:lang="pt_PT">
 				<seg>Grupo</seg>
@@ -1221,6 +1151,16 @@
 		<tu tuid="common.languages">
 			<tuv xml:lang="pt_PT">
 				<seg>Idiomas</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.last_activity">
+			<tuv xml:lang="pt_PT">
+				<seg>Última Actividade</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.last_activity_date">
+			<tuv xml:lang="pt_PT">
+				<seg>Data da Última Actividade</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.last_login">
@@ -1443,6 +1383,16 @@
 				<seg>dono</seg>
 			</tuv>
 		</tu>
+		<tu tuid="common.param">
+			<tuv xml:lang="pt_PT">
+				<seg>Parâmetro</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.params">
+			<tuv xml:lang="pt_PT">
+				<seg>Parâmetros</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.password">
 			<tuv xml:lang="pt_PT">
 				<seg>password</seg>
@@ -1610,7 +1560,7 @@
 		</tu>
 		<tu tuid="common.size">
 			<tuv xml:lang="pt_PT">
-				<seg/>
+				<seg>Tamanho</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.snippets">
@@ -1753,12 +1703,12 @@
 				<seg>Registar URL</seg>
 			</tuv>
 		</tu>
-		<tu tuid="common.virtual_attendant">
+		<tu tuid="common.bot">
 			<tuv xml:lang="pt_PT">
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="common.virtual_attendants">
+		<tu tuid="common.bots">
 			<tuv xml:lang="pt_PT">
 				<seg/>
 			</tuv>
@@ -2003,11 +1953,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="dao.cerb_plugin.author">
-			<tuv xml:lang="pt_PT">
-				<seg>Autor</seg>
-			</tuv>
-		</tu>
 		<tu tuid="dao.cerb_plugin.description">
 			<tuv xml:lang="pt_PT">
 				<seg>Descrição</seg>
@@ -2111,11 +2056,6 @@
 		<tu tuid="dao.decision_node.node_type">
 			<tuv xml:lang="pt_PT">
 				<seg>Tipo de Nó</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dao.decision_node.params">
-			<tuv xml:lang="pt_PT">
-				<seg>Parâmetros</seg>
 			</tuv>
 		</tu>
 		<tu tuid="dao.decision_node.parent_id">
@@ -2291,36 +2231,6 @@
 		<tu tuid="dao.trigger_event.is_disabled">
 			<tuv xml:lang="pt_PT">
 				<seg>Está Inativo</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dao.trigger_event.owner_context">
-			<tuv xml:lang="pt_PT">
-				<seg>Dono do Contexto</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dao.trigger_event.owner_context_id">
-			<tuv xml:lang="pt_PT">
-				<seg>Id do Contexto Dono</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.last_synced_at">
-			<tuv xml:lang="pt_PT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.last_synced_msgid">
-			<tuv xml:lang="pt_PT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.oauth_token">
-			<tuv xml:lang="pt_PT">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.screen_name">
-			<tuv xml:lang="pt_PT">
-				<seg/>
 			</tuv>
 		</tu>
 		<tu tuid="dao.twitter_message.account_id">
@@ -2506,11 +2416,6 @@
 		<tu tuid="dashboard">
 			<tuv xml:lang="pt_PT">
 				<seg>Dashboard</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dashboard.actions">
-			<tuv xml:lang="pt_PT">
-				<seg>Acções</seg>
 			</tuv>
 		</tu>
 		<tu tuid="dashboard.active_dashboard">
@@ -3243,11 +3148,6 @@
 				<seg>Está em Fila</seg>
 			</tuv>
 		</tu>
-		<tu tuid="mail_queue.params_json">
-			<tuv xml:lang="pt_PT">
-				<seg>parâmetros</seg>
-			</tuv>
-		</tu>
 		<tu tuid="mail_queue.queue_delivery_date">
 			<tuv xml:lang="pt_PT">
 				<seg>Data de Entrega</seg>
@@ -3465,7 +3365,7 @@
 		</tu>
 		<tu tuid="portal.cfg.installation_instructions">
 			<tuv xml:lang="pt_PT">
-				<seg>Coloque o ficheiro index.php numa nova directoria dentro do "public website". Esta directoria poderá ter o nome que desejar mas irá normalmente descrever o portal. Por exemplo: http://www.cerberusweb.com/support/</seg>
+				<seg>Coloque o ficheiro index.php numa nova directoria dentro do "public website". Esta directoria poderá ter o nome que desejar mas irá normalmente descrever o portal. Por exemplo: https://cerb.ai/contact/</seg>
 			</tuv>
 		</tu>
 		<tu tuid="portal.cfg.language">
@@ -3598,21 +3498,6 @@
 				<seg>URL da Feed:</seg>
 			</tuv>
 		</tu>
-		<tu tuid="portal.sc.cfg.fnr.choose_resources">
-			<tuv xml:lang="pt_PT">
-				<seg>Seleccione os recursos que deseja expor neste portal:</seg>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.fnr.info">
-			<tuv xml:lang="pt_PT">
-				<seg>Este portal de suporte permite à sua comunidade pesquisar conteúdos de knowledgebase externas atravs do sistema de busca &amp; importação do Cerb,  obtendo links drectos para conteúdo como artigos, artigos de wikis, posts em forums, documentação, posts em blogs, report de erros, etc.</seg>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.fnr.not_configured">
-			<tuv xml:lang="pt_PT">
-				<seg>A função de busca &amp; importação no foi configurada.</seg>
-			</tuv>
-		</tu>
 		<tu tuid="portal.sc.cfg.followup_questions_hint">
 			<tuv xml:lang="pt_PT">
 				<seg>(começar com * para pedir; e.x. "*Que produto esta a considerar?")</seg>
@@ -3621,11 +3506,6 @@
 		<tu tuid="portal.sc.cfg.login_registration">
 			<tuv xml:lang="pt_PT">
 				<seg>Login/Registo</seg>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.open_ticket.allow_custom_subjects">
-			<tuv xml:lang="pt_PT">
-				<seg>Permitir aos visitantes introduzir assuntos personalizados.</seg>
 			</tuv>
 		</tu>
 		<tu tuid="portal.sc.cfg.open_ticket.attachments">
@@ -4218,7 +4098,7 @@ Se não solicitou esta operação, não clique no link em cima. O pedido expira 
 				<seg>Relatório de Tickets</seg>
 			</tuv>
 		</tu>
-		<tu tuid="reports.ui.group.virtual_attendant">
+		<tu tuid="reports.ui.group.bot">
 			<tuv xml:lang="pt_PT">
 				<seg/>
 			</tuv>
@@ -4358,7 +4238,7 @@ Se não solicitou esta operação, não clique no link em cima. O pedido expira 
 				<seg>Por Organização</seg>
 			</tuv>
 		</tu>
-		<tu tuid="reports.ui.virtual_attendant.usage">
+		<tu tuid="reports.ui.bot.usage">
 			<tuv xml:lang="pt_PT">
 				<seg/>
 			</tuv>
@@ -4602,6 +4482,11 @@ Por exemplo: *recipiente*</seg>
 				<seg>Fechado</seg>
 			</tuv>
 		</tu>
+		<tu tuid="status.completed">
+			<tuv xml:lang="pt_PT">
+				<seg>Concluído</seg>
+			</tuv>
+		</tu>
 		<tu tuid="status.deleted">
 			<tuv xml:lang="pt_PT">
 				<seg>Eliminado</seg>
@@ -4635,11 +4520,6 @@ Por exemplo: *recipiente*</seg>
 		<tu tuid="task.status.active">
 			<tuv xml:lang="pt_PT">
 				<seg>Activa</seg>
-			</tuv>
-		</tu>
-		<tu tuid="task.status.completed">
-			<tuv xml:lang="pt_PT">
-				<seg>Concluído</seg>
 			</tuv>
 		</tu>
 		<tu tuid="task.worker_id">
@@ -5012,16 +4892,6 @@ Por exemplo: *recipiente*</seg>
 				<seg>Actividade</seg>
 			</tuv>
 		</tu>
-		<tu tuid="timetracking_entry.id">
-			<tuv xml:lang="pt_PT">
-				<seg>ID</seg>
-			</tuv>
-		</tu>
-		<tu tuid="timetracking_entry.is_closed">
-			<tuv xml:lang="pt_PT">
-				<seg>Está Fechado</seg>
-			</tuv>
-		</tu>
 		<tu tuid="timetracking_entry.log_date">
 			<tuv xml:lang="pt_PT">
 				<seg>Data de Registo</seg>
@@ -5242,11 +5112,6 @@ Por exemplo: *recipiente*</seg>
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="whos_online.heading">
-			<tuv xml:lang="pt_PT">
-				<seg>%s Colaborador(es) em sessão:</seg>
-			</tuv>
-		</tu>
 		<tu tuid="worker.at_mention_name">
 			<tuv xml:lang="pt_PT">
 				<seg/>
@@ -5260,16 +5125,6 @@ Por exemplo: *recipiente*</seg>
 		<tu tuid="worker.is_superuser">
 			<tuv xml:lang="pt_PT">
 				<seg>Administrador</seg>
-			</tuv>
-		</tu>
-		<tu tuid="worker.last_activity">
-			<tuv xml:lang="pt_PT">
-				<seg>Última Actividade</seg>
-			</tuv>
-		</tu>
-		<tu tuid="worker.last_activity_date">
-			<tuv xml:lang="pt_PT">
-				<seg>Data da Última Actividade</seg>
 			</tuv>
 		</tu>
 		<tu tuid="worker.title">

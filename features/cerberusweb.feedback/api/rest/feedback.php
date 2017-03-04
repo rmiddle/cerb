@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 class ChRest_Feedback extends Extension_RestController implements IExtensionRestController {
@@ -165,7 +165,7 @@ class ChRest_Feedback extends Extension_RestController implements IExtensionRest
 		foreach($filters as $k => $filter) {
 			switch($k) {
 				case 'quote_mood':
-					switch(strtolower($filter[2])) {
+					switch(DevblocksPlatform::strLower($filter[2])) {
 						case 'praise':
 							$filter[0] = 'quote_mood_id';
 							$filter[2] = 1;
@@ -305,7 +305,7 @@ class ChRest_Feedback extends Extension_RestController implements IExtensionRest
 					break;
 					
 				case 'quote_mood':
-					switch(strtolower($value)) {
+					switch(DevblocksPlatform::strLower($value)) {
 						case 'praise':
 							unset($putfields['quote_mood_id']);
 							$putfield = 'quote_mood_id';
@@ -380,7 +380,7 @@ class ChRest_Feedback extends Extension_RestController implements IExtensionRest
 					break;
 					
 				case 'quote_mood':
-					switch(strtolower($value)) {
+					switch(DevblocksPlatform::strLower($value)) {
 						case 'praise':
 							unset($postfields['quote_mood_id']);
 							$postfield = 'quote_mood_id';

@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class Page_Profiles extends CerberusPageExtension {
@@ -88,6 +88,7 @@ class Page_Profiles extends CerberusPageExtension {
 				'label' => $cfield->name,
 				'type' => $cfield->type,
 				'value' => $values[$cf_id],
+				'params' => @$cfield->params ?: array(),
 			);
 		}
 		
@@ -104,7 +105,7 @@ class Page_Profiles extends CerberusPageExtension {
 		
 		if(is_array($custom_fieldsets))
 		foreach($custom_fieldsets as $custom_fieldset) { /* @var $custom_fieldset Model_CustomFieldset */
-			if(!$custom_fieldset->isReadableByWorker($active_worker))
+			if(!Context_CustomFieldset::isReadableByActor($custom_fieldset, $active_worker))
 				continue;
 		
 			$cf_group_fields = $custom_fieldset->getCustomFields();
@@ -135,5 +136,48 @@ class Page_Profiles extends CerberusPageExtension {
 		}
 		
 		return $properties;
+	}
+	
+	static function getTimelineJson($models, $is_ascending=true, $start_index=null) {
+		$json = array(
+			'objects' => array(),
+			'length' => count($models),
+			'last' => 0,
+			'index' => 0,
+			'context' => '',
+			'context_id' => 0,
+		);
+		
+		foreach($models as $idx => $model) {
+			if($model instanceof Model_Comment) {
+				$context = CerberusContexts::CONTEXT_COMMENT;
+				$context_id = $model->id;
+				$object = array('context' => $context, 'context_id' => $model->id);
+				$json['objects'][] = $object;
+			} elseif($model instanceof Model_Message) {
+				$context = CerberusContexts::CONTEXT_MESSAGE;
+				$context_id = $model->id;
+				$object = array('context' => $context, 'context_id' => $model->id);
+				$json['objects'][] = $object;
+			}
+		}
+		
+		if(isset($json['objects']) && is_array($json['objects'])) {
+			// Move to the end
+			end($json['objects']);
+			
+			if(is_null($start_index) || !isset($json['objects'][$start_index])) {
+				$start_index = key($json['objects']);
+			}
+			
+			if(!is_null($start_index) && false != ($object = $json['objects'][$start_index])) {
+				$json['last'] = key($json['objects']);
+				$json['index'] = $start_index;
+				$json['context'] = $object['context'];
+				$json['context_id'] = $object['context_id'];
+			}
+		}
+		
+		return json_encode($json);
 	}
 };

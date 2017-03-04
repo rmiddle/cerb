@@ -127,7 +127,7 @@ class ChReportTimeSpentOrg extends Extension_Report {
 			"AND log_date <= %d ".
 			"%s ".
 			"%s ".
-			"GROUP BY contact_org.id, date_plot ",
+			"GROUP BY contact_org.id, contact_org.name, date_plot ",
 			$date_group,
 			$start_time,
 			$end_time,
@@ -135,6 +135,9 @@ class ChReportTimeSpentOrg extends Extension_Report {
 			(is_array($filter_org_ids) && !empty($filter_org_ids) ? sprintf("AND context_link.from_context_id IN (%s)", implode(',', $filter_org_ids)) : "")
 		);
 		$rs = $db->ExecuteSlave($sql);
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		$data = array();
 		
@@ -207,8 +210,7 @@ class ChReportTimeSpentOrg extends Extension_Report {
 			if(!empty($filter_org_ids)) {
 				$params[] = array(
 					DevblocksSearchCriteria::GROUP_AND,
-					new DevblocksSearchCriteria(SearchFields_TimeTrackingEntry::CONTEXT_LINK,DevblocksSearchCriteria::OPER_EQ, CerberusContexts::CONTEXT_ORG),
-					new DevblocksSearchCriteria(SearchFields_TimeTrackingEntry::CONTEXT_LINK_ID,DevblocksSearchCriteria::OPER_IN, $filter_org_ids),
+					new DevblocksSearchCriteria(SearchFields_TimeTrackingEntry::VIRTUAL_CONTEXT_LINK, 'in', [CerberusContexts::CONTEXT_ORG, $filter_org_ids])
 				);
 			}
 			

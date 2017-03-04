@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 if(class_exists('Extension_PageSection')):
@@ -584,7 +584,7 @@ class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget implements ICerbWo
 			return;
 		}
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -656,7 +656,7 @@ class WorkspaceWidget_Gauge extends Extension_WorkspaceWidget implements ICerbWo
 			);
 		}
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -677,15 +677,9 @@ class WorkspaceWidget_Calendar extends Extension_WorkspaceWidget implements ICer
 			return;
 		}
 		
-		$calendar_properties = DevblocksCalendarHelper::getCalendar($month, $year);
+		$start_on_mon = @$calendar->params['start_on_mon'] ? true : false;
+		$calendar_properties = DevblocksCalendarHelper::getCalendar($month, $year, $start_on_mon);
 		$calendar_events = $calendar->getEvents($calendar_properties['date_range_from'], $calendar_properties['date_range_to']);
-		
-		// Contexts (for creating events)
-
-		if(CerberusContexts::isWriteableByActor($calendar->owner_context, $calendar->owner_context_id, $active_worker)) {
-			$create_contexts = $calendar->getCreateContexts();
-			$tpl->assign('create_contexts', $create_contexts);
-		}
 		
 		// Template scope
 		
@@ -729,7 +723,7 @@ class WorkspaceWidget_Calendar extends Extension_WorkspaceWidget implements ICer
 	// Export
 	
 	function exportData(Model_WorkspaceWidget $widget, $format=null) {
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -838,7 +832,7 @@ class WorkspaceWidget_Calendar extends Extension_WorkspaceWidget implements ICer
 			),
 		);
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -899,7 +893,7 @@ class WorkspaceWidget_Clock extends Extension_WorkspaceWidget implements ICerbWo
 	// Export
 	
 	function exportData(Model_WorkspaceWidget $widget, $format=null) {
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -961,7 +955,7 @@ class WorkspaceWidget_Clock extends Extension_WorkspaceWidget implements ICerbWo
 			),
 		);
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -1055,7 +1049,7 @@ class WorkspaceWidget_Counter extends Extension_WorkspaceWidget implements ICerb
 			return;
 		}
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -1111,7 +1105,7 @@ class WorkspaceWidget_Counter extends Extension_WorkspaceWidget implements ICerb
 			),
 		);
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -1162,7 +1156,7 @@ class WorkspaceWidget_Countdown extends Extension_WorkspaceWidget implements ICe
 	// Export
 	
 	function exportData(Model_WorkspaceWidget $widget, $format=null) {
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -1218,7 +1212,7 @@ class WorkspaceWidget_Countdown extends Extension_WorkspaceWidget implements ICe
 			),
 		);
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -1365,7 +1359,7 @@ class WorkspaceWidget_Chart extends Extension_WorkspaceWidget implements ICerbWo
 			return;
 		}
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -1472,7 +1466,7 @@ class WorkspaceWidget_Chart extends Extension_WorkspaceWidget implements ICerbWo
 			}
 		}
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -1616,7 +1610,7 @@ class WorkspaceWidget_Subtotals extends Extension_WorkspaceWidget implements ICe
 			return;
 		}
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -1718,7 +1712,7 @@ class WorkspaceWidget_Subtotals extends Extension_WorkspaceWidget implements ICe
 			);
 		}
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -1800,7 +1794,7 @@ class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget implements ICer
 		if(false == ($view = $this->getView($widget)))
 			return false;
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCSV($widget, $view);
 				break;
@@ -1889,7 +1883,7 @@ class WorkspaceWidget_Worklist extends Extension_WorkspaceWidget implements ICer
 		$export_data['widget']['count'] = count($results);
 		$export_data['widget']['results'] = $results;
 			
-		return DevblocksPlatform::strFormatJson(json_encode($export_data));
+		return DevblocksPlatform::strFormatJson($export_data);
 	}
 	
 	private function _exportDataAsCSV(Model_WorkspaceWidget $widget, $view) {
@@ -2106,7 +2100,7 @@ class WorkspaceWidget_PieChart extends Extension_WorkspaceWidget implements ICer
 			return;
 		}
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -2196,7 +2190,7 @@ class WorkspaceWidget_PieChart extends Extension_WorkspaceWidget implements ICer
 			);
 		}
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };
 
@@ -2306,7 +2300,7 @@ class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget implements I
 			return;
 		}
 		
-		switch(strtolower($format)) {
+		switch(DevblocksPlatform::strLower($format)) {
 			case 'csv':
 				return $this->_exportDataAsCsv($widget);
 				break;
@@ -2411,6 +2405,6 @@ class WorkspaceWidget_Scatterplot extends Extension_WorkspaceWidget implements I
 			}
 		}
 		
-		return DevblocksPlatform::strFormatJson(json_encode($results));
+		return DevblocksPlatform::strFormatJson($results);
 	}
 };

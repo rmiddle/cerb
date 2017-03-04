@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class DAO_FileBundle extends Cerb_ORMHelper {
@@ -98,6 +98,10 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 				null,
 				Cerb_ORMHelper::OPT_GET_MASTER_ONLY
 			);
+			
+			if(!is_array($bundles))
+				return false;
+			
 			$cache->save($bundles, self::CACHE_ALL);
 		}
 		
@@ -125,7 +129,7 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 			;
 		
 		if($options & Cerb_ORMHelper::OPT_GET_MASTER_ONLY) {
-			$rs = $db->ExecuteMaster($sql);
+			$rs = $db->ExecuteMaster($sql, _DevblocksDatabaseManager::OPT_NO_READ_AFTER_WRITE);
 		} else {
 			$rs = $db->ExecuteSlave($sql);
 		}
@@ -176,6 +180,9 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 	 */
 	static private function _getObjectsFromResult($rs) {
 		$objects = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object = new Model_FileBundle();
@@ -237,7 +244,7 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 				break;
 		}
 		
-		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
+		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, 'SearchFields_FileBundle', $sortBy);
 
 		$select_sql = sprintf("SELECT ".
 			"file_bundle.id as %s, ".
@@ -254,23 +261,12 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 			SearchFields_FileBundle::OWNER_CONTEXT_ID
 		);
 			
-		$join_sql = "FROM file_bundle ".
-			(isset($tables['context_link']) ? sprintf("INNER JOIN context_link ON (context_link.to_context = %s AND context_link.to_context_id = file_bundle.id) ", Cerb_ORMHelper::qstr(CerberusContexts::CONTEXT_FILE_BUNDLE)) : " ").
-			'';
-
-		// Custom field joins
-		list($select_sql, $join_sql, $has_multiple_values) = self::_appendSelectJoinSqlForCustomFieldTables(
-			$tables,
-			$params,
-			'file_bundle.id',
-			$select_sql,
-			$join_sql
-		);
+		$join_sql = "FROM file_bundle ";
 
 		$where_sql = "".
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 			
-		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields);
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields, $select_sql, 'SearchFields_FileBundle');
 
 		// Virtuals
 
@@ -278,7 +274,6 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 			'join_sql' => &$join_sql,
 			'where_sql' => &$where_sql,
 			'tables' => &$tables,
-			'has_multiple_values' => &$has_multiple_values
 		);
 
 		array_walk_recursive(
@@ -292,7 +287,6 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 			'select' => $select_sql,
 			'join' => $join_sql,
 			'where' => $where_sql,
-			'has_multiple_values' => $has_multiple_values,
 			'sort' => $sort_sql,
 		);
 	}
@@ -308,59 +302,15 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 		settype($param_key, 'string');
 
 		switch($param_key) {
-			case SearchFields_FileBundle::FULLTEXT_COMMENT_CONTENT:
-				$search = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID);
-				$query = $search->getQueryFromParam($param);
-				
-				if(false === ($ids = $search->query($query, array('context_crc32' => sprintf("%u", crc32($from_context)))))) {
-					$args['where_sql'] .= 'AND 0 ';
-				
-				} elseif(is_array($ids)) {
-					$from_ids = DAO_Comment::getContextIdsByContextAndIds($from_context, $ids);
-					
-					$args['where_sql'] .= sprintf('AND %s IN (%s) ',
-						$from_index,
-						implode(', ', (!empty($from_ids) ? $from_ids : array(-1)))
-					);
-					
-				} elseif(is_string($ids)) {
-					$db = DevblocksPlatform::getDatabaseService();
-					$temp_table = sprintf("_tmp_%s", uniqid());
-					
-					$db->ExecuteSlave(sprintf("CREATE TEMPORARY TABLE %s (PRIMARY KEY (id)) SELECT DISTINCT context_id AS id FROM comment INNER JOIN %s ON (%s.id=comment.id)",
-						$temp_table,
-						$ids,
-						$ids
-					));
-					
-					$args['join_sql'] .= sprintf("INNER JOIN %s ON (%s.id=%s) ",
-						$temp_table,
-						$temp_table,
-						$from_index
-					);
-				}
-				break;
-			
-			case SearchFields_FileBundle::VIRTUAL_CONTEXT_LINK:
-				$args['has_multiple_values'] = true;
-				self::_searchComponentsVirtualContextLinks($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
-				break;
-
 			case SearchFields_FileBundle::VIRTUAL_HAS_FIELDSET:
 				self::_searchComponentsVirtualHasFieldset($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
 				break;
 
-			case SearchFields_FileBundle::VIRTUAL_WATCHERS:
-				$args['has_multiple_values'] = true;
-				self::_searchComponentsVirtualWatchers($param, $from_context, $from_index, $args['join_sql'], $args['where_sql'], $args['tables']);
-				break;
-				
 			case SearchFields_FileBundle::VIRTUAL_OWNER:
 				if(!is_array($param->value))
 					break;
 				
 				$wheres = array();
-				$args['has_multiple_values'] = true;
 					
 				foreach($param->value as $owner_context) {
 					@list($context, $context_id) = explode(':', $owner_context);
@@ -389,21 +339,31 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 		}
 	}
 
-	static function autocomplete($term, $as_worker=null) {
+	static function autocomplete($term, $as='models', $actor=null) {
 		$bundles = DAO_FileBundle::getAll();
 		
-		return array_filter($bundles, function($bundle) use ($as_worker, $term) { /* @var $bundle Model_FileBundle */
+		$models = array_filter($bundles, function($bundle) use ($term) { /* @var $bundle Model_FileBundle */
 			// Check if the term exists
 			if(false === stristr($bundle->name . ' ' . $bundle->tag, $term))
 				return false;
 			
-			// Check if the record is readable by the actor
-			if($as_worker) 
-				if(!CerberusContexts::isReadableByActor($bundle->owner_context, $bundle->owner_context_id, $as_worker))
-					return false;
-			
 			return true;
 		});
+		
+		// Filter to only models readable by the actor
+		if($actor) {
+			$models = CerberusContexts::filterModelsByActorReadable('Context_FileBundle', $models, $actor);
+		}
+		
+		switch($as) {
+			case 'ids':
+				return array_keys($models);
+				break;
+				
+			default:
+				return $models;
+				break;
+		}
 	}
 	
 	/**
@@ -427,24 +387,27 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
 		$where_sql = $query_parts['where'];
-		$has_multiple_values = $query_parts['has_multiple_values'];
 		$sort_sql = $query_parts['sort'];
 
 		$sql =
 			$select_sql.
 			$join_sql.
 			$where_sql.
-			($has_multiple_values ? 'GROUP BY file_bundle.id ' : '').
 			$sort_sql;
 			
 		if($limit > 0) {
-			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
+			if(false == ($rs = $db->SelectLimit($sql,$limit,$page*$limit)))
+				return false;
 		} else {
-			$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
+			if(false == ($rs = $db->ExecuteSlave($sql)))
+				return false;
 			$total = mysqli_num_rows($rs);
 		}
 
 		$results = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object_id = intval($row[SearchFields_FileBundle::ID]);
@@ -457,7 +420,7 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 			// We can skip counting if we have a less-than-full single page
 			if(!(0 == $page && $total < $limit)) {
 				$count_sql =
-				($has_multiple_values ? "SELECT COUNT(DISTINCT file_bundle.id) " : "SELECT COUNT(file_bundle.id) ").
+				"SELECT COUNT(file_bundle.id) ".
 				$join_sql.
 				$where_sql;
 				$total = $db->GetOneSlave($count_sql);
@@ -475,7 +438,7 @@ class DAO_FileBundle extends Cerb_ORMHelper {
 	}
 };
 
-class SearchFields_FileBundle implements IDevblocksSearchFields {
+class SearchFields_FileBundle extends DevblocksSearchFields {
 	const ID = 'f_id';
 	const NAME = 'f_name';
 	const TAG = 'f_tag';
@@ -487,17 +450,63 @@ class SearchFields_FileBundle implements IDevblocksSearchFields {
 	
 	const VIRTUAL_CONTEXT_LINK = '*_context_link';
 	const VIRTUAL_HAS_FIELDSET = '*_has_fieldset';
-	const VIRTUAL_WATCHERS = '*_workers';
-
-	const CONTEXT_LINK = 'cl_context_from';
-	const CONTEXT_LINK_ID = 'cl_context_from_id';
-
 	const VIRTUAL_OWNER = '*_owner';
+	const VIRTUAL_WATCHERS = '*_workers';
+	
+	static private $_fields = null;
+	
+	static function getPrimaryKey() {
+		return 'file_bundle.id';
+	}
+	
+	static function getCustomFieldContextKeys() {
+		return array(
+			CerberusContexts::CONTEXT_FILE_BUNDLE => new DevblocksSearchFieldContextKeys('file_bundle.id', self::ID),
+		);
+	}
+	
+	static function getWhereSQL(DevblocksSearchCriteria $param) {
+		switch($param->field) {
+			case self::FULLTEXT_COMMENT_CONTENT:
+				return self::_getWhereSQLFromCommentFulltextField($param, Search_CommentContent::ID, CerberusContexts::CONTEXT_FILE_BUNDLE, self::getPrimaryKey());
+				break;
+				
+			case self::VIRTUAL_CONTEXT_LINK:
+				return self::_getWhereSQLFromContextLinksField($param, CerberusContexts::CONTEXT_FILE_BUNDLE, self::getPrimaryKey());
+				break;
+				
+			case self::VIRTUAL_OWNER:
+				return self::_getWhereSQLFromContextAndID($param, 'file_bundle.owner_context', 'file_bundle.owner_context_id');
+				break;
+				
+			case self::VIRTUAL_WATCHERS:
+				return self::_getWhereSQLFromWatchersField($param, CerberusContexts::CONTEXT_FILE_BUNDLE, self::getPrimaryKey());
+				break;
+			
+			default:
+				if('cf_' == substr($param->field, 0, 3)) {
+					return self::_getWhereSQLFromCustomFields($param);
+				} else {
+					return $param->getWhereSQL(self::getFields(), self::getPrimaryKey());
+				}
+				break;
+		}
+	}
 	
 	/**
 	 * @return DevblocksSearchField[]
 	 */
 	static function getFields() {
+		if(is_null(self::$_fields))
+			self::$_fields = self::_getFields();
+		
+		return self::$_fields;
+	}
+	
+	/**
+	 * @return DevblocksSearchField[]
+	 */
+	static function _getFields() {
 		$translate = DevblocksPlatform::getTranslationService();
 
 		$columns = array(
@@ -514,9 +523,6 @@ class SearchFields_FileBundle implements IDevblocksSearchFields {
 			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null, false),
 			self::VIRTUAL_OWNER => new DevblocksSearchField(self::VIRTUAL_OWNER, '*', 'owner', $translate->_('common.owner'), null, false),
 			self::VIRTUAL_WATCHERS => new DevblocksSearchField(self::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS', false),
-				
-			self::CONTEXT_LINK => new DevblocksSearchField(self::CONTEXT_LINK, 'context_link', 'from_context', null, null, false),
-			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null, null, false),
 		);
 
 		// Fulltext indexes
@@ -524,9 +530,7 @@ class SearchFields_FileBundle implements IDevblocksSearchFields {
 		$columns[self::FULLTEXT_COMMENT_CONTENT]->ft_schema = Search_CommentContent::ID;
 		
 		// Custom Fields
-		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array(
-			CerberusContexts::CONTEXT_FILE_BUNDLE,
-		));
+		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array_keys(self::getCustomFieldContextKeys()));
 
 		if(!empty($custom_columns))
 			$columns = array_merge($columns, $custom_columns);
@@ -545,14 +549,6 @@ class Model_FileBundle {
 	public $updated_at;
 	public $owner_context;
 	public $owner_context_id;
-	
-	function isReadableByActor($actor) {
-		return CerberusContexts::isReadableByActor($this->owner_context, $this->owner_context_id, $actor);		
-	}
-	
-	function isWriteableByActor($actor) {
-		return CerberusContexts::isWriteableByActor($this->owner_context, $this->owner_context_id, $actor);		
-	}
 	
 	function getAttachments() {
 		return DAO_Attachment::getByContextIds(CerberusContexts::CONTEXT_FILE_BUNDLE, $this->id);
@@ -605,6 +601,9 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 			$this->renderSortAsc,
 			$this->renderTotal
 		);
+		
+		$this->_lazyLoadCustomFieldsIntoObjects($objects, 'SearchFields_FileBundle');
+		
 		return $objects;
 	}
 
@@ -656,39 +655,32 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 	function getSubtotalCounts($column) {
 		$counts = array();
 		$fields = $this->getFields();
+		$context = CerberusContexts::CONTEXT_FILE_BUNDLE;
 
 		if(!isset($fields[$column]))
 			return array();
 
 		switch($column) {
-			//			case SearchFields_FileBundle::EXAMPLE_BOOL:
-			//				$counts = $this->_getSubtotalCountForBooleanColumn('DAO_FileBundle', $column);
-			//				break;
-
-			//			case SearchFields_FileBundle::EXAMPLE_STRING:
-			//				$counts = $this->_getSubtotalCountForStringColumn('DAO_FileBundle', $column);
-			//				break;
-
 			case SearchFields_FileBundle::VIRTUAL_CONTEXT_LINK:
-				$counts = $this->_getSubtotalCountForContextLinkColumn('DAO_FileBundle', CerberusContexts::CONTEXT_FILE_BUNDLE, $column);
+				$counts = $this->_getSubtotalCountForContextLinkColumn($context, $column);
 				break;
 
 			case SearchFields_FileBundle::VIRTUAL_HAS_FIELDSET:
-				$counts = $this->_getSubtotalCountForHasFieldsetColumn('DAO_FileBundle', CerberusContexts::CONTEXT_FILE_BUNDLE, $column);
+				$counts = $this->_getSubtotalCountForHasFieldsetColumn($context, $column);
 				break;
 
 			case SearchFields_FileBundle::VIRTUAL_WATCHERS:
-				$counts = $this->_getSubtotalCountForWatcherColumn('DAO_FileBundle', $column);
+				$counts = $this->_getSubtotalCountForWatcherColumn($context, $column);
 				break;
 					
 			case SearchFields_FileBundle::VIRTUAL_OWNER:
-				$counts = $this->_getSubtotalCountForContextAndIdColumns('DAO_FileBundle', CerberusContexts::CONTEXT_FILE_BUNDLE, $column, DAO_FileBundle::OWNER_CONTEXT, DAO_Snippet::OWNER_CONTEXT_ID, 'owner_context[]');
+				$counts = $this->_getSubtotalCountForContextAndIdColumns($context, $column, DAO_FileBundle::OWNER_CONTEXT, DAO_Snippet::OWNER_CONTEXT_ID, 'owner_context[]');
 				break;
 				
 			default:
 				// Custom fields
 				if('cf_' == substr($column,0,3)) {
-					$counts = $this->_getSubtotalCountForCustomColumn('DAO_FileBundle', $column, 'file_bundle.id');
+					$counts = $this->_getSubtotalCountForCustomColumn($context, $column);
 				}
 
 				break;
@@ -701,7 +693,7 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 		$search_fields = SearchFields_FileBundle::getFields();
 		
 		$fields = array(
-			'_fulltext' => 
+			'text' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_FileBundle::NAME, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
@@ -710,6 +702,14 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_FULLTEXT,
 					'options' => array('param_key' => SearchFields_FileBundle::FULLTEXT_COMMENT_CONTENT),
+				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_FileBundle::ID),
+					'examples' => [
+						['type' => 'chooser', 'context' => CerberusContexts::CONTEXT_FILE_BUNDLE, 'q' => ''],
+					]
 				),
 			'name' => 
 				array(
@@ -732,6 +732,14 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 					'options' => array('param_key' => SearchFields_FileBundle::VIRTUAL_WATCHERS),
 				),
 		);
+		
+		// Add dynamic owner.* fields
+		
+		$fields = self::_appendVirtualFiltersFromQuickSearchContexts('owner', $fields, 'owner');
+		
+		// Add quick search links
+		
+		$fields = self::_appendVirtualFiltersFromQuickSearchContexts('links', $fields, 'links');
 		
 		// Add searchable custom fields
 		
@@ -760,20 +768,22 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 		
 		return $fields;
 	}	
-	
-	function getParamsFromQuickSearchFields($fields) {
-		$search_fields = $this->getQuickSearchFields();
-		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
 
-		// Handle virtual fields and overrides
-		if(is_array($fields))
-		foreach($fields as $k => $v) {
-			switch($k) {
-				// ...
-			}
+	function getParamFromQuickSearchFieldTokens($field, $tokens) {
+		switch($field) {
+			default:
+				if($field == 'owner' || substr($field, 0, strlen('owner.')) == 'owner.')
+					return DevblocksSearchCriteria::getVirtualContextParamFromTokens($field, $tokens, 'owner', SearchFields_FileBundle::VIRTUAL_OWNER);
+				
+				if($field == 'links' || substr($field, 0, 6) == 'links.')
+					return DevblocksSearchCriteria::getContextLinksParamFromTokens($field, $tokens);
+				
+				$search_fields = $this->getQuickSearchFields();
+				return DevblocksSearchCriteria::getParamFromQueryFieldTokens($field, $tokens, $search_fields);
+				break;
 		}
 		
-		return $params;
+		return false;
 	}
 	
 	function render() {
@@ -958,74 +968,17 @@ class View_FileBundle extends C4_AbstractView implements IAbstractView_Subtotals
 			$this->renderPage = 0;
 		}
 	}
-
-	function doBulkUpdate($filter, $do, $ids=array()) {
-		@set_time_limit(600); // 10m
-
-		$change_fields = array();
-		$custom_fields = array();
-
-		// Make sure we have actions
-		if(empty($do))
-			return;
-
-		// Make sure we have checked items if we want a checked list
-		if(0 == strcasecmp($filter,"checks") && empty($ids))
-			return;
-			
-		if(is_array($do))
-			foreach($do as $k => $v) {
-				switch($k) {
-					// [TODO] Implement actions
-					case 'example':
-						//$change_fields[DAO_FileBundle::EXAMPLE] = 'some value';
-						break;
-							
-					default:
-						// Custom fields
-						if(substr($k,0,3)=="cf_") {
-							$custom_fields[substr($k,3)] = $v;
-						}
-						break;
-				}
-			}
-
-		$pg = 0;
-
-		if(empty($ids))
-			do {
-				list($objects,$null) = DAO_FileBundle::search(
-					array(),
-					$this->getParams(),
-					100,
-					$pg++,
-					SearchFields_FileBundle::ID,
-					true,
-					false
-				);
-				$ids = array_merge($ids, array_keys($objects));
-
-	} while(!empty($objects));
-
-	$batch_total = count($ids);
-	for($x=0;$x<=$batch_total;$x+=100) {
-		$batch_ids = array_slice($ids,$x,100);
-			
-		if(!empty($change_fields)) {
-			DAO_FileBundle::update($batch_ids, $change_fields);
-		}
-
-		// Custom Fields
-		self::_doBulkSetCustomFields(CerberusContexts::CONTEXT_FILE_BUNDLE, $custom_fields, $batch_ids);
-			
-		unset($batch_ids);
-	}
-
-	unset($ids);
-	}
 };
 
 class Context_FileBundle extends Extension_DevblocksContext implements IDevblocksContextProfile, IDevblocksContextPeek, IDevblocksContextAutocomplete {
+	static function isReadableByActor($models, $actor) {
+		return CerberusContexts::isReadableByDelegateOwner($actor, CerberusContexts::CONTEXT_FILE_BUNDLE, $models);
+	}
+	
+	static function isWriteableByActor($models, $actor) {
+		return CerberusContexts::isWriteableByDelegateOwner($actor, CerberusContexts::CONTEXT_FILE_BUNDLE, $models);
+	}
+	
 	function getRandom() {
 		return DAO_FileBundle::random();
 	}
@@ -1057,17 +1010,16 @@ class Context_FileBundle extends Extension_DevblocksContext implements IDevblock
 		);
 	}
 	
-	// [TODO] Interface
 	function getDefaultProperties() {
 		return array(
 			'updated_at',
 		);
 	}
 	
-	function autocomplete($term) {
+	function autocomplete($term, $query=null) {
 		$list = array();
 		
-		$models = DAO_FileBundle::autocomplete($term, CerberusApplication::getActiveWorker());
+		$models = DAO_FileBundle::autocomplete($term, 'models', CerberusApplication::getActiveWorker());
 		
 		// [TODO] Rank results?
 		// [TODO] Show count of files, or summarize file names?
@@ -1165,10 +1117,15 @@ class Context_FileBundle extends Extension_DevblocksContext implements IDevblock
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true, true);
 		}
 		
 		switch($token) {
+			case 'links':
+				$links = $this->_lazyLoadLinks($context, $context_id);
+				$values = array_merge($values, $links);
+				break;
+			
 			case 'watchers':
 				$watchers = array(
 					$token => CerberusContexts::getWatchers($context, $context_id, true),
@@ -1177,7 +1134,7 @@ class Context_FileBundle extends Extension_DevblocksContext implements IDevblock
 				break;
 				
 			default:
-				if(substr($token,0,7) == 'custom_') {
+				if(DevblocksPlatform::strStartsWith($token, 'custom_')) {
 					$fields = $this->_lazyLoadCustomFields($token, $context, $context_id);
 					$values = array_merge($values, $fields);
 				}
@@ -1252,8 +1209,7 @@ class Context_FileBundle extends Extension_DevblocksContext implements IDevblock
 		
 		if(!empty($context) && !empty($context_id)) {
 			$params_req = array(
-				new DevblocksSearchCriteria(SearchFields_FileBundle::CONTEXT_LINK,'=',$context),
-				new DevblocksSearchCriteria(SearchFields_FileBundle::CONTEXT_LINK_ID,'=',$context_id),
+				new DevblocksSearchCriteria(SearchFields_FileBundle::VIRTUAL_CONTEXT_LINK,'in',array($context.':'.$context_id)),
 			);
 		}
 		
@@ -1271,7 +1227,7 @@ class Context_FileBundle extends Extension_DevblocksContext implements IDevblock
 		
 		if(!empty($context_id) && null != ($file_bundle = DAO_FileBundle::get($context_id))) {
 			// ACL
-			if(!$file_bundle->isWriteableByActor($active_worker))
+			if(!Context_FileBundle::isWriteableByActor($file_bundle, $active_worker))
 				return;
 			
 			$tpl->assign('model', $file_bundle);
@@ -1290,8 +1246,8 @@ class Context_FileBundle extends Extension_DevblocksContext implements IDevblock
 
 		// Ownership
 
-		$available_owners = CerberusContexts::getAvailableOwners($active_worker);
-		$tpl->assign('available_owners', $available_owners);
+		$owners_menu = Extension_DevblocksContext::getOwnerTree(['app','group','role','worker']);
+		$tpl->assign('owners_menu', $owners_menu);
 		
 		// Attachments
 		

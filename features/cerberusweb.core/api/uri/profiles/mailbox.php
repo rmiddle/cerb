@@ -7,12 +7,12 @@
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class PageSection_ProfilesMailbox extends Extension_PageSection {
@@ -114,8 +114,14 @@ class PageSection_ProfilesMailbox extends Extension_PageSection {
 			'value' => $mailbox->ssl_ignore_validation,
 		);
 		
+		$properties['auth_disable_plain'] = array(
+			'label' => mb_ucfirst($translate->_('dao.mailbox.auth_disable_plain')),
+			'type' => Model_CustomField::TYPE_CHECKBOX,
+			'value' => $mailbox->auth_disable_plain,
+		);
+		
 		$properties['updated'] = array(
-			'label' => mb_ucfirst($translate->_('common.updated')),
+			'label' => DevblocksPlatform::translateCapitalized('common.updated'),
 			'type' => Model_CustomField::TYPE_DATE,
 			'value' => $mailbox->updated_at,
 		);
@@ -144,7 +150,7 @@ class PageSection_ProfilesMailbox extends Extension_PageSection {
 					DAO_ContextLink::getContextLinkCounts(
 						CerberusContexts::CONTEXT_MAILBOX,
 						$mailbox->id,
-						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+						array(CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
 					),
 			),
 		);
@@ -198,6 +204,7 @@ class PageSection_ProfilesMailbox extends Extension_PageSection {
 				@$timeout_secs = DevblocksPlatform::importGPC($_POST['timeout_secs'],'integer');
 				@$max_msg_size_kb = DevblocksPlatform::importGPC($_POST['max_msg_size_kb'],'integer');
 				@$ssl_ignore_validation = DevblocksPlatform::importGPC($_REQUEST['ssl_ignore_validation'],'integer',0);
+				@$auth_disable_plain = DevblocksPlatform::importGPC($_REQUEST['auth_disable_plain'],'integer',0);
 				
 				if(empty($name))
 					$name = "Mailbox";
@@ -240,18 +247,12 @@ class PageSection_ProfilesMailbox extends Extension_PageSection {
 					DAO_Mailbox::TIMEOUT_SECS => $timeout_secs,
 					DAO_Mailbox::MAX_MSG_SIZE_KB => $max_msg_size_kb,
 					DAO_Mailbox::SSL_IGNORE_VALIDATION => $ssl_ignore_validation,
+					DAO_Mailbox::AUTH_DISABLE_PLAIN => $auth_disable_plain,
 					DAO_Mailbox::UPDATED_AT => time(),
 				);
 				
 				if(empty($id)) { // New
 					$id = DAO_Mailbox::create($fields);
-					
-					// Context Link (if given)
-					@$link_context = DevblocksPlatform::importGPC($_REQUEST['link_context'],'string','');
-					@$link_context_id = DevblocksPlatform::importGPC($_REQUEST['link_context_id'],'integer','');
-					if(!empty($id) && !empty($link_context) && !empty($link_context_id)) {
-						DAO_ContextLink::setLink(CerberusContexts::CONTEXT_MAILBOX, $id, $link_context, $link_context_id);
-					}
 					
 					if(!empty($view_id) && !empty($id))
 						C4_AbstractView::setMarqueeContextCreated($view_id, CerberusContexts::CONTEXT_MAILBOX, $id);
@@ -308,6 +309,7 @@ class PageSection_ProfilesMailbox extends Extension_PageSection {
 			@$timeout_secs = DevblocksPlatform::importGPC($_REQUEST['timeout_secs'],'integer',0);
 			@$max_msg_size_kb = DevblocksPlatform::importGPC($_REQUEST['max_msg_size_kb'],'integer',25600);
 			@$ssl_ignore_validation = DevblocksPlatform::importGPC($_REQUEST['ssl_ignore_validation'],'integer',0);
+			@$auth_disable_plain = DevblocksPlatform::importGPC($_REQUEST['auth_disable_plain'],'integer',0);
 			
 			// Defaults
 			if(empty($port)) {
@@ -331,7 +333,7 @@ class PageSection_ProfilesMailbox extends Extension_PageSection {
 			if(!empty($host)) {
 				$mail_service = DevblocksPlatform::getMailService();
 				
-				if(false == $mail_service->testMailbox($host, $port, $protocol, $user, $pass, $ssl_ignore_validation, $timeout_secs, $max_msg_size_kb))
+				if(false == $mail_service->testMailbox($host, $port, $protocol, $user, $pass, $ssl_ignore_validation, $auth_disable_plain, $timeout_secs, $max_msg_size_kb))
 					throw new Exception($translate->_('config.mailboxes.failed'));
 				
 			} else {

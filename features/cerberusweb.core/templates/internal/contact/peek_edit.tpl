@@ -21,7 +21,7 @@
 		<tr>
 			<td width="1%" nowrap="nowrap"><b>{'common.name.first'|devblocks_translate|capitalize}:</b></td>
 			<td width="99%">
-				<input type="text" name="first_name" value="{$model->first_name}" style="width:98%;" autocomplete="off" spellcheck="false">
+				<input type="text" name="first_name" value="{$model->first_name}" style="width:98%;" autocomplete="off" spellcheck="false" autofocus="autofocus">
 			</td>
 		</tr>
 		
@@ -29,6 +29,15 @@
 			<td width="1%" nowrap="nowrap"><b>{'common.name.last'|devblocks_translate|capitalize}:</b></td>
 			<td width="99%">
 				<input type="text" name="last_name" value="{$model->last_name}" style="width:98%;" autocomplete="off" spellcheck="false">
+			</td>
+		</tr>
+		
+		<tr>
+			<td width="1%" nowrap="nowrap" valign="top" title="(one per line)">
+				<b>{'common.aliases'|devblocks_translate|capitalize}:</b>
+			</td>
+			<td width="99%" valign="top">
+				<textarea name="aliases" cols="45" rows="3" style="width:98%;" placeholder="(one per line)">{$aliases|implode:"\n"}</textarea>
 			</td>
 		</tr>
 		
@@ -42,7 +51,7 @@
 		<tr>
 			<td width="1%" nowrap="nowrap" valign="middle"><b>{'common.organization'|devblocks_translate|capitalize}:</b></td>
 			<td width="99%" valign="top">
-					<button type="button" class="chooser-abstract" data-field-name="org_id" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-autocomplete="if-null" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+					<button type="button" class="chooser-abstract" data-field-name="org_id" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-autocomplete="" data-autocomplete-if-empty="true" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
 					
 					<ul class="bubbles chooser-container">
 						{if $org}
@@ -55,13 +64,44 @@
 		<tr>
 			<td width="1%" nowrap="nowrap" valign="middle"><b>{'common.email'|devblocks_translate|capitalize}:</b></td>
 			<td width="99%" valign="top">
-					<button type="button" class="chooser-abstract" data-field-name="primary_email_id" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-single="true" data-query="org.id:{$org->id}" data-autocomplete="if-null" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+					<button type="button" class="chooser-abstract" data-field-name="primary_email_id" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-single="true" data-query="org.id:{$org->id}" data-autocomplete="" data-autocomplete-if-empty="true" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
 					
 					<ul class="bubbles chooser-container">
 						{if $addy}
 							<li><img class="cerb-avatar" src="{devblocks_url}c=avatars&context=address&context_id={$addy->id}{/devblocks_url}?v={$addy->updated}"><input type="hidden" name="primary_email_id" value="{$addy->id}"><a href="javascript:;" class="cerb-peek-trigger no-underline" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-context-id="{$addy->id}">{$addy->email}</a></li>
 						{/if}
 					</ul>
+			</td>
+		</tr>
+		
+		<tr>
+			<td width="1%" nowrap="nowrap"><b>{'common.location'|devblocks_translate|capitalize}:</b></td>
+			<td width="99%">
+				<input type="text" name="location" value="{$model->location}" style="width:98%;" autocomplete="off" spellcheck="false">
+			</td>
+		</tr>
+		
+		<tr>
+			<td width="0%" nowrap="nowrap" valign="middle"><b>{'common.language'|devblocks_translate}:</b></td>
+			<td width="100%">
+				<select name="language">
+					<option value=""></option>
+					{foreach from=$languages key=lang_code item=lang_name}
+					<option value="{$lang_code}" {if $model->language==$lang_code}selected="selected"{/if}>{$lang_name}</option>
+					{/foreach}
+				</select>
+			</td>
+		</tr>
+		
+		<tr>
+			<td width="0%" nowrap="nowrap" valign="middle"><b>{'common.timezone'|devblocks_translate}:</b></td>
+			<td width="100%">
+				<select name="timezone">
+					<option value=""></option>
+					{foreach from=$timezones item=timezone}
+					<option value="{$timezone}" {if $model->timezone==$timezone}selected="selected"{/if}>{$timezone}</option>
+					{/foreach}
+				</select>
 			</td>
 		</tr>
 		
@@ -76,13 +116,6 @@
 			<td width="1%" nowrap="nowrap"><b>{'common.mobile'|devblocks_translate|capitalize}:</b></td>
 			<td width="99%">
 				<input type="text" name="mobile" value="{$model->mobile}" style="width:98%;" autocomplete="off" spellcheck="false">
-			</td>
-		</tr>
-		
-		<tr>
-			<td width="1%" nowrap="nowrap"><b>{'common.location'|devblocks_translate|capitalize}:</b></td>
-			<td width="99%">
-				<input type="text" name="location" value="{$model->location}" style="width:98%;" autocomplete="off" spellcheck="false">
 			</td>
 		</tr>
 		
@@ -194,7 +227,8 @@ $(function() {
 	
 	$popup.one('popup_open', function(event,ui) {
 		$popup.dialog('option','title',"{'common.edit'|devblocks_translate|capitalize|escape:'javascript' nofilter}: {'common.contact'|devblocks_translate|capitalize|escape:'javascript' nofilter}");
-		$popup.find('input:text:first').focus();
+		
+		var $aliases = $(this).find('textarea[name=aliases]').autosize();
 		
 		// Buttons
 		

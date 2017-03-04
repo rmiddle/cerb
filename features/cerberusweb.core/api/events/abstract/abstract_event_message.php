@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
@@ -30,7 +30,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			list($results) = DAO_Ticket::search(
 				array(),
 				array(
-					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,'=',0),
+					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_STATUS_ID,'!=',Model_Ticket::STATUS_DELETED),
 				),
 				10,
 				0,
@@ -84,8 +84,8 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 		CerberusContexts::getContext(CerberusContexts::CONTEXT_TICKET, $ticket_id, $ticket_labels, $ticket_values, 'Message:Ticket:', true);
 
 			// Fill some custom values
-			if(!is_null($event_model)) {
-				$values['is_first'] = ($values['id'] == $ticket_values['initial_message_id']) ? 1 : 0;
+			if(!is_null($event_model) && isset($values['id']) && isset($ticket_values['initial_message_id'])) {
+				$values['is_first'] = (isset($ticket_values['initial_message_id']) && $values['id'] == $ticket_values['initial_message_id']) ? 1 : 0;
 			}
 		
 			if(isset($ticket_values['group_id']))
@@ -440,7 +440,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 			case 'ticket_latest_message_headers':
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
-				@$header = rtrim(strtolower($params['header']), ':');
+				@$header = rtrim(DevblocksPlatform::strLower($params['header']), ':');
 				@$param_value = $params['value'];
 				
 				// Lazy load
@@ -600,14 +600,14 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				'add_recipients' => array('label' =>'Add recipients'),
 				'add_watchers' => array('label' =>'Add watchers'),
 				'create_comment' => array('label' =>'Create comment'),
-				'create_notification' => array('label' =>'Send a notification'),
-				'create_message_note' => array('label' =>'Create a message sticky note'),
+				'create_notification' => array('label' =>'Create notification'),
+				'create_message_note' => array('label' =>'Create sticky note'),
 				'create_task' => array('label' =>'Create task'),
 				'create_ticket' => array('label' =>'Create ticket'),
-				'move_to' => array('label' => 'Move to'),
-				'relay_email' => array('label' => 'Relay to external email'),
+				'move_to' => array('label' => 'Move to bucket'),
+				'relay_email' => array('label' => 'Send email relay to workers'),
 				'remove_recipients' => array('label' =>'Remove recipients'),
-				'schedule_email_recipients' => array('label' => 'Schedule email to recipients'),
+				'schedule_email_recipients' => array('label' => 'Send scheduled email to recipients'),
 				'send_email' => array('label' => 'Send email'),
 				'send_email_recipients' => array('label' => 'Send email to recipients'),
 				'set_importance' => array('label' =>'Set ticket importance'),
@@ -665,7 +665,7 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				break;
 				
 			case 'relay_email':
-				if(false == ($va = $trigger->getVirtualAttendant()))
+				if(false == ($va = $trigger->getBot()))
 					break;
 				
 				switch($va->owner_context) {
@@ -1111,30 +1111,22 @@ abstract class AbstractEvent_Message extends Extension_DevblocksEvent {
 				switch($to_status) {
 					case 'open':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 0,
-							DAO_Ticket::IS_CLOSED => 0,
-							DAO_Ticket::IS_DELETED => 0,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_OPEN,
 						);
 						break;
 					case 'waiting':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 1,
-							DAO_Ticket::IS_CLOSED => 0,
-							DAO_Ticket::IS_DELETED => 0,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_WAITING,
 						);
 						break;
 					case 'closed':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 0,
-							DAO_Ticket::IS_CLOSED => 1,
-							DAO_Ticket::IS_DELETED => 0,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_CLOSED,
 						);
 						break;
 					case 'deleted':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 0,
-							DAO_Ticket::IS_CLOSED => 1,
-							DAO_Ticket::IS_DELETED => 1,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_DELETED,
 						);
 						break;
 					default:

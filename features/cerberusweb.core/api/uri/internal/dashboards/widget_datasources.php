@@ -96,12 +96,6 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 		@$metric_func = $params['metric_func'];
 		@$metric_field = $fields[$params['metric_field']];
 
-		// If we're subtotalling on a custom field, make sure it's joined
-		
-		if(!$view->hasParam($metric_field->token, $view->getParams())) {
-			$view->addParam(new DevblocksSearchCriteria($metric_field->token, DevblocksSearchCriteria::OPER_TRUE), $metric_field->token);
-		}
-
 		// Build the query
 		
 		$query_parts = $dao_class::getSearchQueryComponents(
@@ -191,7 +185,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 			return;
 
 		if(null == ($dao_class = @$context_ext->manifest->params['dao_class']))
-			continue;
+			return;
 			
 		$data = array();
 		
@@ -233,17 +227,26 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 			}
 			
 			@$yaxis_func = $params['yaxis_func'];
-			@$yaxis_field = $fields[$params['yaxis_field']];
-				
-			if(empty($yaxis_field)) {
-				$yaxis_func = 'count';
-				
-			} else {
-				// If we're subtotalling on a custom field, make sure it's joined
-				if(!$view->hasParam($yaxis_field->token, $view->getParams())) {
-					$view->addParam(new DevblocksSearchCriteria($yaxis_field->token, DevblocksSearchCriteria::OPER_TRUE));
-					$params_changed = true;
-				}
+			$yaxis_field = null;
+			
+			switch($yaxis_func) {
+				case 'count':
+					break;
+					
+				default:
+					@$yaxis_field = $fields[$params['yaxis_field']];
+					
+					if(empty($yaxis_field)) {
+						$yaxis_func = 'count';
+						
+					} else {
+						// If we're subtotalling on a custom field, make sure it's joined
+						if(!$view->hasParam($yaxis_field->token, $view->getParams())) {
+							$view->addParam(new DevblocksSearchCriteria($yaxis_field->token, DevblocksSearchCriteria::OPER_TRUE));
+							$params_changed = true;
+						}
+					}
+					break;
 			}
 			
 			if($params_changed) {
@@ -436,15 +439,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 						case '_id':
 							$order_by = null;
 							$group_by = sprintf("GROUP BY %s.id ", str_replace('%','%%',$query_parts['primary_table']));
-								
-							if(isset($fields[$view->renderSortBy])) {
-								$order_by = sprintf("ORDER BY %s.%s %s",
-									$fields[$view->renderSortBy]->db_table,
-									$fields[$view->renderSortBy]->db_column,
-									($view->renderSortAsc) ? 'ASC' : 'DESC'
-								);
-							}
-								
+							
 							if(empty($order_by))
 								$order_by = sprintf("ORDER BY %s.id ", str_replace('%','%%',$query_parts['primary_table']));
 							
@@ -459,8 +454,7 @@ class WorkspaceWidgetDatasource_Worklist extends Extension_WorkspaceWidgetDataso
 							$order_by = 'ORDER BY xaxis ASC';
 							break;
 					}
-						
-						
+					
 					switch($yaxis_func) {
 						case 'sum':
 							$select_func = sprintf("SUM(%s.%s)",
@@ -594,16 +588,14 @@ class WorkspaceWidgetDatasource_URL extends Extension_WorkspaceWidgetDatasource 
 		$cache_key = sprintf("widget%d_datasource", $widget->id);
 		
 		if(true || null === ($data = $cache->load($cache_key))) {
-			$ch = curl_init($url);
+			$ch = DevblocksPlatform::curlInit($url);
 			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-			$raw_data = curl_exec($ch);
+			$raw_data = DevblocksPlatform::curlExec($ch);
 			$info = curl_getinfo($ch);
 			
 			//@$status = $info['http_code'];
-			@$content_type = strtolower($info['content_type']);
+			@$content_type = DevblocksPlatform::strLower($info['content_type']);
 			
 			$data = array(
 				'raw_data' => $raw_data,
@@ -612,7 +604,7 @@ class WorkspaceWidgetDatasource_URL extends Extension_WorkspaceWidgetDatasource 
 			
 			DAO_WorkspaceWidget::update($widget->id, array(
 				DAO_WorkspaceWidget::UPDATED_AT => time(),
-			));
+			), DevblocksORMHelper::OPT_UPDATE_NO_READ_AFTER_WRITE);
 			
 			$cache->save($data, $cache_key, array(), $cache_mins*60);
 		}

@@ -64,16 +64,37 @@ blockquote a {
 		<fieldset class="peek">
 			<legend>Signature</legend>
 			<textarea name="signature" style="width:98%;height:150px;border:1px solid rgb(180,180,180);padding:2px;" spellcheck="false" placeholder="Leave blank to use the default group signature.">{$model->signature}</textarea>
-			
+
 			<div>
-				<select name="sig_token">
-					<option value="">-- insert at cursor --</option>
-					{foreach from=$worker_token_labels key=k item=v}
-					<option value="{literal}{{{/literal}{$k}{literal}}}{/literal}">{$v}</option>
+				<button type="button" class="cerb-popupmenu-trigger" onclick="">Insert placeholder &#x25be;</button>
+				
+				{$types = $values._types}
+				{function tree level=0}
+					{foreach from=$keys item=data key=idx}
+						{$type = $types.{$data->key}}
+						{if is_array($data->children) && !empty($data->children)}
+							<li {if $data->key}data-token="{$data->key}{if $type == Model_CustomField::TYPE_DATE}|date{/if}" data-label="{$data->label}"{/if}>
+								{if $data->key}
+									<div style="font-weight:bold;">{$data->l|capitalize}</div>
+								{else}
+									<div>{$idx|capitalize}</div>
+								{/if}
+								<ul>
+									{tree keys=$data->children level=$level+1}
+								</ul>
+							</li>
+						{elseif $data->key}
+							<li data-token="{$data->key}{if $type == Model_CustomField::TYPE_DATE}|date{/if}" data-label="{$data->label}"><div style="font-weight:bold;">{$data->l|capitalize}</div></li>
+						{/if}
 					{/foreach}
-				</select>
+				{/function}
+				
+				<ul class="menu" style="width:150px;">
+				{tree keys=$placeholders}
+				</ul>
 			</div>
-		</fieldset>		
+			
+		</fieldset>
 	</div>
 	
 	<div id="htmlTemplateCustomFields{$tabs_id}">
@@ -88,26 +109,22 @@ blockquote a {
 	</div>
 	
 	<div id="htmlTemplateAttachments{$tabs_id}">
-		{$a_map = DAO_AttachmentLink::getLinksAndAttachments(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $model->id)}
-		{$links = $a_map.links}
-		{$attachments = $a_map.attachments}
-		
-		<b>{'common.attachments'|devblocks_translate}:</b><br>
+		{$attachments = DAO_Attachment::getByContextIds(CerberusContexts::CONTEXT_MAIL_HTML_TEMPLATE, $model->id)}
+	
+		<b>{'common.attachments'|devblocks_translate|capitalize}:</b><br>
 		<button type="button" class="chooser_file"><span class="glyphicons glyphicons-paperclip"></span></button>
 		<ul class="chooser-container bubbles cerb-attachments-container" style="display:block;">
-		{if !empty($links) && !empty($attachments)}
-			{foreach from=$links item=link name=links}
-			{$attachment = $attachments.{$link->attachment_id}}
-			{if !empty($attachment)}
-				<li>
-					{$attachment->display_name}
-					( {$attachment->storage_size|devblocks_prettybytes}	- 
-					{if !empty($attachment->mime_type)}{$attachment->mime_type}{else}{'display.convo.unknown_format'|devblocks_translate|capitalize}{/if}
-					 )
-					<input type="hidden" name="file_ids[]" value="{$attachment->id}">
-					<a href="javascript:;" onclick="$(this).parent().remove();"><span class="glyphicons glyphicons-circle-remove"></span></a>
-				</li>
-			{/if}
+		{if !empty($attachments)}
+			{foreach from=$attachments item=attachment name=attachments}
+			<li>
+				<a href="javascript:;" class="cerb-peek-trigger" data-context="{CerberusContexts::CONTEXT_ATTACHMENT}" data-context-id="{$attachment->id}">
+					<b>{$attachment->name}</b>
+					({$attachment->storage_size|devblocks_prettybytes}	- 
+					{if !empty($attachment->mime_type)}{$attachment->mime_type}{else}{'display.convo.unknown_format'|devblocks_translate|capitalize}{/if})
+				</a>
+				<input type="hidden" name="file_ids[]" value="{$attachment->id}">
+				<a href="javascript:;" onclick="$(this).parent().remove();"><span class="glyphicons glyphicons-circle-remove"></span></a>
+			</li>
 			{/foreach}
 		{/if}
 		</ul>
@@ -148,7 +165,8 @@ $(function() {
 	
 	$popup.one('popup_open', function(event,ui) {
 		$popup.dialog('option','title',"{'HTML Template'}");
-
+		$popup.css('overflow', 'inherit');
+		
 		$popup.find('.cerb-tabs-panel').tabs();
 		
 		var $content = $popup.find('textarea[name=content]');
@@ -159,6 +177,12 @@ $(function() {
 		
 		$popup.find('button.submit').click(Devblocks.callbackPeekEditSave);
 		$popup.find('button.delete').click({ mode: 'delete' }, Devblocks.callbackPeekEditSave);
+		
+		// Peek triggers
+		
+		$popup.find('.cerb-peek-trigger')
+			.cerbPeekTrigger()
+			;
 		
 		// Attachments
 		
@@ -183,7 +207,7 @@ $(function() {
 							if(!event.response || 0 == event.response)
 								return;
 							
-							$signature.insertAtCursor("![inline-image](" + event.response[0].url + ")");
+							{literal}$signature.insertAtCursor("![inline-image]({{cerb_file_url(" + event.response[0].id + ",'" + event.response[0].name + "')}})");{/literal}
 	
 							// Add an attachment link
 							
@@ -248,7 +272,7 @@ $(function() {
 					key: 'U',
 					className:'image-inline'
 				}
-			);			
+			);
 			
 			delete markitupHTMLSettings.previewParserPath;
 			delete markitupHTMLSettings.previewTemplatePath;
@@ -280,17 +304,28 @@ $(function() {
 		
 		// Placeholders
 		
-		$popup.find('select[name=sig_token]').change(function(e) {
-			var $select = $(this);
-			var $val = $select.val();
-			
-			if($val.length == 0)
-				return;
-			
-			$signature.insertAtCursor($val).focus();
-			
-			$select.val('');
+		var $placeholder_menu_trigger = $popup.find('button.cerb-popupmenu-trigger');
+		var $placeholder_menu = $popup.find('ul.menu').hide();
+		
+		$placeholder_menu.menu({
+			select: function(event, ui) {
+				var token = ui.item.attr('data-token');
+				var label = ui.item.attr('data-label');
+				
+				if(undefined == token || undefined == label)
+					return;
+				
+				$signature.focus().insertAtCursor('{literal}{{{/literal}' + token + '{literal}}}{/literal}');
+			}
 		});
+		
+		$placeholder_menu_trigger
+			.click(
+				function(e) {
+					$placeholder_menu.toggle();
+				}
+			)
+		;
 	});
 });
 </script>

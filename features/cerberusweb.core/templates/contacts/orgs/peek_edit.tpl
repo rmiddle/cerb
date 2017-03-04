@@ -1,16 +1,18 @@
 {$form_id = "peek{uniqid()}"}
 
 <form action="{devblocks_url}{/devblocks_url}" method="POST" id="{$form_id}" onsubmit="return false;">
-<input type="hidden" name="c" value="contacts">
-<input type="hidden" name="a" value="saveOrgPeek">
+<input type="hidden" name="c" value="profiles">
+<input type="hidden" name="a" value="handleSectionAction">
+<input type="hidden" name="section" value="org">
+<input type="hidden" name="action" value="savePeekPopupJson">
 <input type="hidden" name="view_id" value="{$view_id}">
 <input type="hidden" name="id" value="{$org->id}">
-{if !empty($link_context)}
-<input type="hidden" name="link_context" value="{$link_context}">
-<input type="hidden" name="link_context_id" value="{$link_context_id}">
-{/if}
 <input type="hidden" name="do_delete" value="0">
 <input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
+
+{if $org instanceof Model_ContactOrg}
+	{$addy = $org->getEmail()}
+{/if}
 
 <fieldset class="peek">
 	<legend>{'common.properties'|devblocks_translate}</legend>
@@ -19,6 +21,14 @@
 		<tr>
 			<td width="0%" nowrap="nowrap" align="right">{'common.name'|devblocks_translate|capitalize}: </td>
 			<td width="100%"><input type="text" name="org_name" value="{$org->name}" style="width:98%;"></td>
+		</tr>
+		<tr>
+			<td width="1%" nowrap="nowrap" valign="top" align="right" title="(one per line)">
+				{'common.aliases'|devblocks_translate|capitalize}:
+			</td>
+			<td width="99%" valign="top">
+				<textarea name="aliases" cols="45" rows="3" style="width:98%;" placeholder="(one per line)">{$aliases|implode:"\n"}</textarea>
+			</td>
 		</tr>
 		<tr>
 			<td align="right" valign="top">{'contact_org.street'|devblocks_translate|capitalize}: </td>
@@ -43,6 +53,18 @@
 			</td>
 		</tr>
 		<tr>
+			<td width="1%" nowrap="nowrap" align="right" valign="middle">{'common.email'|devblocks_translate|capitalize}:</td>
+			<td width="99%" valign="top">
+					<button type="button" class="chooser-abstract" data-field-name="email_id" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-single="true" data-query="org.id:{$org->id}" data-autocomplete="" data-autocomplete-if-empty="true" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+					
+					<ul class="bubbles chooser-container">
+						{if $addy}
+							<li><img class="cerb-avatar" src="{devblocks_url}c=avatars&context=address&context_id={$addy->id}{/devblocks_url}?v={$addy->updated}"><input type="hidden" name="email_id" value="{$addy->id}"><a href="javascript:;" class="cerb-peek-trigger no-underline" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-context-id="{$addy->id}">{$addy->email}</a></li>
+						{/if}
+					</ul>
+			</td>
+		</tr>
+		<tr>
 			<td align="right">{'common.phone'|devblocks_translate|capitalize}: </td>
 			<td><input type="text" name="phone" value="{$org->phone}" style="width:98%;"></td>
 		</tr>
@@ -50,17 +72,6 @@
 			<td align="right">{if !empty($org->website)}<a href="{$org->website}" target="_blank">{'common.website'|devblocks_translate|capitalize}</a>{else}{'common.website'|devblocks_translate|capitalize}{/if}: </td>
 			<td><input type="text" name="website" value="{$org->website}" style="width:98%;" class="url"></td>
 		</tr>
-		
-		{* Watchers *}
-		{if empty($org->id)}
-		<tr>
-			<td width="0%" nowrap="nowrap" valign="top" align="right">{'common.watchers'|devblocks_translate|capitalize}: </td>
-			<td width="100%">
-					<button type="button" class="chooser_watcher"><span class="glyphicons glyphicons-search"></span></button>
-					<ul class="chooser-container bubbles" style="display:block;"></ul>
-			</td>
-		</tr>
-		{/if}
 		
 		<tr>
 			<td width="1%" nowrap="nowrap" valign="top" align="right">{'common.image'|devblocks_translate|capitalize}:</td>
@@ -86,9 +97,6 @@
 {/if}
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/peek_custom_fieldsets.tpl" context=CerberusContexts::CONTEXT_ORG context_id=$org->id}
-
-{* Comments *}
-{include file="devblocks:cerberusweb.core::internal/peek/peek_comments_pager.tpl" comments=$comments}
 
 <fieldset class="peek">
 	<legend>{'common.comment'|devblocks_translate|capitalize}</legend>
@@ -118,12 +126,6 @@
 		<div class="error">{'error.core.no_acl.edit'|devblocks_translate}</div>
 	{/if}
 </div>
-
-{if !empty($org->id)}
-<div style="float:right;">
-	<a href="{devblocks_url}&c=profiles&type=org&id={$org->id}-{$org->name|devblocks_permalink}{/devblocks_url}">{'addy_book.peek.view_full'|devblocks_translate}</a>
-</div>
-{/if}
 </form>
 
 <script type="text/javascript">
@@ -132,6 +134,7 @@ $(function() {
 	var $popup = genericAjaxPopupFind($frm);
 
 	$popup.one('popup_open',function(event,ui) {
+		var $aliases = $(this).find('textarea[name=aliases]').autosize();
 		var $textarea = $(this).find('textarea[name=comment]');
 		
 		// Buttons

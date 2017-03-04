@@ -1,7 +1,8 @@
-_version
+_master.key
 attachments
 context_avatar
 message_content
 tmp/cache
 tmp/templates_c
 tmp/__Twig*
+version.php

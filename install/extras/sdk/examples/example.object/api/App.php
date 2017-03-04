@@ -102,11 +102,6 @@ class Page_ExampleObjects extends CerberusPageExtension {
 		// Create
 		} else {
 			$id = DAO_ExampleObject::create($fields);
-			
-			// Watchers
-			@$add_watcher_ids = DevblocksPlatform::sanitizeArray(DevblocksPlatform::importGPC($_REQUEST['add_watcher_ids'],'array',array()),'integer',array('unique','nonzero'));
-			if(!empty($add_watcher_ids))
-				CerberusContexts::addWatchers(Context_ExampleObject::ID, $id, $add_watcher_ids);
 		}
 		
 		// If we're adding a comment
@@ -148,7 +143,7 @@ class Page_ExampleObjects extends CerberusPageExtension {
 		$tpl->display('devblocks:example.object::example_object/bulk.tpl');
 	}
 	
-	function saveBulkUpdatePopupAction() {
+	function startBulkUpdateJsonAction() {
 		// Filter: whole list or check
 		@$filter = DevblocksPlatform::importGPC($_REQUEST['filter'],'string','');
 		$ids = array();
@@ -190,17 +185,31 @@ class Page_ExampleObjects extends CerberusPageExtension {
 				@$ids_str = DevblocksPlatform::importGPC($_REQUEST['ids'],'string');
 				$ids = DevblocksPlatform::parseCsvString($ids_str);
 				break;
+				
 			case 'sample':
 				@$sample_size = min(DevblocksPlatform::importGPC($_REQUEST['filter_sample_size'],'integer',0),9999);
 				$filter = 'checks';
 				$ids = $view->getDataSample($sample_size);
 				break;
+				
 			default:
 				break;
 		}
 		
-		$view->doBulkUpdate($filter, $do, $ids);
-		$view->render();
+		// If we have specific IDs, add a filter for those too
+		if(!empty($ids)) {
+			$view->addParam(new DevblocksSearchCriteria(SearchFields_ExampleObject::ID, 'in', $ids));
+		}
+		
+		// Create batches
+		$batch_key = DAO_ContextBulkUpdate::createFromView($view, $do);
+		
+		header('Content-Type: application/json; charset=utf-8');
+		
+		echo json_encode(array(
+			'cursor' => $batch_key,
+		));
+		
 		return;
 	}
 	

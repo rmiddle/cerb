@@ -18,6 +18,47 @@ class DevblocksPlatformTest extends PHPUnit_Framework_TestCase {
 		parent::__construct($name, $data, $dataName);
 	}
 	
+	public function testRequirements() {
+		// Version
+		$actual = version_compare(PHP_VERSION, "5.5", ">=");
+		$this->assertEquals(true, $actual, sprintf('Cerb requires a PHP version of 5.5+, currently %s', PHP_VERSION));
+
+		// File Uploads
+		$ini_file_uploads = ini_get("file_uploads");
+		$actual = ($ini_file_uploads == 1 || strcasecmp($ini_file_uploads,"on")==0);
+		$this->assertEquals(true, $actual, 'In php.ini, file_uploads is not enabled.');
+		
+		// Memory Limit
+		$expected = 16777216;
+		$ini_memory_limit = ini_get("memory_limit");
+		$actual = DevblocksPlatform::parseBytesString($ini_memory_limit ?: PHP_INT_MAX);
+		$this->assertGreaterThanOrEqual($expected, $actual, 'Cerb requires a memory_limit in php.ini of at least 16MB');
+		
+		// Required extensions
+		$required_extensions = array(
+			'ctype',
+			'curl',
+			'dom',
+			'gd',
+			'imap',
+			'json',
+			'mailparse',
+			'mbstring',
+			'mysqli',
+			'openssl',
+			'pcre',
+			'session',
+			'simplexml',
+			'spl',
+			'xml',
+		);
+		
+		foreach($required_extensions as $extension) {
+			$actual = extension_loaded($extension);
+			$this->assertEquals(true, $actual, sprintf('The %s extension is required.', $extension));
+		}
+	}
+	
 	public function testCompareStrings() {
 		// Equals
 		$actual = DevblocksPlatform::compareStrings('foo', 'foo', 'is');
@@ -497,23 +538,28 @@ class DevblocksPlatformTest extends PHPUnit_Framework_TestCase {
 		$this->assertEquals(256, $actual);
 		
 		// [TODO] This could test 'bytes', 'MB', 'GB', etc.
-		// [TODO] Also 1000^n vs 1024^n (MB vs MiB)
+		// [TODO] Handle commas and decimals?
+		// [TODO] Test KB/MB/GB/TB vs KiB/...
 		
 		// B
 		$actual = DevblocksPlatform::parseBytesString('512B');
 		$this->assertEquals(512, $actual);
 		
-		// K
-		$actual = DevblocksPlatform::parseBytesString('256K');
+		// KiB
+		$actual = DevblocksPlatform::parseBytesString('256KiB');
 		$this->assertEquals(262144, $actual);
 		
-		// M
-		$actual = DevblocksPlatform::parseBytesString('100M');
+		// MiB
+		$actual = DevblocksPlatform::parseBytesString('100MiB');
 		$this->assertEquals(104857600, $actual);
 		
-		// G
-		$actual = DevblocksPlatform::parseBytesString('8G');
+		// GiB
+		$actual = DevblocksPlatform::parseBytesString('8GiB');
 		$this->assertEquals(8589934592, $actual);
+		
+		// TiB
+		$actual = DevblocksPlatform::parseBytesString('2TiB');
+		$this->assertEquals(2 * pow(1024,4), $actual);
 	}
 	
 	public function testParseCrlfString() {
@@ -544,6 +590,11 @@ class DevblocksPlatformTest extends PHPUnit_Framework_TestCase {
 		$actual = DevblocksPlatform::parseCsvString($str, false, null);
 		$this->assertEquals(array('1','2','3'), $actual);
 		
+		// CSV, no blanks, no cast, limit 2
+		$str = "1,2,3,";
+		$actual = DevblocksPlatform::parseCsvString($str, false, null, 2);
+		$this->assertEquals(array('1','2,3'), $actual);
+		
 		// CSV, with blanks, no cast
 		$str = "1,2,3,";
 		$actual = DevblocksPlatform::parseCsvString($str, true, null);
@@ -558,6 +609,12 @@ class DevblocksPlatformTest extends PHPUnit_Framework_TestCase {
 		$str = "red,green,blue";
 		$actual = DevblocksPlatform::parseCsvString($str, false, 'string');
 		$this->assertEquals(array('red','green','blue'), $actual);
+		
+		// CSV, with blanks, no cast, and limit
+		$str = "1,2,3,";
+		$actual = DevblocksPlatform::parseCsvString($str, true, null, 2);
+		$this->assertEquals(array('1','2,3,'), $actual);
+		
 	}
 	
 	public function testParseMarkdown() {
@@ -812,6 +869,26 @@ class DevblocksPlatformTest extends PHPUnit_Framework_TestCase {
 		$this->assertEquals($expected, $actual);
 	}
 	
+	public function testStrUpper() {
+		$expected = "Ü";
+		$actual = DevblocksPlatform::strUpper("ü");
+		$this->assertEquals($expected, $actual);
+		
+		$expected = "THIS IS SOME TEXT!";
+		$actual = DevblocksPlatform::strUpper("this is some text!");
+		$this->assertEquals($expected, $actual);
+	}
+	
+	public function testStrLower() {
+		$expected = "ü";
+		$actual = DevblocksPlatform::strLower("Ü");
+		$this->assertEquals($expected, $actual);
+		
+		$expected = "this is some text!";
+		$actual = DevblocksPlatform::strLower("THIS IS SOME TEXT!");
+		$this->assertEquals($expected, $actual);
+	}
+	
 	public function testStrBase32Encode() {
 		$expected = 'I5UXMZJANVSSAJBRGAYDAMBAN5TCAQKBKBGCA43UN5RWWLBAOBWGKYLTMUQQ====';
 		$actual = DevblocksPlatform::strBase32Encode('Give me $10000 of AAPL stock, please!');
@@ -825,19 +902,28 @@ class DevblocksPlatformTest extends PHPUnit_Framework_TestCase {
 	}
 	
 	public function testStrFormatJson() {
+		
 		$expected = <<< END
 [
-  {
-    "name":"Jeff",
-    "title":"Software Architect",
-    "org":"Webgroup Media LLC"
-  }
+    {
+        "name": "Jeff",
+        "title": "Software Architect",
+        "org": "Webgroup Media LLC"
+    }
 ]
 END;
 		
-		$actual = DevblocksPlatform::strFormatJson(json_encode(array(
+		// Test array input
+		
+		$actual = DevblocksPlatform::strFormatJson(array(
 			array('name'=>'Jeff','title'=>'Software Architect','org'=>'Webgroup Media LLC'),
-		)));
+		));
+		
+		$this->assertEquals($expected, $actual);
+		
+		// Test string input
+		
+		$actual = DevblocksPlatform::strFormatJson('[{"name":"Jeff","title":"Software Architect","org":"Webgroup Media LLC"}]');
 		
 		$this->assertEquals($expected, $actual);
 	}
@@ -875,25 +961,25 @@ END;
 		
 		// Convert unordered list
 		$html = '<ul><li>one</li><li>two</li><li>three</li></ul>';
-		$expected = "- one\n- two\n- three\n\n\n";
+		$expected = "- one\n\n- two\n\n- three\n\n\n";
 		$actual = DevblocksPlatform::stripHTML($html, true, false);
 		$this->assertEquals($expected, $actual);
 		
 		// Convert ordered list
 		$html = '<ol><li>one</li><li>two</li><li>three</li></ol>';
-		$expected = "1. one\n2. two\n3. three\n\n\n";
+		$expected = "1. one\n\n2. two\n\n3. three\n\n\n";
 		$actual = DevblocksPlatform::stripHTML($html, true, false);
 		$this->assertEquals($expected, $actual);
 		
 		// Convert nested lists
 		$html = '<ol><li><ul><li>red</li><li>green</li></ul></li><li><ul><li>blue</li><li>orange</li></ul></li><li><ul><li>yellow</li><li>purple</li></ul></li></ol>';
-		$expected = "- red\n- green\n\n- blue\n- orange\n\n- yellow\n- purple\n\n\n";
+		$expected = "1. - red\n\n- green\n\n2. - blue\n\n- orange\n\n3. - yellow\n\n- purple\n\n\n";
 		$actual = DevblocksPlatform::stripHTML($html, true, false);
 		$this->assertEquals($expected, $actual);
 		
 		// Convert nested lists
 		$html = '<ol><li>one<ul><li>red</li><li>green</li></ul></li><li>two<ul><li>blue</li><li>orange</li></ul></li><li>three<ul><li>yellow</li><li>purple</li></ul></li></ol>';
-		$expected = "1. one\n- red\n- green\n\n2. two\n- blue\n- orange\n\n3. three\n- yellow\n- purple\n\n\n";
+		$expected = "1. one\n- red\n\n- green\n\n2. two\n- blue\n\n- orange\n\n3. three\n- yellow\n\n- purple\n\n\n";
 		$actual = DevblocksPlatform::stripHTML($html, true, false);
 		$this->assertEquals($expected, $actual);
 		
@@ -1035,28 +1121,28 @@ END;
 	public function testStrToPermalink() {
 		// With defaults
 		$expected = 'devs-1000-ways-to-improve-sales';
-		$actual = strtolower(DevblocksPlatform::strToPermalink('Devs: 1000 Ways to Improve Sales'));
+		$actual = DevblocksPlatform::strLower(DevblocksPlatform::strToPermalink('Devs: 1000 Ways to Improve Sales'));
 		$this->assertEquals($expected, $actual);
 		
 		// With underscores
 		$expected = 'devs_1000_ways_to_improve_sales';
-		$actual = strtolower(DevblocksPlatform::strToPermalink('Devs: 1000 Ways to Improve Sales!', '_'));
+		$actual = DevblocksPlatform::strLower(DevblocksPlatform::strToPermalink('Devs: 1000 Ways to Improve Sales!', '_'));
 		$this->assertEquals($expected, $actual);
 	}
 	
 	public function testStrToRegexp() {
 		// Prefix
-		$expected = '/^prefix.*?$/i';
+		$expected = '/^prefix(.*?)$/i';
 		$actual = DevblocksPlatform::strToRegExp('prefix*');
 		$this->assertEquals($expected, $actual);
 		
 		// Suffix
-		$expected = '/^.*?suffix$/i';
+		$expected = '/^(.*?)suffix$/i';
 		$actual = DevblocksPlatform::strToRegExp('*suffix');
 		$this->assertEquals($expected, $actual);
 		
 		// Partial
-		$expected = '/^.*?partial.*?$/i';
+		$expected = '/^(.*?)partial(.*?)$/i';
 		$actual = DevblocksPlatform::strToRegExp('*partial*');
 		$this->assertEquals($expected, $actual);
 	}

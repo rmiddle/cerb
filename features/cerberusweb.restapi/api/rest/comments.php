@@ -199,32 +199,30 @@ class ChRest_Comments extends Extension_RestController implements IExtensionRest
 			'owner_context_id' => 'integer',
 			'created' => 'integer',
 			'comment' => 'string',
+			'file_id' => 'array',
 		);
 
 		@$context = DevblocksPlatform::importGPC($_POST['context'], 'string', '');
-		@$context_id = DevblocksPlatform::importGPC($_POST['context'], 'integer', 0);
-		@$owner_context = DevblocksPlatform::importGPC($_POST['context'], 'string', '');
-		@$owner_context_id = DevblocksPlatform::importGPC($_POST['context'], 'integer', 0);
+		@$context_id = DevblocksPlatform::importGPC($_POST['context_id'], 'integer', 0);
+		@$owner_context = DevblocksPlatform::importGPC($_POST['owner_context'], 'string', '');
+		@$owner_context_id = DevblocksPlatform::importGPC($_POST['owner_context_id'], 'integer', 0);
+		@$file_ids = DevblocksPlatform::sanitizeArray(DevblocksPlatform::importGPC($_POST['file_id'], 'array', array()), 'int');
 
 		$fields = array();
 		
 		foreach($postfields as $postfield => $type) {
 			if(!isset($_POST[$postfield]))
 				continue;
+			
+			if(in_array($postfield, array('file_id')))
+				continue;
 				
 			@$value = DevblocksPlatform::importGPC($_POST[$postfield], 'string', '');
 			
 			switch($postfield) {
 				case 'context':
-					if($worker->is_superuser) {
-						// A superuser can do anything
-					} else {
-						// Otherwise, is this worker allowed to see this record they are commenting on?
-						if(null != ($context_ext = Extension_DevblocksContext::get($context))) {
-							if(!$context_ext->authorize($context_id, $worker))
-								$this->error(self::ERRNO_ACL);
-						}
-					}
+					if(!CerberusContexts::isReadableByActor($context, $context_id, $worker))
+						$this->error(self::ERRNO_ACL);
 					break;
 				
 				case 'owner_context':
@@ -274,6 +272,11 @@ class ChRest_Comments extends Extension_RestController implements IExtensionRest
 		
 		// Create
 		if(false != ($id = DAO_Comment::create($fields))) {
+			// Attachments
+			if(is_array($file_ids) && !empty($file_ids))
+				DAO_Attachment::setLinks(CerberusContexts::CONTEXT_COMMENT, $id, $file_ids);
+			
+			// Retrieve record
 			$this->getId($id);
 		}
 	}

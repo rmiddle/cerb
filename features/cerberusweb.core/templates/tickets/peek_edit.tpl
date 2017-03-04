@@ -6,10 +6,6 @@
 <input type="hidden" name="a" value="savePeekJson">
 <input type="hidden" name="id" value="{$ticket->id}">
 <input type="hidden" name="view_id" value="{$view_id}">
-{if !empty($link_context)}
-<input type="hidden" name="link_context" value="{$link_context}">
-<input type="hidden" name="link_context_id" value="{$link_context_id}">
-{/if}
 <input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
 <fieldset class="peek" style="margin-bottom:0;">
@@ -29,7 +25,7 @@
 		<tr>
 			<td width="1%" nowrap="nowrap" align="right" valign="middle">{'common.organization'|devblocks_translate|capitalize}:</td>
 			<td width="99%" valign="top">
-					<button type="button" class="chooser-abstract" data-field-name="org_id" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-query="" data-autocomplete="if-null" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+					<button type="button" class="chooser-abstract" data-field-name="org_id" data-context="{CerberusContexts::CONTEXT_ORG}" data-single="true" data-query="" data-autocomplete="" data-autocomplete-if-empty="true" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
 					
 					<ul class="bubbles chooser-container">
 						{$ticket_org = $ticket->getOrg()}
@@ -72,12 +68,12 @@
 		<tr>
 			<td width="0%" nowrap="nowrap" valign="top" align="right">{'common.status'|devblocks_translate|capitalize}: </td>
 			<td width="100%">
-				<label><input type="radio" name="closed" value="0" onclick="toggleDiv('ticketClosed','none');" {if !$ticket->is_closed && !$ticket->is_waiting}checked{/if}> {'status.open'|devblocks_translate|capitalize}</label>
-				<label><input type="radio" name="closed" value="2" onclick="toggleDiv('ticketClosed','block');" {if !$ticket->is_closed && $ticket->is_waiting}checked{/if}> {'status.waiting'|devblocks_translate|capitalize}</label>
-				{if $active_worker->hasPriv('core.ticket.actions.close') || ($ticket->is_closed && !$ticket->is_deleted)}<label><input type="radio" name="closed" value="1" onclick="toggleDiv('ticketClosed','block');" {if $ticket->is_closed && !$ticket->is_deleted}checked{/if}> {'status.closed'|devblocks_translate|capitalize}</label>{/if}
-				{if $active_worker->hasPriv('core.ticket.actions.delete') || ($ticket->is_deleted)}<label><input type="radio" name="closed" value="3" onclick="toggleDiv('ticketClosed','none');" {if $ticket->is_deleted}checked{/if}> {'status.deleted'|devblocks_translate|capitalize}</label>{/if}
+				<label><input type="radio" name="status_id" value="{Model_Ticket::STATUS_OPEN}" onclick="toggleDiv('ticketClosed','none');" {if $ticket->status_id == Model_Ticket::STATUS_OPEN}checked{/if}> {'status.open'|devblocks_translate|capitalize}</label>
+				<label><input type="radio" name="status_id" value="{Model_Ticket::STATUS_WAITING}" onclick="toggleDiv('ticketClosed','block');" {if $ticket->status_id == Model_Ticket::STATUS_WAITING}checked{/if}> {'status.waiting'|devblocks_translate|capitalize}</label>
+				{if $active_worker->hasPriv('core.ticket.actions.close') || ($ticket->status_id == Model_Ticket::STATUS_CLOSED)}<label><input type="radio" name="status_id" value="{Model_Ticket::STATUS_CLOSED}" onclick="toggleDiv('ticketClosed','block');" {if $ticket->status_id == Model_Ticket::STATUS_CLOSED}checked{/if}> {'status.closed'|devblocks_translate|capitalize}</label>{/if}
+				{if $active_worker->hasPriv('core.ticket.actions.delete') || ($ticket->status_id == Model_Ticket::STATUS_DELETED)}<label><input type="radio" name="status_id" value="{Model_Ticket::STATUS_DELETED}" onclick="toggleDiv('ticketClosed','none');" {if $ticket->status_id == Model_Ticket::STATUS_DELETED}checked{/if}> {'status.deleted'|devblocks_translate|capitalize}</label>{/if}
 				
-				<div id="ticketClosed" style="display:{if $ticket->is_closed || $ticket->is_waiting}block{else}none{/if};margin:5px 0px 5px 15px;">
+				<div id="ticketClosed" style="display:{if in_array($ticket->status_id,[Model_Ticket::STATUS_WAITING,Model_Ticket::STATUS_CLOSED])}block{else}none{/if};margin:5px 0px 5px 15px;">
 					<b>{'display.reply.next.resume'|devblocks_translate}:</b><br>
 					<i>{'display.reply.next.resume_eg'|devblocks_translate}</i><br>
 					<input type="text" name="ticket_reopen" size="32" class="input_date" value="{if !empty($ticket->reopen_at)}{$ticket->reopen_at|devblocks_date}{/if}" style="width:75%;"><br>
@@ -113,16 +109,16 @@
 		
 		{* Owner *}
 		<tr>
-			<td width="1%" nowrap="nowrap" align="right" valign="middle"><b>{'common.owner'|devblocks_translate|capitalize}:</b></td>
+			<td width="1%" nowrap="nowrap" align="right" valign="middle">{'common.owner'|devblocks_translate|capitalize}:</td>
 			<td width="99%" valign="top">
-					<button type="button" class="chooser-abstract" data-field-name="owner_id" data-context="{CerberusContexts::CONTEXT_WORKER}" data-single="true" data-query="inGroups:{$ticket->group_id}" data-autocomplete="if-null"><span class="glyphicons glyphicons-search"></span></button>
-					
-					<ul class="bubbles chooser-container">
-						{$owner = $ticket->getOwner()}
-						{if $owner}
-							<li><img class="cerb-avatar" src="{devblocks_url}c=avatars&context=worker&context_id={$owner->id}{/devblocks_url}?v={$owner->updated}"><input type="hidden" name="owner_id" value="{$owner->id}"><a href="javascript:;" class="cerb-peek-trigger no-underline" data-context="{CerberusContexts::CONTEXT_WORKER}" data-context-id="{$owner->id}">{$owner->getName()}</a></li>
-						{/if}
-					</ul>
+				<button type="button" class="chooser-abstract" data-field-name="owner_id" data-context="{CerberusContexts::CONTEXT_WORKER}" data-single="true" data-query="group:(id:{$ticket->group_id})" data-autocomplete="group:(id:{$ticket->group_id})" data-autocomplete-if-empty="true"><span class="glyphicons glyphicons-search"></span></button>
+				
+				<ul class="bubbles chooser-container">
+					{$owner = $ticket->getOwner()}
+					{if $owner}
+						<li><img class="cerb-avatar" src="{devblocks_url}c=avatars&context=worker&context_id={$owner->id}{/devblocks_url}?v={$owner->updated}"><input type="hidden" name="owner_id" value="{$owner->id}"><a href="javascript:;" class="cerb-peek-trigger no-underline" data-context="{CerberusContexts::CONTEXT_WORKER}" data-context-id="{$owner->id}">{$owner->getName()}</a></li>
+					{/if}
+				</ul>
 			</td>
 		</tr>
 		
@@ -138,9 +134,6 @@
 {/if}
 
 {include file="devblocks:cerberusweb.core::internal/custom_fieldsets/peek_custom_fieldsets.tpl" context=CerberusContexts::CONTEXT_TICKET context_id=$ticket->id}
-
-{* Comments *}
-{include file="devblocks:cerberusweb.core::internal/peek/peek_comments_pager.tpl" comments=$comments}
 
 <fieldset class="peek">
 	<legend>{'common.comment'|devblocks_translate|capitalize}</legend>
@@ -256,6 +249,7 @@ $(function() {
 		// Dates
 		$frm.find('input.input_date').cerbDateInputHelper();
 		
+		// Linked form elements
 		$frm.on('cerb-form-update', function() {
 			$btn_recommend.attr('group_id', $frm.find('select[name=group_id]').val());
 			$btn_recommend.attr('bucket_id', $frm.find('select[name=bucket_id]').val());
@@ -266,7 +260,9 @@ $(function() {
 			$btn_watchers.trigger('refresh');
 			
 			// When the group changes, change the owner chooser defaults
-			$chooser_owner.attr('data-query', 'inGroups:' + $frm.find('select[name=group_id]').val());
+			var group_id = $frm.find('select[name=group_id]').val();
+			$chooser_owner.attr('data-query', 'group:(id:' + group_id + ')');
+			$chooser_owner.attr('data-autocomplete', 'group:(id:' + group_id + ')');
 		});
 	});
 });

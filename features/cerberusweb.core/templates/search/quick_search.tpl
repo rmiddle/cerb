@@ -1,6 +1,6 @@
 {$uniqid = uniqid()}
 {if $view instanceof IAbstractView_QuickSearch}
-{$search_fields = $view->getQuickSearchFields()}
+{$menu = $view->getQuickSearchMenu()}
 
 <form action="javascript:;" method="post" id="{$uniqid}" class="quick-search">
 	<input type="hidden" name="c" value="search">
@@ -13,179 +13,98 @@
 		<a href="javascript:;" class="cerb-quick-search-menu-trigger" style="position:relative;top:5px;padding:0px 10px;"><span class="glyphicons glyphicons-chevron-down" style="margin:2px 0px 0px 2px;"></span></a>
 	</div>
 	
-	<ul class="cerb-quick-search-menu" style="position:absolute;float:right;margin-right:10px;z-index:5;display:none;">
-		{$placeholder_labels = $view->getPlaceholderLabels()}
-		
-		{if !empty($placeholder_labels)}
-		<li field="">
-			(placeholders)
-			<ul style="width:200px;">
-				{foreach from=$placeholder_labels item=v key=k}
-				<li value="{literal}{{{/literal}{$k}{literal}}}{/literal}">{$v.label}</li>
-				{/foreach}
-			</ul>
-		</li>
-		{/if}
-
-		{capture name=sortable_fields}{*
-		*}{if !empty($search_fields)}{*
-		*}{foreach from=$search_fields key=field_key item=field}{*
-		*}{if $field.is_sortable}
-			<li field="">
-				{$field_key}
-				<ul style="width:200px;">
-					<li value="sort:{$field_key}">ascending</li>
-					<li value="sort:-{$field_key}">descending</li>
-				</ul>
-			</li>
-		{/if}{*
-		*}{/foreach}{*
-		*}{/if}{*
-		*}{/capture}
-		
-		{if $smarty.capture.sortable_fields}
-		<li field="">
-			(sort)
-			<ul style="width:200px;">
-				{$smarty.capture.sortable_fields nofilter}
-			</ul>
-		</li>
-		{/if}
-		
-		{if !empty($search_fields)}
-		{foreach from=$search_fields key=field_key item=field}
-		<li field="{$field_key}">
-			<b>{$field_key}</b>
-			
-			{if $field.examples}
-				<ul style="width:200px;">
-					{foreach from=$field.examples item=example}
-					<li>{$example}</li>
-					{/foreach}
-				</ul>
-			{else}
-				{if $field.type == DevblocksSearchCriteria::TYPE_BOOL}
-				<ul style="width:200px;">
-					<li>yes</li>
-					<li>no</li>
-				</ul>
-				{elseif $field.type == DevblocksSearchCriteria::TYPE_DATE}
-				<ul style="width:200px;">
-					<li>never</li>
-					<li>"-1 day"</li>
-					<li>"-2 weeks"</li>
-					<li>"big bang to now"</li>
-					<li>"yesterday to today"</li>
-					<li>"last Monday to next Monday"</li>
-					<li>"Jan 1 to Dec 31 23:59:59"</li>
-				</ul>
-				{elseif $field.type == DevblocksSearchCriteria::TYPE_FULLTEXT}
-				<ul style="width:200px;">
-					<li>word</li>
-					<li>"a multiple word phrase"</li>
-					<li>("any" "of" "these" "words")</li>
-					<li>person@example.com</li>
-				</ul>
-				{elseif $field.type == DevblocksSearchCriteria::TYPE_NUMBER}
-				<ul style="width:200px;">
-					<li>1</li>
-					<li>!=42</li>
-					<li>&gt;0</li>
-					<li>&gt;=5</li>
-					<li>&lt;50</li>
-					<li>&lt;=100</li>
-				</ul>
-				{elseif $field.type == DevblocksSearchCriteria::TYPE_TEXT}
-				<ul style="width:200px;">
-					<li>word</li>
-					<li>prefix*</li>
-					<li>*wildcard*</li>
-					<li>"a several word phrase"</li>
-					<li>("an exact match")</li>
-				</ul>
-				{elseif $field.type == DevblocksSearchCriteria::TYPE_WORKER}
-				<ul style="width:200px;">
-					<li>me</li>
-					<li>any</li>
-					<li>none</li>
-					<li>no</li>
-					<li>jeff,dan,darren</li>
-				</ul>
-				{/if}
+	{function tree level=0}
+		{foreach from=$keys item=data key=idx}
+			{if is_array($data->children) && !empty($data->children)}
+				<li {if $data->key}data-token="{$data->key}" data-label="{$data->label}"{/if}>
+					{if $data->key}
+						<div style="font-weight:bold;">{$data->l}</div>
+					{else}
+						<div>{$idx}</div>
+					{/if}
+					<ul>
+						{tree keys=$data->children level=$level+1}
+					</ul>
+				</li>
+			{elseif $data->type == 'search' && $data->params}
+				<li data-token="{$data->key}" data-label="{$data->label}" data-type="search" data-context="{$data->params.context}" data-query="{$data->params.query}"><div style="font-weight:bold;">{$data->l}</div></li>
+			{elseif $data->type == 'chooser' && $data->params}
+				<li data-token="{$data->key}" data-label="{$data->label}" data-type="chooser" data-context="{$data->params.context}" data-query="{$data->params.query}"><div style="font-weight:bold;">{$data->l}</div></li>
+			{elseif $data->key}
+				<li data-token="{$data->key}" data-label="{$data->label}"><div style="font-weight:bold;">{$data->l}</div></li>
 			{/if}
-		</li>
 		{/foreach}
-		{/if}
+	{/function}
+	
+	<ul class="cerb-menu cerb-float" style="display:none;">
+	{tree keys=$menu}
 	</ul>
-
 </form>
 
 <script type="text/javascript">
 $(function() {
-	var $div = $('#{$uniqid}');
-	var $input = $div.find('input:text');
+	var $frm = $('#{$uniqid}');
+	var $input = $frm.find('input:text');
 	var $popup = $input.closest('.ui-dialog');
 	var isInPopup = ($popup.length > 0);
+	var $menu = $frm.find('ul.cerb-menu').menu().zIndex($popup.zIndex()+1);
 	
-	$input.keyup(function(e) {
-		if(e.keyCode == 27) {
-			if(!isInPopup) {
-				$menu.hide();
+	var $menu_trigger = $frm.find('a.cerb-quick-search-menu-trigger').click(function() {
+		$menu.toggle();
+	});
+	
+	$menu.find('li').on('click', function(e) {
+		e.stopPropagation();
+
+		var key = $(this).attr('data-token');
+		var type = $(this).attr('data-type');
+		
+		if(key.length == 0)
+			return;
+		
+		if(type == 'chooser') {
+			var $context = $(this).attr('data-context');
+			var $q = $(this).attr('data-query');
+			var width = $(window).width()-100;
+			var $chooser=genericAjaxPopup('chooser' + new Date().getTime(),'c=internal&a=chooserOpen&context=' + encodeURIComponent($context),null,true,width);
+			
+			$chooser.one('chooser_save', function(event) {
+				var val = key + '[' + event.values.join(',') + ']';
 				
-			} else {
-				if($menu.is(':visible')) {
-					$menu.hide();
+				if(key.substr(-1) != ')')
+					val += ' ';
+				
+				$input.insertAtCursor(val).focus();
+			});
+			
+		} else if(type == 'search') {
+			var $context = $(this).attr('data-context');
+			var $q = $(this).attr('data-query');
+			var width = $(window).width()-100;
+			var $chooser = genericAjaxPopup("chooser{uniqid()}",'c=internal&a=chooserOpenParams&context=' + encodeURIComponent($context) + '&q=' + encodeURIComponent($q),null,true,width);
+			
+			$chooser.on('chooser_save',function(event) {
+				if(null != event.worklist_model) {
+					var val = key + '(' + event.worklist_quicksearch + ')';
 					
-				} else {
-					$popup.find('.devblocks-popup').dialog('close');
+					if(key.substr(-1) != ')')
+						val += ' ';
+					
+					$input.insertAtCursor(val).focus();
 				}
-			}
+			});
+			
+		} else {
+			var val = key;
+			
+			if(key.substr(-1) != ':')
+				val += ' ';
+			
+			$input.insertAtCursor(val).focus();
 		}
 	});
 	
-	var $menu = $div.find('ul.cerb-quick-search-menu')
-		.menu({
-			items: "> :not(.ui-widget-header)",
-			select: function(event, ui) {
-				var val = $input.val();
-				
-				if(undefined == ui.item.attr('field')) {
-					var field_key = ui.item.parent().closest('li').attr('field');
-					var field_value = '';
-
-					if(ui.item.attr('value')) {
-						field_value = ui.item.attr('value');
-					} else {
-						field_value = ui.item.text();
-					}
-					
-					var insert_txt = (field_key ? (field_key + ':') : '') + field_value;
-					
-				} else {
-					var field_key = ui.item.attr('field');
-					var insert_txt = (field_key ? (field_key + ':') : '');
-					
-				}
-				
-				if(val.length > 0 && val.substr(-1) != " ")
-					insert_txt = " " + insert_txt;
-				
-				if(insert_txt.length > 0) {
-					$input.insertAtCursor(insert_txt).scrollLeft(2000);
-					$menu.hide();
-				}
-			}
-		})
-		.css('width', $input.width())
-		.hide()
-		;
-	
-	var $menu_trigger = $div.find('a.cerb-quick-search-menu-trigger').click(function() {
-		$menu.toggle();
-		$input.insertAtCursor('').scrollLeft(2000);
-	});
-	
-	$div.submit(function() {
+	$frm.submit(function() {
 		genericAjaxPost('{$uniqid}','',null,function(json) {
 			if(json.status == true) {
 				{if !empty($return_url)}

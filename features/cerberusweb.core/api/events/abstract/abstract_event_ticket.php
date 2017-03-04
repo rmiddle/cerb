@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
@@ -30,7 +30,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			list($results) = DAO_Ticket::search(
 				array(),
 				array(
-					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_CLOSED,'=',0),
+					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_STATUS_ID,'in',array(Model_Ticket::STATUS_OPEN, Model_Ticket::STATUS_WAITING)),
 				),
 				10,
 				0,
@@ -403,7 +403,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 			case 'ticket_latest_message_headers':
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
-				@$header = rtrim(strtolower($params['header']), ':');
+				@$header = rtrim(DevblocksPlatform::strLower($params['header']), ':');
 				@$param_value = $params['value'];
 				
 				// Lazy load
@@ -665,7 +665,7 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				break;
 				
 			case 'relay_email':
-				if(false == ($va = $trigger->getVirtualAttendant()))
+				if(false == ($va = $trigger->getBot()))
 					break;
 				
 				switch($va->owner_context) {
@@ -899,8 +899,8 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 					$buckets[$bucket_id]->name
 				);
 				
-				$dict->group_id = $to_group_id;
-				$dict->ticket_bucket_id = $to_bucket_id;
+				$dict->group_id = $group_id;
+				$dict->ticket_bucket_id = $bucket_id;
 				
 				return $out;
 				break;
@@ -1094,30 +1094,22 @@ abstract class AbstractEvent_Ticket extends Extension_DevblocksEvent {
 				switch($to_status) {
 					case 'open':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 0,
-							DAO_Ticket::IS_CLOSED => 0,
-							DAO_Ticket::IS_DELETED => 0,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_OPEN,
 						);
 						break;
 					case 'waiting':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 1,
-							DAO_Ticket::IS_CLOSED => 0,
-							DAO_Ticket::IS_DELETED => 0,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_WAITING,
 						);
 						break;
 					case 'closed':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 0,
-							DAO_Ticket::IS_CLOSED => 1,
-							DAO_Ticket::IS_DELETED => 0,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_CLOSED,
 						);
 						break;
 					case 'deleted':
 						$fields = array(
-							DAO_Ticket::IS_WAITING => 0,
-							DAO_Ticket::IS_CLOSED => 1,
-							DAO_Ticket::IS_DELETED => 1,
+							DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_DELETED,
 						);
 						break;
 					default:

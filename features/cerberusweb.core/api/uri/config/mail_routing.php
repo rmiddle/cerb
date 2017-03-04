@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class PageSection_SetupMailRouting extends Extension_PageSection {
@@ -193,7 +193,7 @@ class PageSection_SetupMailRouting extends Extension_PageSection {
 				case 'header4':
 				case 'header5':
 					if(null != (@$header = DevblocksPlatform::importGPC($_POST[$rule],'string',null)))
-						$criteria['header'] = strtolower($header);
+						$criteria['header'] = DevblocksPlatform::strLower($header);
 					break;
 					
 				case 'body':

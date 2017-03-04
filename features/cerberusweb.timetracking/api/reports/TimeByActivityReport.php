@@ -146,7 +146,7 @@ class ChReportTimeSpentActivity extends Extension_Report {
 			"AND log_date > %d ".
 			"AND log_date <= %d ".
 			"%s ".
-			"GROUP BY activity_id, date_plot ".
+			"GROUP BY tta.id, tta.name, date_plot ".
 			"ORDER BY activity_name ASC ",
 			$date_group,
 			$start_time,
@@ -154,6 +154,9 @@ class ChReportTimeSpentActivity extends Extension_Report {
 			(is_array($filter_worker_ids) && !empty($filter_worker_ids) ? sprintf("AND tte.worker_id IN (%s)", implode(',', $filter_worker_ids)) : "")
 		);
 		$rs = $db->ExecuteSlave($sql);
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		$data = array();
 		$activities = array();

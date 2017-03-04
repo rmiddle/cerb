@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 class ChReportSnippetPopularity extends Extension_Report {
@@ -51,7 +51,7 @@ class ChReportSnippetPopularity extends Extension_Report {
 			"INNER JOIN snippet ON (snippet_use_history.snippet_id=snippet.id) ".
 			"WHERE snippet_use_history.ts_day BETWEEN %d AND %d ".
 			"%s ".
-			"GROUP BY snippet_use_history.snippet_id ".
+			"GROUP BY snippet.id, snippet.title ".
 			"ORDER BY snippet_uses %%s ".
 			"%s",
 			$start_time,

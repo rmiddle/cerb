@@ -1,10 +1,10 @@
 {$form_id = "frmWorkerEdit{uniqid()}"}
 
 <form action="{devblocks_url}{/devblocks_url}" method="POST" id="{$form_id}" onsubmit="return false;">
-<input type="hidden" name="c" value="config">
+<input type="hidden" name="c" value="profiles">
 <input type="hidden" name="a" value="handleSectionAction">
-<input type="hidden" name="section" value="workers">
-<input type="hidden" name="action" value="saveWorkerPeek">
+<input type="hidden" name="section" value="worker">
+<input type="hidden" name="action" value="savePeekJson">
 <input type="hidden" name="id" value="{$worker->id}">
 <input type="hidden" name="view_id" value="{$view_id}">
 <input type="hidden" name="do_delete" value="0">
@@ -16,11 +16,19 @@
 	<table cellpadding="0" cellspacing="2" border="0" width="98%">
 		<tr>
 			<td width="0%" nowrap="nowrap" align="right" valign="middle"><b>{'common.name.first'|devblocks_translate|capitalize}:</b> </td>
-			<td width="100%"><input type="text" name="first_name" value="{$worker->first_name}" style="width:98%;"></td>
+			<td width="100%"><input type="text" name="first_name" value="{$worker->first_name}" style="width:98%;" autofocus="autofocus"></td>
 		</tr>
 		<tr>
 			<td width="0%" nowrap="nowrap" align="right" valign="middle">{'common.name.last'|devblocks_translate|capitalize}: </td>
 			<td width="100%"><input type="text" name="last_name" value="{$worker->last_name}" style="width:98%;"></td>
+		</tr>
+		<tr>
+			<td width="1%" nowrap="nowrap" valign="top" align="right" title="(one per line)">
+				{'common.aliases'|devblocks_translate|capitalize}:
+			</td>
+			<td width="99%" valign="top">
+				<textarea name="aliases" cols="45" rows="3" style="width:98%;" placeholder="(one per line)">{$aliases|implode:"\n"}</textarea>
+			</td>
 		</tr>
 		<tr>
 			<td width="0%" nowrap="nowrap" align="right" valign="middle">{'worker.title'|devblocks_translate|capitalize}: </td>
@@ -29,7 +37,7 @@
 		<tr>
 			<td width="0%" nowrap="nowrap" align="right" valign="middle"><b>{'common.email'|devblocks_translate}</b>: </td>
 			<td width="100%">
-				<button type="button" class="chooser-abstract" data-field-name="email_id" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-single="true" data-query="" data-autocomplete="if-null" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
+				<button type="button" class="chooser-abstract" data-field-name="email_id" data-context="{CerberusContexts::CONTEXT_ADDRESS}" data-single="true" data-query="" data-autocomplete="" data-autocomplete-if-empty="true" data-create="if-null"><span class="glyphicons glyphicons-search"></span></button>
 				
 				<ul class="bubbles chooser-container">
 					{$addy = $worker->getEmailModel()}
@@ -92,8 +100,8 @@
 					<input type="hidden" name="is_disabled" value="{$worker->is_disabled}">
 					{if $worker->is_disabled}{'common.inactive'|devblocks_translate|capitalize}{else}{'common.active'|devblocks_translate|capitalize}{/if}
 				{else}
-					<label><input type="radio" name="is_disabled" value="0" {if !$worker->is_disabled}checked="checked"{/if}>{'common.active'|devblocks_translate|capitalize}</label>
-					<label><input type="radio" name="is_disabled" value="1" {if $worker->is_disabled}checked="checked"{/if}>{'common.inactive'|devblocks_translate|capitalize}</label>
+					<label><input type="radio" name="is_disabled" value="0" {if !$worker->is_disabled}checked="checked"{/if}> {'common.active'|devblocks_translate|capitalize}</label>
+					<label><input type="radio" name="is_disabled" value="1" {if $worker->is_disabled}checked="checked"{/if}> {'common.inactive'|devblocks_translate|capitalize}</label>
 				{/if}
 			</td>
 		</tr>
@@ -104,8 +112,8 @@
 					<input type="hidden" name="is_superuser" value="{$worker->is_superuser}">
 					{if !$worker->is_superuser}{'common.worker'|devblocks_translate|capitalize}{else}{'worker.is_superuser'|devblocks_translate|capitalize}{/if}
 				{else}
-					<label><input type="radio" name="is_superuser" value="0" {if !$worker->is_superuser}checked="checked"{/if}>{'common.worker'|devblocks_translate|capitalize}</label>
-					<label><input type="radio" name="is_superuser" value="1" {if $worker->is_superuser}checked="checked"{/if}>{'worker.is_superuser'|devblocks_translate|capitalize}</label>
+					<label><input type="radio" name="is_superuser" value="0" {if !$worker->is_superuser}checked="checked"{/if}> {'common.worker'|devblocks_translate|capitalize}</label>
+					<label><input type="radio" name="is_superuser" value="1" {if $worker->is_superuser}checked="checked"{/if}> {'worker.is_superuser'|devblocks_translate|capitalize}</label>
 				{/if}
 			</td>
 		</tr>
@@ -131,7 +139,7 @@
 	
 	<table cellpadding="0" cellspacing="2" border="0" width="98%">
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="middle">{'worker.language'|devblocks_translate}: </td>
+			<td width="0%" nowrap="nowrap" align="right" valign="middle">{'common.language'|devblocks_translate}: </td>
 			<td width="100%">
 				<select name="lang_code">
 					{foreach from=$languages key=lang_code item=lang_name}
@@ -141,7 +149,7 @@
 			</td>
 		</tr>
 		<tr>
-			<td width="0%" nowrap="nowrap" align="right" valign="middle">{'worker.timezone'|devblocks_translate}: </td>
+			<td width="0%" nowrap="nowrap" align="right" valign="middle">{'common.timezone'|devblocks_translate}: </td>
 			<td width="100%">
 				<select name="timezone">
 					{foreach from=$timezones item=timezone}
@@ -257,6 +265,8 @@ $(function() {
 	$popup.one('popup_open', function(event,ui) {
 		$popup.dialog('option','title',"{'common.edit'|devblocks_translate|capitalize|escape:'javascript' nofilter}: {'common.worker'|devblocks_translate|capitalize|escape:'javascript' nofilter}");
 		
+		var $aliases = $(this).find('textarea[name=aliases]').autosize();
+		
 		// Buttons
 		
 		$popup.find('button.submit').click(Devblocks.callbackPeekEditSave);
@@ -292,10 +302,6 @@ $(function() {
 		var $avatar_chooser = $popup.find('button.cerb-avatar-chooser');
 		var $avatar_image = $avatar_chooser.closest('td').find('img.cerb-avatar');
 		ajax.chooserAvatar($avatar_chooser, $avatar_image);
-		
-		// Focus
-		
-		$frm.find('input:text:first').select().focus();
 	});
 });
 </script>

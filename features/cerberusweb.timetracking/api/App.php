@@ -2,29 +2,29 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 /*
- * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
+ * IMPORTANT LICENSING NOTE from your friends at Cerb
  *
- * Sure, it would be so easy to just cheat and edit this file to use the
- * software without paying for it.  But we trust you anyway.  In fact, we're
- * writing this software for you!
+ * Sure, it would be really easy to just cheat and edit this file to use
+ * Cerb without paying for a license.  We trust you anyway.
  *
- * Quality software backed by a dedicated team takes money to develop.  We
- * don't want to be out of the office bagging groceries when you call up
- * needing a helping hand.  We'd rather spend our free time coding your
- * feature requests than mowing the neighbors' lawns for rent money.
+ * It takes a significant amount of time and money to develop, maintain,
+ * and support high-quality enterprise software with a dedicated team.
+ * For Cerb's entire history we've avoided taking money from outside
+ * investors, and instead we've relied on actual sales from satisfied
+ * customers to keep the project running.
  *
  * We've never believed in hiding our source code out of paranoia over not
  * getting paid.  We want you to have the full source code and be able to
@@ -32,19 +32,12 @@
  * having less of everything than you might need (time, people, money,
  * energy).  We shouldn't be your bottleneck.
  *
- * We've been building our expertise with this project since January 2002.  We
- * promise spending a couple bucks [Euro, Yuan, Rupees, Galactic Credits] to
- * let us take over your shared e-mail headache is a worthwhile investment.
- * It will give you a sense of control over your inbox that you probably
- * haven't had since spammers found you in a game of 'E-mail Battleship'.
- * Miss. Miss. You sunk my inbox!
+ * As a legitimate license owner, your feedback will help steer the project.
+ * We'll also prioritize your issues, and work closely with you to make sure
+ * your teams' needs are being met.
  *
- * A legitimate license entitles you to support from the developers,
- * and the warm fuzzy feeling of feeding a couple of obsessed developers
- * who want to help you get more done.
- *
- \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
- *	 Webgroup Media LLC - Developers of Cerb
+ * - Jeff Standen and Dan Hildebrandt
+ *	 Founders at Webgroup Media LLC; Developers of Cerb
  */
 
 if (class_exists('Extension_AppPreBodyRenderer',true)):
@@ -116,13 +109,6 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 	function render() {
 	}
 	
-	/**
-	 * @return Model_Activity
-	 */
-	public function getActivity() {
-		return new Model_Activity('activity.default');
-	}
-	
 	private function _startTimer() {
 		if(!isset($_SESSION['timetracking_started'])) {
 			$_SESSION['timetracking_started'] = time();
@@ -176,192 +162,6 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 			'total_mins' => ceil($total_secs/60),
 		));
 		exit;
-	}
-	
-	function saveEntryAction() {
-		$active_worker = CerberusApplication::getActiveWorker();
-		
-		// Make sure we're an active worker
-		if(empty($active_worker) || empty($active_worker->id))
-			return;
-		
-		@$id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer',0);
-		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string','');
-		@$do_delete = DevblocksPlatform::importGPC($_REQUEST['do_delete'],'integer',0);
-			
-		@$activity_id = DevblocksPlatform::importGPC($_POST['activity_id'],'integer',0);
-		@$time_actual_mins = DevblocksPlatform::importGPC($_POST['time_actual_mins'],'integer',0);
-		@$is_closed = DevblocksPlatform::importGPC($_POST['is_closed'],'integer',0);
-		
-		// Date
-		@$log_date = DevblocksPlatform::importGPC($_REQUEST['log_date'],'string','now');
-		if(false == (@$log_date = strtotime($log_date)))
-			$log_date = time();
-		
-		// Comment
-		@$comment = DevblocksPlatform::importGPC($_POST['comment'],'string','');
-		
-		// Delete entries
-		if(!empty($id) && !empty($do_delete)) {
-			if(null != ($entry = DAO_TimeTrackingEntry::get($id))) {
-				// Check privs
-				if(($active_worker->hasPriv('timetracking.actions.create') && $active_worker->id==$entry->worker_id)
-					|| $active_worker->hasPriv('timetracking.actions.update_all'))
-						DAO_TimeTrackingEntry::delete($id);
-			}
-			
-			return;
-		}
-		
-		// New or modify
-		$fields = array(
-			DAO_TimeTrackingEntry::ACTIVITY_ID => intval($activity_id),
-			DAO_TimeTrackingEntry::TIME_ACTUAL_MINS => intval($time_actual_mins),
-			DAO_TimeTrackingEntry::LOG_DATE => intval($log_date),
-			DAO_TimeTrackingEntry::IS_CLOSED => intval($is_closed),
-		);
-
-		// Only on new
-		if(empty($id)) {
-			$fields[DAO_TimeTrackingEntry::WORKER_ID] = intval($active_worker->id);
-		}
-		
-		if(empty($id)) { // create
-			$id = DAO_TimeTrackingEntry::create($fields);
-	
-			// Watchers
-			@$add_watcher_ids = DevblocksPlatform::sanitizeArray(DevblocksPlatform::importGPC($_REQUEST['add_watcher_ids'],'array',array()),'integer',array('unique','nonzero'));
-			if(!empty($add_watcher_ids))
-				CerberusContexts::addWatchers(CerberusContexts::CONTEXT_TIMETRACKING, $id, $add_watcher_ids);
-			
-			$translate = DevblocksPlatform::getTranslationService();
-			$url_writer = DevblocksPlatform::getUrlService();
-			
-			// Context Link (if given)
-			@$link_context = DevblocksPlatform::importGPC($_REQUEST['link_context'],'string','');
-			@$link_context_id = DevblocksPlatform::importGPC($_REQUEST['link_context_id'],'integer','');
-			
-			// Procedurally create a comment
-			// [TODO] Check context for 'comment' option
-			switch($link_context) {
-				// If ticket, add a comment about the timeslip to the ticket
-				case CerberusContexts::CONTEXT_OPPORTUNITY:
-				case CerberusContexts::CONTEXT_TICKET:
-				case CerberusContexts::CONTEXT_TASK:
-					if(null != ($worker_address = $active_worker->getEmailModel())) {
-						if(!empty($activity_id)) {
-							$activity = DAO_TimeTrackingActivity::get($activity_id);
-						}
-						
-						// [TODO] This comment could be added to anything context now using DAO_Comment + Context_*
-						$context_comment = sprintf(
-							"== %s ==\n".
-							"%s %s\n".
-							"%s %d\n".
-							"%s %s\n".
-							"%s".
-							"\n".
-							"%s\n",
-							$translate->_('timetracking.ui.timetracking'),
-							$translate->_('timetracking.ui.worker'),
-							$active_worker->getName(),
-							$translate->_('timetracking.ui.comment.time_spent'),
-							$time_actual_mins,
-							$translate->_('timetracking.ui.comment.activity'),
-							(!empty($activity) ? $activity->name : ''),
-							(!empty($comment) ? sprintf("%s: %s\n", $translate->_('common.comment'), $comment) : ''),
-							$url_writer->writeNoProxy(sprintf("c=profiles&type=time_tracking&id=%d", $id), true)
-						);
-						$fields = array(
-							DAO_Comment::OWNER_CONTEXT => CerberusContexts::CONTEXT_WORKER,
-							DAO_Comment::OWNER_CONTEXT_ID => $active_worker->id,
-							DAO_Comment::COMMENT => $context_comment,
-							DAO_Comment::CREATED => time(),
-							DAO_Comment::CONTEXT => $link_context,
-							DAO_Comment::CONTEXT_ID => intval($link_context_id),
-						);
-						DAO_Comment::create($fields);
-					}
-					break;
-					
-				case '':
-					unset($link_context);
-					unset($link_context);
-					break;
-			}
-			
-			// Establishing a context link?
-			if(isset($link_context) && isset($link_context_id)) {
-				// Primary context
-				DAO_ContextLink::setLink(CerberusContexts::CONTEXT_TIMETRACKING, $id, $link_context, $link_context_id);
-				
-				// Associated contexts
-				switch($link_context) {
-					case CerberusContexts::CONTEXT_OPPORTUNITY:
-						if(!class_exists('DAO_CrmOpportunity', true))
-							break;
-							
-						$labels = null;
-						$values = null;
-						CerberusContexts::getContext($link_context, $link_context_id, $labels, $values);
-						
-						if(is_array($values)) {
-							// Is there an org associated with this context?
-							if(isset($values['email_org_id']) && !empty($values['email_org_id'])) {
-								DAO_ContextLink::setLink(CerberusContexts::CONTEXT_TIMETRACKING, $id, CerberusContexts::CONTEXT_ORG, $values['email_org_id']);
-							}
-						}
-						break;
-						
-					case CerberusContexts::CONTEXT_TICKET:
-						$labels = null;
-						$values = null;
-						CerberusContexts::getContext($link_context, $link_context_id, $labels, $values);
-						
-						if(is_array($values)) {
-							// Try the ticket's org
-							@$org_id = $values['org_id'];
-							
-							// Fallback to the initial sender's org
-							if(empty($org_id))
-								@$org_id = $values['initial_message_sender_org_id'];
-							
-							// Is there an org associated with this context?
-							if(!empty($org_id)) {
-								DAO_ContextLink::setLink(CerberusContexts::CONTEXT_TIMETRACKING, $id, CerberusContexts::CONTEXT_ORG, $org_id);
-							}
-						}
-						break;
-				}
-			}
-
-			// View marquee
-			if(!empty($id) && !empty($view_id)) {
-				C4_AbstractView::setMarqueeContextCreated($view_id, CerberusContexts::CONTEXT_TIMETRACKING, $id);
-			}
-			
-		} else { // modify
-			DAO_TimeTrackingEntry::update($id, $fields);
-		}
-		
-		// Custom field saves
-		@$field_ids = DevblocksPlatform::importGPC($_POST['field_ids'], 'array', array());
-		DAO_CustomFieldValue::handleFormPost(CerberusContexts::CONTEXT_TIMETRACKING, $id, $field_ids);
-		
-		// Comments
-		if(!empty($comment)) {
-			$also_notify_worker_ids = array_keys(CerberusApplication::getWorkersByAtMentionsText($comment));
-			
-			$fields = array(
-				DAO_Comment::OWNER_CONTEXT => CerberusContexts::CONTEXT_WORKER,
-				DAO_Comment::OWNER_CONTEXT_ID => $active_worker->id,
-				DAO_Comment::COMMENT => $comment,
-				DAO_Comment::CONTEXT => CerberusContexts::CONTEXT_TIMETRACKING,
-				DAO_Comment::CONTEXT_ID => $id,
-				DAO_Comment::CREATED => time(),
-			);
-			$comment_id = DAO_Comment::create($fields, $also_notify_worker_ids);
-		}
 	}
 	
 	function viewMarkClosedAction() {
@@ -464,116 +264,6 @@ class ChTimeTrackingPage extends CerberusPageExtension {
 	function clearEntryAction() {
 		$this->_destroyTimer();
 	}
-	
-	function showBulkPanelAction() {
-		@$id_csv = DevblocksPlatform::importGPC($_REQUEST['ids']);
-		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id']);
-
-		$active_worker = CerberusApplication::getActiveWorker();
-		
-		$tpl = DevblocksPlatform::getTemplateService();
-		$tpl->assign('view_id', $view_id);
-
-		if(!empty($id_csv)) {
-			$ids = DevblocksPlatform::parseCsvString($id_csv);
-			$tpl->assign('ids', implode(',', $ids));
-		}
-		
-		// Activities
-		$activities = DAO_TimeTrackingActivity::getWhere();
-		$tpl->assign('activities', $activities);
-		
-		// Custom Fields
-		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TIMETRACKING, false);
-		$tpl->assign('custom_fields', $custom_fields);
-		
-		// Macros
-		
-		$macros = DAO_TriggerEvent::getReadableByActor(
-			$active_worker,
-			'event.macro.timetracking'
-		);
-		$tpl->assign('macros', $macros);
-		
-		$tpl->display('devblocks:cerberusweb.timetracking::timetracking/bulk.tpl');
-	}
-	
-	function doBulkUpdateAction() {
-		@set_time_limit(600); // 10m
-		
-		// Filter: whole list or check
-		@$filter = DevblocksPlatform::importGPC($_REQUEST['filter'],'string','');
-		$ids = array();
-		
-		// View
-		@$view_id = DevblocksPlatform::importGPC($_REQUEST['view_id'],'string');
-		$view = C4_AbstractViewLoader::getView($view_id);
-		$view->setAutoPersist(false);
-		
-		// Time Tracking fields
-		@$activity = DevblocksPlatform::importGPC($_POST['activity_id'],'string','');
-		@$is_closed = DevblocksPlatform::importGPC($_POST['is_closed'],'string','');
-
-		// Scheduled behavior
-		@$behavior_id = DevblocksPlatform::importGPC($_POST['behavior_id'],'string','');
-		@$behavior_when = DevblocksPlatform::importGPC($_POST['behavior_when'],'string','');
-		@$behavior_params = DevblocksPlatform::importGPC($_POST['behavior_params'],'array',array());
-		
-		$do = array();
-		
-		// Do: ...
-		if(0 != strlen($is_closed))
-			$do['is_closed'] = !empty($is_closed) ? 1 : 0;
-
-		// Do: Scheduled Behavior
-		if(0 != strlen($behavior_id)) {
-			$do['behavior'] = array(
-				'id' => $behavior_id,
-				'when' => $behavior_when,
-				'params' => $behavior_params,
-			);
-		}
-		
-		if(strlen($activity) > 0)
-			$do['activity_id'] = $activity;
-		
-		// Watchers
-		$watcher_params = array();
-		
-		@$watcher_add_ids = DevblocksPlatform::importGPC($_REQUEST['do_watcher_add_ids'],'array',array());
-		if(!empty($watcher_add_ids))
-			$watcher_params['add'] = $watcher_add_ids;
-			
-		@$watcher_remove_ids = DevblocksPlatform::importGPC($_REQUEST['do_watcher_remove_ids'],'array',array());
-		if(!empty($watcher_remove_ids))
-			$watcher_params['remove'] = $watcher_remove_ids;
-		
-		if(!empty($watcher_params))
-			$do['watchers'] = $watcher_params;
-		
-		// Do: Custom fields
-		$do = DAO_CustomFieldValue::handleBulkPost($do);
-
-		switch($filter) {
-			// Checked rows
-			case 'checks':
-				@$ids_str = DevblocksPlatform::importGPC($_REQUEST['ids'],'string');
-				$ids = DevblocksPlatform::parseCsvString($ids_str);
-				break;
-			case 'sample':
-				@$sample_size = min(DevblocksPlatform::importGPC($_REQUEST['filter_sample_size'],'integer',0),9999);
-				$filter = 'checks';
-				$ids = $view->getDataSample($sample_size);
-				break;
-			default:
-				break;
-		}
-		
-		$view->doBulkUpdate($filter, $do, $ids);
-		$view->render();
-		return;
-	}
-	
 };
 
 if(class_exists('Extension_PageSection')):

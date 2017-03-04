@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 class DAO_MailToGroupRule extends Cerb_ORMHelper {
@@ -59,6 +59,10 @@ class DAO_MailToGroupRule extends Cerb_ORMHelper {
 				null,
 				Cerb_ORMHelper::OPT_GET_MASTER_ONLY
 			);
+			
+			if(!is_array($results))
+				return false;
+			
 			$cache->save($results, self::_CACHE_ALL, array(), 1200); // 20 mins
 		}
 		
@@ -83,7 +87,7 @@ class DAO_MailToGroupRule extends Cerb_ORMHelper {
 			;
 			
 		if($options & Cerb_ORMHelper::OPT_GET_MASTER_ONLY) {
-			$rs = $db->ExecuteMaster($sql);
+			$rs = $db->ExecuteMaster($sql, _DevblocksDatabaseManager::OPT_NO_READ_AFTER_WRITE);
 		} else {
 			$rs = $db->ExecuteSlave($sql);
 		}
@@ -113,6 +117,9 @@ class DAO_MailToGroupRule extends Cerb_ORMHelper {
 	 */
 	static private function _getObjectsFromResult($rs) {
 		$objects = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object = new Model_MailToGroupRule();
@@ -323,7 +330,7 @@ class Model_MailToGroupRule {
 					case 'header3':
 					case 'header4':
 					case 'header5':
-						@$header = strtolower($crit['header']);
+						@$header = DevblocksPlatform::strLower($crit['header']);
 						@$header_value = is_array($message_headers[$header]) ? implode(" ", $message_headers[$header]) : (string) $message_headers[$header];
 						
 						if(empty($header)) {

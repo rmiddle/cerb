@@ -1,4 +1,20 @@
 function DevblocksClass() {
+	this.audio = null;
+	
+	this.playAudioUrl = function(url) {
+		try {
+			if(null == this.audio)
+				this.audio = new Audio();
+			
+			this.audio.src = url;
+			this.audio.play();
+			
+		} catch(e) {
+			if(window.console)
+				console.log(e);
+		}
+	}
+	
 	// Source: http://stackoverflow.com/a/16693578
 	this.uniqueId = function() {
 		return (Math.random().toString(16)+"000000000").substr(2,8);
@@ -116,7 +132,7 @@ function DevblocksClass() {
 					.append($('<span class="cerb-ajax-spinner"/>'))
 					;
 				ui.panel.html($div);
-			},
+			}
 		};
 	}
 	
@@ -132,7 +148,12 @@ function DevblocksClass() {
 					selectedTabs = JSON.parse(localStorage.selectedTabs);
 				
 				selectedTabs[tabsId] = $activeTab.index(); //$tabs.index($activeTab);
-				localStorage.selectedTabs = JSON.stringify(selectedTabs);
+				
+				try {
+					localStorage.selectedTabs = JSON.stringify(selectedTabs);
+				} catch(e) {
+					
+				}
 				
 				return $activeTab.index();
 			}
@@ -157,7 +178,12 @@ function DevblocksClass() {
 		var $popup = genericAjaxPopupFind($button);
 		var $frm = $popup.find('form').first();
 		var $status = $popup.find('div.status');
-		var is_delete = (e.data && e.data.mode == 'delete');
+		var options = e.data;
+		var is_delete = (options && options.mode == 'delete');
+		
+		if(options && options.before && typeof options.before == 'function') {
+			options.before(e, $frm);
+		}
 		
 		if(!($popup instanceof jQuery))
 			return false;
@@ -180,6 +206,10 @@ function DevblocksClass() {
 			if(!(typeof e == 'object'))
 				return;
 			
+			if(options && options.after && typeof options.after == 'function') {
+				options.after(e);
+			}
+			
 			if(e.status) {
 				var event;
 				
@@ -190,10 +220,9 @@ function DevblocksClass() {
 				}
 				
 				// Meta fields
-				if(e.id)
-					event.context_id = e.id;
-				if(e.label)
-					event.context_label = e.label;
+				for(k in e) {
+					event[k] = e[k];
+				}
 				
 				// Reload the associated view (underlying helper)
 				if(e.view_id)
@@ -532,6 +561,7 @@ function genericAjaxPopup($layer,request,target,modal,width,cb) {
 	return $popup;
 }
 
+// [TODO] Deprecate this
 function genericAjaxPopupPostCloseReloadView($layer, frm, view_id, has_output, $event) {
 	var has_view = (null != view_id && view_id.length > 0 && $('#view'+view_id).length > 0) ? true : false;
 	if(null == has_output)

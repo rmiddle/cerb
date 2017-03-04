@@ -1,13 +1,13 @@
 {$view_context = ''}
 {$view_fields = $view->getColumnsAvailable()}
-{assign var=results value=$view->getData()}
-{assign var=total value=$results[1]}
-{assign var=data value=$results[0]}
+{$results = $view->getData()}
+{$total = $results[1]}
+{$data = $results[0]}
 <table cellpadding="0" cellspacing="0" border="0" class="worklist" width="100%">
 	<tr>
 		<td nowrap="nowrap"><span class="title">{$view->name}</span></td>
 		<td nowrap="nowrap" align="right" class="title-toolbar">
-			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek','c=preferences&a=handleTabAction&tab=rest.preferences.tab.api&action=showPeekPopup&id=0&view_id={$view->id}',null,false,'500');"><span class="glyphicons glyphicons-circle-plus"></span></a>
+			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek','c=preferences&a=handleTabAction&tab=rest.preferences.tab.api&action=showPeekPopup&id=0&view_id={$view->id}',null,false,'50%');"><span class="glyphicons glyphicons-circle-plus"></span></a>
 			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',null,false,'400');"><span class="glyphicons glyphicons-search"></span></a>
 			<a href="javascript:;" title="{'common.customize'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('customize{$view->id}','c=internal&a=viewCustomize&id={$view->id}');toggleDiv('customize{$view->id}','block');"><span class="glyphicons glyphicons-cogwheel"></span></a>
 			<a href="javascript:;" title="{'common.export'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('{$view->id}_tips','c=internal&a=viewShowExport&id={$view->id}');toggleDiv('{$view->id}_tips','block');"><span class="glyphicons glyphicons-file-export"></span></a>
@@ -56,9 +56,9 @@
 	{foreach from=$data item=result key=idx name=results}
 
 	{if $smarty.foreach.results.iteration % 2}
-		{assign var=tableRowClass value="even"}
+		{$tableRowClass = "even"}
 	{else}
-		{assign var=tableRowClass value="odd"}
+		{$tableRowClass = "odd"}
 	{/if}
 	
 	<tbody style="cursor:pointer;">
@@ -67,16 +67,15 @@
 			{if substr($column,0,3)=="cf_"}
 				{include file="devblocks:cerberusweb.core::internal/custom_fields/view/cell_renderer.tpl"}
 			{elseif $column=="w_label"}
-				<td>
+				<td data-column="{$column}">
 					<input type="checkbox" name="row_id[]" value="{$result.w_id}" style="display:none;">
-					<a href="javascript:;" class="subject" onclick="genericAjaxPopup('peek','c=preferences&a=handleTabAction&tab=rest.preferences.tab.api&action=showPeekPopup&id={$result.w_id}&view_id={$view->id}',null,false,'500');">{$result.w_label}</a>
-					{*<button type="button" class="peek" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$view_context}&context_id={$result.tt_id}&view_id={$view->id}',null,false,'500');"><span class="glyphicons glyphicons-new-window-alt"></span></button>*}
+					<a href="javascript:;" class="subject" onclick="genericAjaxPopup('peek','c=preferences&a=handleTabAction&tab=rest.preferences.tab.api&action=showPeekPopup&id={$result.w_id}&view_id={$view->id}',null,false,'50%');">{$result.w_label}</a>
 				</td>
 			{elseif $column=="w_worker_id"}
 				{$worker_id = $result.$column}
-				<td>{if isset($workers.$worker_id)}{$workers.$worker_id->getName()}{/if}&nbsp;</td>
+				<td data-column="{$column}">{if isset($workers.$worker_id)}{$workers.$worker_id->getName()}{/if}&nbsp;</td>
 			{else}
-			<td>{$result.$column}</td>
+				<td data-column="{$column}">{$result.$column}</td>
 			{/if}
 		{/foreach}
 		</tr>

@@ -7,9 +7,17 @@
 {if isset($trigger_id)}<input type="hidden" name="trigger_id" value="{$trigger_id}">{/if}
 <input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
-<b>{'common.title'|devblocks_translate|capitalize}:</b><br>
-<input type="text" name="title" value="{$model->title}" style="width:100%;"><br>
-<br>
+<b>{'common.title'|devblocks_translate|capitalize}:</b>
+<div style="margin:0px 0px 10px 10px;">
+	<input type="text" name="title" value="{$model->title}" style="width:100%;" autocomplete="off" spellcheck="false">
+</div>
+
+<b>{'common.status'|devblocks_translate|capitalize}:</b>
+<div style="margin:0px 0px 10px 10px;">
+	<label><input type="radio" name="status_id" value="0" {if !$model->status_id}checked="checked"{/if}> Live</label>
+	<label><input type="radio" name="status_id" value="2" {if 2 == $model->status_id}checked="checked"{/if}> Simulator only</label>
+	<label><input type="radio" name="status_id" value="1" {if 1 == $model->status_id}checked="checked"{/if}> Disabled</label>
+</div>
 
 {$seq = 0}
 
@@ -54,24 +62,35 @@
 {/if}
 
 <div id="divDecisionOutcomeToolbar{$id}" style="display:none;">
+	<div class="tester"></div>
+	
 	<button type="button" class="cerb-popupmenu-trigger" onclick="">Insert placeholder &#x25be;</button>
 	<button type="button" class="tester">{'common.test'|devblocks_translate|capitalize}</button>
 	<button type="button" onclick="genericAjaxPopup('help', 'c=internal&a=showSnippetHelpPopup', { my:'left top' , at:'left+20 top+20'}, false, '600');">Help</button>
-	<div class="tester"></div>
-	<ul class="cerb-popupmenu" style="max-height:200px;overflow-y:auto;">
-		<li style="background:none;">
-			<input type="text" size="18" class="input_search filter">
-		</li>
-		{$types = $values._types}
-		{foreach from=$labels key=k item=v}
-			{$modifier = ''}
-			
-			{$type = $types.$k}
-			{if $type == Model_CustomField::TYPE_DATE}
-				{$modifier = '|date'}
+
+	{$types = $values._types}
+	{function tree level=0}
+		{foreach from=$keys item=data key=idx}
+			{$type = $types.{$data->key}}
+			{if is_array($data->children) && !empty($data->children)}
+				<li {if $data->key}data-token="{$data->key}{if $type == Model_CustomField::TYPE_DATE}|date{/if}" data-label="{$data->label}"{/if}>
+					{if $data->key}
+						<div style="font-weight:bold;">{$data->l|capitalize}</div>
+					{else}
+						<div>{$idx|capitalize}</div>
+					{/if}
+					<ul>
+						{tree keys=$data->children level=$level+1}
+					</ul>
+				</li>
+			{elseif $data->key}
+				<li data-token="{$data->key}{if $type == Model_CustomField::TYPE_DATE}|date{/if}" data-label="{$data->label}"><div style="font-weight:bold;">{$data->l|capitalize}</div></li>
 			{/if}
-			<li><a href="javascript:;" token="{$k}{$modifier}">{$v}</a></li>
 		{/foreach}
+	{/function}
+	
+	<ul class="menu" style="width:150px;">
+	{tree keys=$placeholders}
 	</ul>
 </div>
 
@@ -84,18 +103,34 @@
 <input type="hidden" name="_csrf_token" value="{$session.csrf_token}">
 
 <fieldset>
-	<legend>Add Condition</legend>
+	<legend>{'common.conditions'|devblocks_translate|capitalize}</legend>
 
-	<button type="button" class="condition cerb-popupmenu-trigger">Add Condition &#x25be;</button>
+	<button type="button" class="condition cerb-popupmenu-trigger">{'common.condition'|devblocks_translate|capitalize} &#x25be;</button>
 	<button type="button" class="group">Add Group</button>
-	<ul class="cerb-popupmenu" style="border:0;">
-		<li style="background:none;">
-			<input type="text" size="16" class="input_search filter">
-		</li>
-		{foreach from=$conditions key=token item=condition}
-		<li><a href="javascript:;" token="{$token}">{$condition.label}</a></li>
+	
+	{function menu level=0}
+		{foreach from=$keys item=data key=idx}
+			{if is_array($data->children) && !empty($data->children)}
+				<li {if $data->key}data-token="{$data->key}" data-label="{$data->label}"{/if}>
+					{if $data->key}
+						<div style="font-weight:bold;">{$data->l|capitalize}</div>
+					{else}
+						<div>{$idx|capitalize}</div>
+					{/if}
+					<ul>
+						{menu keys=$data->children level=$level+1}
+					</ul>
+				</li>
+			{elseif $data->key}
+				<li data-token="{$data->key}" data-label="{$data->label}"><div style="font-weight:bold;">{$data->l|capitalize}</div></li>
+			{/if}
 		{/foreach}
+	{/function}
+	
+	<ul class="conditions-menu" style="width:150px;display:none;">
+	{menu keys=$conditions_menu}
 	</ul>
+	
 </fieldset>
 </form>
 
@@ -116,7 +151,7 @@
 	{else}
 		<button type="button" onclick="genericAjaxPost('frmDecisionOutcome{$id}','','c=internal&a=saveDecisionPopup',function() { genericAjaxPopupDestroy('node_outcome{$id}'); genericAjaxGet('decisionTree{$trigger_id}','c=internal&a=showDecisionTree&id={$trigger_id}'); });"><span class="glyphicons glyphicons-circle-ok" style="color:rgb(0,180,0);"></span> {'common.save_and_close'|devblocks_translate|capitalize}</button>
 		<button type="button" onclick="genericAjaxPost('frmDecisionOutcome{$id}','','c=internal&a=saveDecisionPopup',function() { Devblocks.showSuccess('#{$status_div}', 'Saved!'); genericAjaxGet('decisionTree{$trigger_id}','c=internal&a=showDecisionTree&id={$trigger_id}'); });"><span class="glyphicons glyphicons-circle-arrow-right" style="color:rgb(0,180,0);"></span> {'common.save_and_continue'|devblocks_translate|capitalize}</button>
-		<button type="button" onclick="genericAjaxPopup('simulate_behavior','c=internal&a=showBehaviorSimulatorPopup&trigger_id={$trigger_id}','reuse',false,'500');"> <span class="glyphicons glyphicons-cogwheel"></span> Simulator</button>
+		<button type="button" onclick="genericAjaxPopup('simulate_behavior','c=internal&a=showBehaviorSimulatorPopup&trigger_id={$trigger_id}','reuse',false,'50%');"> <span class="glyphicons glyphicons-cogwheel"></span> Simulator</button>
 		<button type="button" onclick="$(this).closest('form').hide().prev('fieldset.delete').show();"><span class="glyphicons glyphicons-circle-remove" style="color:rgb(200,0,0);"></span> {'common.delete'|devblocks_translate|capitalize}</button>
 	{/if}
 </form>
@@ -128,8 +163,9 @@ $(function() {
 	var $popup = genericAjaxPopupFetch('node_outcome{$id}');
 	
 	$popup.one('popup_open', function(event,ui) {
-		$(this).dialog('option','title',"{if empty($id)}New {/if}Outcome");
-		$(this).find('input:text').first().focus();
+		$popup.dialog('option','title',"{if empty($id)}New {/if}Outcome");
+		$popup.find('input:text').first().focus();
+		$popup.css('overflow', 'inherit');
 
 		var $frm = $popup.find('form#frmDecisionOutcome{$id}');
 		var $legend = $popup.find('fieldset legend');
@@ -183,7 +219,7 @@ $(function() {
 			var src = (null==e.srcElement) ? e.target : e.srcElement;
 			if(0 == $(src).nextAll('#divDecisionOutcomeToolbar{$id}').length) {
 				$toolbar.find('div.tester').html('');
-				$toolbar.find('ul.cerb-popupmenu').hide();
+				$toolbar.find('ul.menu').hide();
 				$toolbar.show().insertAfter(src);
 			}
 		});
@@ -192,12 +228,38 @@ $(function() {
 		
 		var $divPlaceholderMenu = $('#divDecisionOutcomeToolbar{$id}');
 		
-		var $ph_menu_trigger = $divPlaceholderMenu.find('button.cerb-popupmenu-trigger');
-		var $ph_menu = $divPlaceholderMenu.find('ul.cerb-popupmenu');
-		$ph_menu_trigger.data('menu', $ph_menu);
+		var $placeholder_menu_trigger = $divPlaceholderMenu.find('button.cerb-popupmenu-trigger');
+		var $placeholder_menu = $divPlaceholderMenu.find('ul.menu').hide();
+		
+		// Quick insert token menu
+		
+		$placeholder_menu.menu({
+			select: function(event, ui) {
+				var token = ui.item.attr('data-token');
+				var label = ui.item.attr('data-label');
+				
+				if(undefined == token || undefined == label)
+					return;
+				
+				var $toolbar = $('DIV#divDecisionOutcomeToolbar{$id}');
+				var $field = null;
+				
+				if($toolbar.data('src')) {
+					$field = $toolbar.data('src');
+				
+				} else {
+					$field = $toolbar.prev(':text, textarea');
+				}
+				
+				if(null == $field)
+					return;
+				
+				$field.focus().insertAtCursor('{literal}{{{/literal}' + token + '{literal}}}{/literal}');
+			}
+		});
 		
 		$divPlaceholderMenu.find('button.tester').click(function(e) {
-			var divTester = $(this).nextAll('div.tester').first();
+			var divTester = $divPlaceholderMenu.find('div.tester').first();
 			
 			var $toolbar = $('DIV#divDecisionOutcomeToolbar{$id}');
 			var $field = $toolbar.prev(':text, textarea');
@@ -217,150 +279,70 @@ $(function() {
 			genericAjaxPost($(this).closest('form').attr('id'), divTester, 'c=internal&a=testDecisionEventSnippets&prefix=' + strNamespace + '&field=' + strName);
 		});
 		
-		$ph_menu_trigger
+		$placeholder_menu_trigger
 			.click(
 				function(e) {
-					var $ph_menu = $(this).data('menu');
-					
-					if($ph_menu.is(':visible')) {
-						$ph_menu.hide();
-						
-					} else {
-						$ph_menu
-							.show()
-							.find('> li input:text')
-							.focus()
-							.select()
-							;
-					}
+					$placeholder_menu.toggle();
 				}
 			)
 			.bind('remove',
 				function(e) {
-					var $ph_menu = $(this).data('menu');
-					$ph_menu.remove();
+					$placeholder_menu.remove();
 				}
 			)
 		;
 		
-		$ph_menu.find('> li > input.filter').keyup(
-			function(e) {
-				var term = $(this).val().toLowerCase();
-				var $ph_menu = $(this).closest('ul.cerb-popupmenu');
-				$ph_menu.find('> li a').each(function(e) {
-					if(-1 != $(this).html().toLowerCase().indexOf(term)) {
-						$(this).parent().show();
-					} else {
-						$(this).parent().hide();
-					}
-				});
-			}
-		);
-		
-		$ph_menu.find('> li').click(function(e) {
-			e.stopPropagation();
-			if(!$(e.target).is('li'))
-				return;
-		
-			$(this).find('a').trigger('click');
-		});
-		
-		$ph_menu.find('> li > a').click(function() {
-			var $toolbar = $('DIV#divDecisionOutcomeToolbar{$id}');
-			var $field = $toolbar.prev(':text, textarea');
-			
-			if(null == $field)
-				return;
-			
-			var strtoken = $(this).attr('token');
-			
-			$field.focus().insertAtCursor('{literal}{{{/literal}' + strtoken + '{literal}}}{/literal}');
-		});
-
 		// Quick insert condition menu
 
-		var $menu_trigger = $frmAdd.find('button.condition.cerb-popupmenu-trigger');
-		var $menu = $frmAdd.find('ul.cerb-popupmenu');
-		$menu_trigger.data('menu', $menu);
+		var $conditions_menu_trigger = $frmAdd.find('button.condition.cerb-popupmenu-trigger');
+		var $conditions_menu = $frmAdd.find('ul.conditions-menu');
 
-		$menu_trigger
-			.click(
-				function(e) {
-					var $menu = $(this).data('menu');
-
-					if($menu.is(':visible')) {
-						$menu.hide();
-						return;
-					}
-					
-					$menu
-						.show()
-						.find('> li input:text')
-						.focus()
-						.select()
-						;
-				}
-			)
-		;
-
-		$menu.find('> li > input.filter').keyup(
-			function(e) {
-				var term = $(this).val().toLowerCase();
-				var $menu = $(this).closest('ul.cerb-popupmenu');
-				$menu.find('> li a').each(function(e) {
-					if(-1 != $(this).html().toLowerCase().indexOf(term)) {
-						$(this).parent().show();
-					} else {
-						$(this).parent().hide();
-					}
-				});
-			}
-		);
-
-		$menu.find('> li').click(function(e) {
-			e.stopPropagation();
-			if(!$(e.target).is('li'))
-				return;
-
-			$(this).find('a').trigger('click');
+		$conditions_menu_trigger.click(function() {
+			$conditions_menu.toggle();
 		});
-
-		$menu.find('> li > a').click(function() {
-			var token = $(this).attr('token');
-			var $frmDecAdd = $('#frmDecisionOutcomeAdd{$id}');
-			$frmDecAdd.find('input[name=condition]').val(token);
-			var $this = $(this);
-			
-			genericAjaxPost('frmDecisionOutcomeAdd{$id}','','c=internal&a=doDecisionAddCondition',function(html) {
-				var $ul = $('#frmDecisionOutcome{$id} UL.rules:last');
+		
+		$conditions_menu.menu({
+			select: function(event, ui) {
+				var token = ui.item.attr('data-token');
+				var label = ui.item.attr('data-label');
 				
-				var seq = parseInt($frmDecAdd.find('input[name=seq]').val());
-				if(null == seq)
-					seq = 0;
-
-				var $html = $('<div style="margin-left:20px;"/>').html(html);
+				if(undefined == token || undefined == label)
+					return;
 				
-				var $container = $('<li style="padding-bottom:5px;"/>').attr('id','condition'+seq);
-				$container.append($('<input type="hidden" name="nodes[]">').attr('value', seq));
-				$container.append($('<input type="hidden">').attr('name', 'condition'+seq+'[condition]').attr('value',token));
-				$container.append($('<a href="javascript:;" onclick="$(this).closest(\'li\').remove();"><span class="glyphicons glyphicons-circle-minus" style="color:rgb(200,0,0);"></span></a>'));
-				$container.append('&nbsp;');
-				$container.append($('<b style="cursor:move;"/>').text($this.text()));
-				$container.append('&nbsp;');
-
-				$ul.append($container);
-				$container.append($html);
-
-				$html.find('BUTTON.chooser_worker.unbound').each(function() {
-					ajax.chooser(this,'cerberusweb.contexts.worker','condition'+seq+'[worker_id]', { autocomplete:true });
-					$(this).removeClass('unbound');
+				var $frmDecAdd = $('#frmDecisionOutcomeAdd{$id}');
+				$frmDecAdd.find('input[name=condition]').val(token);
+				
+				genericAjaxPost('frmDecisionOutcomeAdd{$id}','','c=internal&a=doDecisionAddCondition',function(html) {
+					var $ul = $('#frmDecisionOutcome{$id} UL.rules:last');
+					
+					var seq = parseInt($frmDecAdd.find('input[name=seq]').val());
+					if(null == seq)
+						seq = 0;
+	
+					var $html = $('<div style="margin-left:20px;"/>').html(html);
+					
+					var $container = $('<li style="padding-bottom:5px;"/>').attr('id','condition'+seq);
+					$container.append($('<input type="hidden" name="nodes[]">').attr('value', seq));
+					$container.append($('<input type="hidden">').attr('name', 'condition'+seq+'[condition]').attr('value',token));
+					$container.append($('<a href="javascript:;" onclick="$(this).closest(\'li\').remove();"><span class="glyphicons glyphicons-circle-minus" style="color:rgb(200,0,0);"></span></a>'));
+					$container.append('&nbsp;');
+					$container.append($('<b style="cursor:move;"/>').text(label));
+					$container.append('&nbsp;');
+					$container.hide();
+	
+					$ul.append($container);
+					$container.append($html).fadeIn();
+	
+					$html.find('BUTTON.chooser_worker.unbound').each(function() {
+						ajax.chooser(this,'cerberusweb.contexts.worker','condition'+seq+'[worker_id]', { autocomplete:true });
+						$(this).removeClass('unbound');
+					});
+					
+					// [TODO] This can take too long to increment when packets are arriving quickly
+					$frmDecAdd.find('input[name=seq]').val(1+seq);
 				});
 				
-				$menu.find('input:text:first').focus().select();
-
-				// [TODO] This can take too long to increment when packets are arriving quickly
-				$frmDecAdd.find('input[name=seq]').val(1+seq);
-			});
+			}
 		});
 
 	}); // end popup_open

@@ -2,17 +2,17 @@
 /************************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 class DAO_WorkspaceWidget extends Cerb_ORMHelper {
@@ -37,7 +37,7 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 		return $id;
 	}
 	
-	static function update($ids, $fields) {
+	static function update($ids, $fields, $option_bits = 0) {
 		if(!is_array($ids))
 			$ids = array($ids);
 		
@@ -49,7 +49,7 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 				continue;
 			
 			// Make changes
-			parent::_update($batch_ids, 'workspace_widget', $fields);
+			parent::_update($batch_ids, 'workspace_widget', $fields, 'id', $option_bits);
 		}
 	}
 	
@@ -119,6 +119,9 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 	static private function _getObjectsFromResult($rs) {
 		$objects = array();
 		
+		if(!($rs instanceof mysqli_result))
+			return false;
+		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object = new Model_WorkspaceWidget();
 			$object->id = intval($row['id']);
@@ -187,7 +190,7 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 	public static function getSearchQueryComponents($columns, $params, $sortBy=null, $sortAsc=null) {
 		$fields = SearchFields_WorkspaceWidget::getFields();
 		
-		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
+		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, 'SearchFields_WorkspaceWidget', $sortBy);
 		
 		$select_sql = sprintf("SELECT ".
 			"workspace_widget.id as %s, ".
@@ -210,52 +213,19 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 			
 		$join_sql = "FROM workspace_widget ";
 		
-		$has_multiple_values = false;
 				
 		$where_sql = "".
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 			
-		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields);
-	
-		array_walk_recursive(
-			$params,
-			array('DAO_WorkspaceWidget', '_translateVirtualParameters'),
-			array(
-				'join_sql' => &$join_sql,
-				'where_sql' => &$where_sql,
-				'tables' => &$tables,
-				'has_multiple_values' => &$has_multiple_values
-			)
-		);
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields, $select_sql, 'SearchFields_WorkspaceWidget');
 	
 		return array(
 			'primary_table' => 'workspace_widget',
 			'select' => $select_sql,
 			'join' => $join_sql,
 			'where' => $where_sql,
-			'has_multiple_values' => $has_multiple_values,
 			'sort' => $sort_sql,
 		);
-	}
-	
-	private static function _translateVirtualParameters($param, $key, &$args) {
-		if(!is_a($param, 'DevblocksSearchCriteria'))
-			return;
-			
-		//$from_context = CerberusContexts::CONTEXT_EXAMPLE;
-		//$from_index = 'example.id';
-		
-		$param_key = $param->field;
-		settype($param_key, 'string');
-		
-		switch($param_key) {
-			/*
-			case SearchFields_EXAMPLE::VIRTUAL_WATCHERS:
-				$args['has_multiple_values'] = true;
-				self::_searchComponentsVirtualWatchers($param, $from_context, $from_index, $args['join_sql'], $args['where_sql'], $args['tables']);
-				break;
-			*/
-		}
 	}
 	
 	/**
@@ -279,24 +249,27 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
 		$where_sql = $query_parts['where'];
-		$has_multiple_values = $query_parts['has_multiple_values'];
 		$sort_sql = $query_parts['sort'];
 		
 		$sql =
 			$select_sql.
 			$join_sql.
 			$where_sql.
-			($has_multiple_values ? 'GROUP BY workspace_widget.id ' : '').
 			$sort_sql;
 			
 		if($limit > 0) {
-			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
+			if(false == ($rs = $db->SelectLimit($sql,$limit,$page*$limit)))
+				return false;
 		} else {
-			$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
+			if(false == ($rs = $db->ExecuteSlave($sql)))
+				return false;
 			$total = mysqli_num_rows($rs);
 		}
 		
 		$results = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object_id = intval($row[SearchFields_WorkspaceWidget::ID]);
@@ -309,7 +282,7 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 			// We can skip counting if we have a less-than-full single page
 			if(!(0 == $page && $total < $limit)) {
 				$count_sql =
-					($has_multiple_values ? "SELECT COUNT(DISTINCT workspace_widget.id) " : "SELECT COUNT(workspace_widget.id) ").
+					"SELECT COUNT(workspace_widget.id) ".
 					$join_sql.
 					$where_sql;
 				$total = $db->GetOneSlave($count_sql);
@@ -323,7 +296,7 @@ class DAO_WorkspaceWidget extends Cerb_ORMHelper {
 
 };
 
-class SearchFields_WorkspaceWidget implements IDevblocksSearchFields {
+class SearchFields_WorkspaceWidget extends DevblocksSearchFields {
 	const ID = 'w_id';
 	const EXTENSION_ID = 'w_extension_id';
 	const WORKSPACE_TAB_ID = 'w_workspace_tab_id';
@@ -333,10 +306,41 @@ class SearchFields_WorkspaceWidget implements IDevblocksSearchFields {
 	const POS = 'w_pos';
 	const CACHE_TTL = 'w_cache_ttl';
 	
+	static private $_fields = null;
+	
+	static function getPrimaryKey() {
+		return 'workspace_widget.id';
+	}
+	
+	static function getCustomFieldContextKeys() {
+		return array(
+			CerberusContexts::CONTEXT_WORKSPACE_WIDGET => new DevblocksSearchFieldContextKeys('workspace_widget.id', self::ID),
+			CerberusContexts::CONTEXT_WORKSPACE_TAB => new DevblocksSearchFieldContextKeys('workspace_widget.workspace_tab_id', self::WORKSPACE_TAB_ID),
+		);
+	}
+	
+	static function getWhereSQL(DevblocksSearchCriteria $param) {
+		if('cf_' == substr($param->field, 0, 3)) {
+			return self::_getWhereSQLFromCustomFields($param);
+		} else {
+			return $param->getWhereSQL(self::getFields(), self::getPrimaryKey());
+		}
+	}
+	
 	/**
 	 * @return DevblocksSearchField[]
 	 */
 	static function getFields() {
+		if(is_null(self::$_fields))
+			self::$_fields = self::_getFields();
+		
+		return self::$_fields;
+	}
+	
+	/**
+	 * @return DevblocksSearchField[]
+	 */
+	static function _getFields() {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
@@ -377,23 +381,17 @@ class Model_WorkspaceWidget {
 		
 		return $tab->getWorkspacePage();
 	}
-	
-	function isReadableByWorker(Model_Worker $worker) {
-		if(false == ($page = $this->getWorkspacePage()))
-			return false;
-		
-		return $page->isReadableByWorker($worker);
-	}
-	
-	function isWriteableByWorker(Model_Worker $worker) {
-		if(false == ($page = $this->getWorkspacePage()))
-			return false;
-		
-		return $page->isWriteableByWorker($worker);
-	}
 };
 
 class Context_WorkspaceWidget extends Extension_DevblocksContext {
+	static function isReadableByActor($models, $actor) {
+		return CerberusContexts::isReadableByDelegateOwner($actor, CerberusContexts::CONTEXT_WORKSPACE_WIDGET, $models, 'tab_page_owner_');
+	}
+	
+	static function isWriteableByActor($models, $actor) {
+		return CerberusContexts::isWriteableByDelegateOwner($actor, CerberusContexts::CONTEXT_WORKSPACE_WIDGET, $models, 'tab_page_owner_');
+	}
+	
 	function getRandom() {
 		return DAO_WorkspaceTab::random();
 	}
@@ -461,7 +459,7 @@ class Context_WorkspaceWidget extends Extension_DevblocksContext {
 		
 		$token_values['_context'] = CerberusContexts::CONTEXT_WORKSPACE_WIDGET;
 		$token_values['_types'] = $token_types;
-
+		
 		// Token values
 		if(null != $widget) {
 			$token_values['_loaded'] = true;
@@ -470,9 +468,25 @@ class Context_WorkspaceWidget extends Extension_DevblocksContext {
 			$token_values['extension_id'] = $widget->extension_id;
 			$token_values['label'] = $widget->label;
 			
+			$token_values['tab_id'] = $widget->workspace_tab_id;
+			
 			// Custom fields
 			$token_values = $this->_importModelCustomFieldsAsValues($widget, $token_values);
 		}
+		
+		// Tab
+		$merge_token_labels = array();
+		$merge_token_values = array();
+		CerberusContexts::getContext(CerberusContexts::CONTEXT_WORKSPACE_TAB, null, $merge_token_labels, $merge_token_values, '', true);
+
+		CerberusContexts::merge(
+			'tab_',
+			$prefix.'Tab:',
+			$merge_token_labels,
+			$merge_token_values,
+			$token_labels,
+			$token_values
+		);
 		
 		return true;
 	}
@@ -489,7 +503,7 @@ class Context_WorkspaceWidget extends Extension_DevblocksContext {
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values, null, false);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true, false);
 		}
 		
 		switch($token) {
@@ -519,9 +533,14 @@ class Context_WorkspaceWidget extends Extension_DevblocksContext {
 				
 				$values['data'] = isset($json['widget']) ? $json['widget'] : $json;
 				break;
+				
+			case 'links':
+				$links = $this->_lazyLoadLinks($context, $context_id);
+				$values = array_merge($values, $links);
+				break;
 			
 			default:
-				if(substr($token,0,7) == 'custom_') {
+				if(DevblocksPlatform::strStartsWith($token, 'custom_')) {
 					$fields = $this->_lazyLoadCustomFields($token, $context, $context_id);
 					$values = array_merge($values, $fields);
 				}

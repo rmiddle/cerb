@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class ChDisplayPage extends CerberusPageExtension {
@@ -99,6 +99,7 @@ class ChDisplayPage extends CerberusPageExtension {
 		$tpl->assign('mail_reply_button', $mail_reply_button);
 			
 		$tpl->assign('expanded', (empty($hide) ? true : false));
+		$tpl->assign('is_refreshed', true);
 
 		$tpl->display('devblocks:cerberusweb.core::display/modules/conversation/message.tpl');
 	}
@@ -107,9 +108,8 @@ class ChDisplayPage extends CerberusPageExtension {
 		$active_worker = CerberusApplication::getActiveWorker();
 		
 		@$id = DevblocksPlatform::importGPC($_REQUEST['id']); // ticket id
-		@$closed = DevblocksPlatform::importGPC($_REQUEST['closed'],'integer',0);
+		@$status_id = DevblocksPlatform::importGPC($_REQUEST['status_id'],'integer',0);
 		@$spam = DevblocksPlatform::importGPC($_REQUEST['spam'],'integer',0);
-		@$deleted = DevblocksPlatform::importGPC($_REQUEST['deleted'],'integer',0);
 		
 		if(null == ($ticket = DAO_Ticket::get($id)))
 			return;
@@ -121,33 +121,27 @@ class ChDisplayPage extends CerberusPageExtension {
 		// Anti-Spam
 		if(!empty($spam)) {
 			CerberusBayes::markTicketAsSpam($id);
-			// [mdf] if the spam button was clicked override the default params for deleted/closed
-			$closed=1;
-			$deleted=1;
+			$status_id = Model_Ticket::STATUS_DELETED;
 		}
 
 		// Properties
 		$properties = array(
-			DAO_Ticket::IS_CLOSED => intval($closed),
-			DAO_Ticket::IS_DELETED => intval($deleted),
+			DAO_Ticket::STATUS_ID => $status_id,
 		);
 		
-		if($closed) {
+		if($status_id == Model_Ticket::STATUS_DELETED) {
 			$properties[DAO_Ticket::REOPEN_AT] = 0;
 		}
 
 		// Undeleting?
-		if(empty($spam) && empty($closed) && empty($deleted)
-			&& $ticket->spam_training == CerberusTicketSpamTraining::SPAM && $ticket->is_closed) {
+		if(empty($spam) && $status_id == Model_Ticket::STATUS_OPEN && $ticket->status_id != Model_Ticket::STATUS_OPEN
+			&& $ticket->spam_training == CerberusTicketSpamTraining::SPAM) {
 				$score = CerberusBayes::calculateTicketSpamProbability($id);
 				$properties[DAO_Ticket::SPAM_SCORE] = $score['probability'];
 				$properties[DAO_Ticket::SPAM_TRAINING] = CerberusTicketSpamTraining::BLANK;
 				$properties[DAO_Ticket::INTERESTING_WORDS] = $score['interesting_words'];
+				$properties[DAO_Ticket::STATUS_ID] = Model_Ticket::STATUS_OPEN;
 		}
-		
-		// Don't double set the closed property (auto-close replies)
-		if(isset($properties[DAO_Ticket::IS_CLOSED]) && $properties[DAO_Ticket::IS_CLOSED]==$ticket->is_closed)
-			unset($properties[DAO_Ticket::IS_CLOSED]);
 		
 		// Only update fields that changed
 		$properties = Cerb_ORMHelper::uniqueFields($properties, $ticket);
@@ -188,14 +182,11 @@ class ChDisplayPage extends CerberusPageExtension {
 		
 		$active_worker = CerberusApplication::getActiveWorker();
 		
-		header('Content-Type: application/json; charset=' . LANG_CHARSET_CODE);
+		header('Content-Type: application/json; charset=utf-8');
 		
 		try {
-		
-			$context_ext = Extension_DevblocksContext::get(CerberusContexts::CONTEXT_MESSAGE);
-			
 			// ACL
-			if(!$context_ext->authorize($id, $active_worker))
+			if(!Context_Message::isWriteableByActor($id, $active_worker))
 				throw new Exception_DevblocksAjaxValidationError("You are not authorized to modify this record.");
 			
 			if(!empty($id) && !empty($do_delete)) { // Delete
@@ -312,90 +303,6 @@ class ChDisplayPage extends CerberusPageExtension {
 		
 		// Redisplay
 		DevblocksPlatform::redirect(new DevblocksHttpResponse(array('profiles','ticket',$refresh_id)));
-	}
-	
-	/**
-	 * Enter description here...
-	 * @param string $message_id
-	 */
-	private function _renderNotes($message_id) {
-		$tpl = DevblocksPlatform::getTemplateService();
-		$tpl->assign('message_id', $message_id);
-		
-		$notes = DAO_Comment::getByContext(CerberusContexts::CONTEXT_MESSAGE, $message_id);
-		$message_notes = array();
-		
-		// [TODO] DAO-ize? (shared in render())
-		if(is_array($notes))
-		foreach($notes as $note) {
-			if(!isset($message_notes[$note->context_id]))
-				$message_notes[$note->context_id] = array();
-			$message_notes[$note->context_id][$note->id] = $note;
-		}
-		$tpl->assign('message_notes', $message_notes);
-				
-		$workers = DAO_Worker::getAll();
-		$tpl->assign('workers', $workers);
-
-		$tpl->display('devblocks:cerberusweb.core::display/modules/conversation/notes.tpl');
-	}
-	
-	// [TODO] Merge w/ the new comments functionality?
-	function addNoteAction() {
-		@$id = DevblocksPlatform::importGPC($_REQUEST['id']);
-
-		$tpl = DevblocksPlatform::getTemplateService();
-		$tpl->assign('id',$id);
-		
-		$message = DAO_Message::get($id);
-		$ticket = DAO_Ticket::get($message->ticket_id);
-		$tpl->assign('message',$message);
-		$tpl->assign('ticket',$ticket);
-		
-		$worker = CerberusApplication::getActiveWorker();
-		$tpl->assign('worker', $worker);
-		
-		$active_workers = DAO_Worker::getAllActive();
-		$tpl->assign('active_workers', $active_workers);
-		
-		$workers = DAO_Worker::getAll();
-		$tpl->assign('workers', $workers);
-		
-		$tpl->display('devblocks:cerberusweb.core::display/rpc/add_note.tpl');
-	}
-	
-	function doAddNoteAction() {
-		@$id = DevblocksPlatform::importGPC($_REQUEST['id'],'integer',0);
-		@$ticket_id = DevblocksPlatform::importGPC($_REQUEST['ticket_id'],'integer',0);
-		@$content = DevblocksPlatform::importGPC($_REQUEST['content'],'string','');
-		
-		$worker = CerberusApplication::getActiveWorker();
-		
-		$also_notify_worker_ids = array_keys(CerberusApplication::getWorkersByAtMentionsText($content));
-
-		// Get watchers
-		$watcher_ids = array_keys(CerberusContexts::getWatchers(CerberusContexts::CONTEXT_TICKET, $ticket_id));
-		
-		// Remove the active worker from the watcher list
-		$watcher_ids = array_diff($watcher_ids, array($worker->id));
-		
-		// Merge ticket watchers with the notify list
-		$also_notify_worker_ids = array_merge(
-			$also_notify_worker_ids,
-			$watcher_ids
-		);
-		
-		$fields = array(
-			DAO_Comment::CONTEXT => CerberusContexts::CONTEXT_MESSAGE,
-			DAO_Comment::CONTEXT_ID => $id,
-			DAO_Comment::CREATED => time(),
-			DAO_Comment::OWNER_CONTEXT => CerberusContexts::CONTEXT_WORKER,
-			DAO_Comment::OWNER_CONTEXT_ID => $worker->id,
-			DAO_Comment::COMMENT => $content,
-		);
-		$note_id = DAO_Comment::create($fields, $also_notify_worker_ids);
-		
-		$this->_renderNotes($id);
 	}
 	
 	private function _checkRecentTicketActivity($ticket_id, $since_timestamp) {
@@ -822,7 +729,7 @@ class ChDisplayPage extends CerberusPageExtension {
 			'content' => DevblocksPlatform::importGPC(@$_REQUEST['content']),
 			'content_format' => DevblocksPlatform::importGPC(@$_REQUEST['format'],'string',''),
 			'html_template_id' => DevblocksPlatform::importGPC(@$_REQUEST['html_template_id'],'integer',0),
-			'closed' => DevblocksPlatform::importGPC(@$_REQUEST['closed'],'integer',0),
+			'status_id' => DevblocksPlatform::importGPC(@$_REQUEST['status_id'],'integer',0),
 			'group_id' => DevblocksPlatform::importGPC(@$_REQUEST['group_id'],'integer',0),
 			'bucket_id' => DevblocksPlatform::importGPC(@$_REQUEST['bucket_id'],'integer',0),
 			'owner_id' => DevblocksPlatform::importGPC(@$_REQUEST['owner_id'],'integer',0),
@@ -1231,11 +1138,8 @@ class ChDisplayPage extends CerberusPageExtension {
 		$tpl->assign('ticket_id', $ticket_id);
 		$tpl->assign('message_id', $message_id);
 		
-		if(null == ($ctx = DevblocksPlatform::getExtension(CerberusContexts::CONTEXT_TICKET, true))) /* @var $ctx Extension_DevblocksContext */
-			return;
-
 		// Verify permission
-		$editable = $ctx->authorize($ticket_id, $active_worker);
+		$editable = Context_Ticket::isWriteableByActor($ticket_id, $active_worker);
 		
 		if(!$editable)
 			return;
@@ -1261,11 +1165,8 @@ class ChDisplayPage extends CerberusPageExtension {
 			return;
 		}
 			
-		if(null == ($ctx = DevblocksPlatform::getExtension(CerberusContexts::CONTEXT_TICKET, true))) /* @var $ctx Extension_DevblocksContext */
-			return;
-
 		// Verify permission
-		$editable = $ctx->authorize($ticket_id, $active_worker);
+		$editable = Context_Ticket::isWriteableByActor($ticket_id, $active_worker);
 		
 		if(!$editable)
 			return;
@@ -1533,9 +1434,7 @@ class ChDisplayPage extends CerberusPageExtension {
 			DAO_Ticket::LAST_MESSAGE_ID => $orig_message->id,
 			DAO_Ticket::FIRST_WROTE_ID => $orig_message->address_id,
 			DAO_Ticket::LAST_WROTE_ID => $orig_message->address_id,
-			DAO_Ticket::LAST_ACTION_CODE => CerberusTicketActionCode::TICKET_OPENED,
-			DAO_Ticket::IS_CLOSED => CerberusTicketStatus::OPEN,
-			DAO_Ticket::IS_DELETED => 0,
+			DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_OPEN,
 			DAO_Ticket::MASK => $new_ticket_mask,
 			DAO_Ticket::SUBJECT => (isset($orig_headers['subject']) ? $orig_headers['subject'] : $orig_ticket->subject),
 			DAO_Ticket::GROUP_ID => $orig_ticket->group_id,
@@ -1659,13 +1558,10 @@ class ChDisplayPage extends CerberusPageExtension {
 		if(empty($ticket_id))
 			return;
 
-		// Check context for worker auth
-		$ticket_context = DevblocksPlatform::getExtension(CerberusContexts::CONTEXT_TICKET, true, true); /* @var $ticket_context Extension_DevblocksContext */
-
-		if(!$ticket_context->authorize($ticket_id, $active_worker))
-			return;
-
 		if(null == ($ticket = DAO_Ticket::get($ticket_id)))
+			return;
+		
+		if(!Context_Ticket::isWriteableByActor($ticket, $active_worker))
 			return;
 		
 		if(empty($ticket->owner_id)) {
@@ -1684,6 +1580,9 @@ class ChDisplayPage extends CerberusPageExtension {
 			return;
 
 		if(null == ($ticket = DAO_Ticket::get($ticket_id)))
+			return;
+		
+		if(!Context_Ticket::isWriteableByActor($ticket, $active_worker))
 			return;
 		
 		if($ticket->owner_id == $active_worker->id) {

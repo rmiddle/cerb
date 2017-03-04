@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class DAO_ContextActivityLog extends Cerb_ORMHelper {
@@ -86,11 +86,55 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 	}
 	
 	/**
+	 * 
+	 * @param string $actor_context
+	 * @param integer $actor_context_id
+	 * @return Model_ContextActivityLog|NULL
+	 */
+	static function getLatestEntriesByActor($actor_context, $actor_context_id, $limit = 1, $only_activities = array()) {
+		// Filter to only this worker
+		$sql = sprintf("%s = %s AND %s = %d",
+			self::escape(DAO_ContextActivityLog::ACTOR_CONTEXT),
+			self::qstr($actor_context),
+			self::escape(DAO_ContextActivityLog::ACTOR_CONTEXT_ID),
+			$actor_context_id
+		);
+		
+		// Are we're limiting our search to only some activities?
+		if(is_array($only_activities) && !empty($only_activities)) {
+			array_walk($only_activities, function($k, &$v) {
+				$v = self::qstr($v);
+			});
+			
+			$sql .= sprintf(" AND %s IN (%s)",
+				self::escape(DAO_ContextActivityLog::ACTIVITY_POINT),
+				implode(',', $only_activities)
+			);
+		}
+		
+		// Grab the entries
+		$results = self::getWhere(
+			$sql,
+			DAO_ContextActivityLog::CREATED,
+			false,
+			max(1, intval($limit))
+		);
+		
+		if(is_array($results) && !empty($results))
+			return array_shift($results);
+		
+		return NULL;
+	}
+	
+	/**
 	 * @param resource $rs
 	 * @return Model_ContextActivityLog[]
 	 */
 	static private function _getObjectsFromResult($rs) {
 		$objects = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object = new Model_ContextActivityLog();
@@ -150,7 +194,7 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 	public static function getSearchQueryComponents($columns, $params, $sortBy=null, $sortAsc=null) {
 		$fields = SearchFields_ContextActivityLog::getFields();
 		
-		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
+		list($tables,$wheres) = parent::_parseSearchParams($params, $columns, 'SearchFields_ContextActivityLog', $sortBy);
 		
 		$select_sql = sprintf("SELECT ".
 			"context_activity_log.id as %s, ".
@@ -173,12 +217,10 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 			
 		$join_sql = "FROM context_activity_log ";
 		
-		$has_multiple_values = false;
-				
 		$where_sql = "".
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 			
-		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields);
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields, $select_sql, 'SearchFields_ContextActivityLog');
 	
 		// Translate virtual fields
 		
@@ -186,13 +228,6 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 			'join_sql' => &$join_sql,
 			'where_sql' => &$where_sql,
 			'tables' => &$tables,
-			'has_multiple_values' => &$has_multiple_values
-		);
-		
-		array_walk_recursive(
-			$params,
-			array('DAO_ContextActivityLog', '_translateVirtualParameters'),
-			$args
 		);
 		
 		return array(
@@ -200,57 +235,8 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 			'select' => $select_sql,
 			'join' => $join_sql,
 			'where' => $where_sql,
-			'has_multiple_values' => $has_multiple_values,
 			'sort' => $sort_sql,
 		);
-	}
-	
-	private static function _translateVirtualParameters($param, $key, &$args) {
-		if(!is_a($param, 'DevblocksSearchCriteria'))
-			return;
-
-		$from_context = CerberusContexts::CONTEXT_ACTIVITY_LOG;
-		$from_index = 'context_activity_log.id';
-		
-		$param_key = $param->field;
-		settype($param_key, 'string');
-		
-		switch($param_key) {
-			case SearchFields_ContextActivityLog::VIRTUAL_ACTOR:
-			case SearchFields_ContextActivityLog::VIRTUAL_TARGET:
-				switch($param_key) {
-					case SearchFields_ContextActivityLog::VIRTUAL_ACTOR:
-						$context_field = 'actor_context';
-						break;
-					case SearchFields_ContextActivityLog::VIRTUAL_TARGET:
-						$context_field = 'target_context';
-						break;
-				}
-
-				if(is_array($param->value)) {
-					$wheres = array();
-					foreach($param->value as $context_pair) {
-						@list($context, $context_id) = explode(':', $context_pair);
-						if(!empty($context_id)) {
-							$wheres[] = sprintf("(%s = %s AND %s_id = %d)",
-								$context_field,
-								Cerb_ORMHelper::qstr($context),
-								$context_field,
-								$context_id
-							);
-						} else {
-							$wheres[] = sprintf("(%s = %s)",
-								$context_field,
-								Cerb_ORMHelper::qstr($context)
-							);
-						}
-					}
-				}
-				
-				if(!empty($wheres))
-					$args['where_sql'] .= ' AND (' . implode(' OR ', $wheres) . ') ';
-				break;
-		}
 	}
 	
 	/**
@@ -274,24 +260,27 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
 		$where_sql = $query_parts['where'];
-		$has_multiple_values = $query_parts['has_multiple_values'];
 		$sort_sql = $query_parts['sort'];
 		
 		$sql =
 			$select_sql.
 			$join_sql.
 			$where_sql.
-			($has_multiple_values ? 'GROUP BY context_activity_log.id ' : '').
 			$sort_sql;
 		
 		if($limit > 0) {
-			$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
+			if(false == ($rs = $db->SelectLimit($sql,$limit,$page*$limit)))
+				return false;
 		} else {
-			$rs = $db->ExecuteSlave($sql) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg()); /* @var $rs mysqli_result */
+			if(false == ($rs = $db->ExecuteSlave($sql)))
+				return false;
 			$total = mysqli_num_rows($rs);
 		}
 		
 		$results = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object_id = intval($row[SearchFields_ContextActivityLog::ID]);
@@ -304,7 +293,7 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 			// We can skip counting if we have a less-than-full single page
 			if(!(0 == $page && $total < $limit)) {
 				$count_sql =
-					($has_multiple_values ? "SELECT COUNT(DISTINCT context_activity_log.id) " : "SELECT COUNT(context_activity_log.id) ").
+					"SELECT COUNT(context_activity_log.id) ".
 					$join_sql.
 					$where_sql;
 				$total = $db->GetOneSlave($count_sql);
@@ -318,7 +307,7 @@ class DAO_ContextActivityLog extends Cerb_ORMHelper {
 
 };
 
-class SearchFields_ContextActivityLog implements IDevblocksSearchFields {
+class SearchFields_ContextActivityLog extends DevblocksSearchFields {
 	const ID = 'c_id';
 	const ACTIVITY_POINT = 'c_activity_point';
 	const ACTOR_CONTEXT = 'c_actor_context';
@@ -331,10 +320,122 @@ class SearchFields_ContextActivityLog implements IDevblocksSearchFields {
 	const VIRTUAL_ACTOR = '*_actor';
 	const VIRTUAL_TARGET = '*_target';
 	
+	static private $_fields = null;
+	
+	static function getPrimaryKey() {
+		return 'context_activity_log.id';
+	}
+	
+	static function getCustomFieldContextKeys() {
+		return array(
+			CerberusContexts::CONTEXT_ACTIVITY_LOG => new DevblocksSearchFieldContextKeys('context_activity_log.id', self::ID),
+		);
+	}
+	
+	static function getWhereSQL(DevblocksSearchCriteria $param) {
+		switch($param->field) {
+			case self::VIRTUAL_ACTOR:
+			case self::VIRTUAL_TARGET:
+				switch($param->field) {
+					case self::VIRTUAL_ACTOR:
+						$context_field = 'actor_context';
+						break;
+					case self::VIRTUAL_TARGET:
+						$context_field = 'target_context';
+						break;
+				}
+				
+				// Handle nested quick search filters first
+				if($param->operator == DevblocksSearchCriteria::OPER_CUSTOM) {
+					@list($alias, $query) = explode(':', $param->value, 2);
+					
+					if(empty($alias) || (false == ($ext = Extension_DevblocksContext::getByAlias(str_replace('.', ' ', $alias), true))))
+						return;
+					
+					$view = $ext->getSearchView(uniqid());
+					$view->is_ephemeral = true;
+					$view->setAutoPersist(false);
+					$view->addParamsWithQuickSearch($query, true);
+					
+					$params = $view->getParams();
+					
+					if(false == ($dao_class = $ext->getDaoClass()) || !class_exists($dao_class))
+						return;
+					
+					if(false == ($search_class = $ext->getSearchClass()) || !class_exists($search_class))
+						return;
+					
+					if(false == ($primary_key = $search_class::getPrimaryKey()))
+						return;
+					
+					$query_parts = $dao_class::getSearchQueryComponents(array(), $params);
+					
+					$query_parts['select'] = sprintf("SELECT %s ", $primary_key);
+					
+					$sql = 
+						$query_parts['select']
+						. $query_parts['join']
+						. $query_parts['where']
+						. $query_parts['sort']
+						;
+					
+					return sprintf("%s = %s AND %s_id IN (%s) ",
+						$context_field,
+						Cerb_ORMHelper::qstr($ext->id),
+						$context_field,
+						$sql
+					);
+				}
+
+				if(is_array($param->value)) {
+					$wheres = array();
+					foreach($param->value as $context_pair) {
+						@list($context, $context_id) = explode(':', $context_pair);
+						if(!empty($context_id)) {
+							$wheres[] = sprintf("(%s = %s AND %s_id = %d)",
+								$context_field,
+								Cerb_ORMHelper::qstr($context),
+								$context_field,
+								$context_id
+							);
+						} else {
+							$wheres[] = sprintf("(%s = %s)",
+								$context_field,
+								Cerb_ORMHelper::qstr($context)
+							);
+						}
+					}
+				}
+				
+				if(!empty($wheres))
+					return '(' . implode(' OR ', $wheres) . ') ';
+				
+				break;
+				
+			default:
+				if('cf_' == substr($param->field, 0, 3)) {
+					return self::_getWhereSQLFromCustomFields($param);
+				} else {
+					return $param->getWhereSQL(self::getFields(), self::getPrimaryKey());
+				}
+				break;
+		}
+	}
+	
 	/**
 	 * @return DevblocksSearchField[]
 	 */
 	static function getFields() {
+		if(is_null(self::$_fields))
+			self::$_fields = self::_getFields();
+		
+		return self::$_fields;
+	}
+	
+	/**
+	 * @return DevblocksSearchField[]
+	 */
+	static function _getFields() {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
@@ -407,6 +508,9 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 			$this->renderSortAsc,
 			$this->renderTotal
 		);
+		
+		$this->_lazyLoadCustomFieldsIntoObjects($objects, 'SearchFields_ContextActivityLog');
+		
 		return $objects;
 	}
 	
@@ -455,6 +559,7 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 	function getSubtotalCounts($column) {
 		$counts = array();
 		$fields = $this->getFields();
+		$context = CerberusContexts::CONTEXT_ACTIVITY_LOG;
 
 		if(!isset($fields[$column]))
 			return array();
@@ -472,21 +577,21 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 						$label_map[$k] = $translate->_($string_id);
 					}
 				}
-				$counts = $this->_getSubtotalCountForStringColumn('DAO_ContextActivityLog', $column, $label_map, 'in', 'options[]');
+				$counts = $this->_getSubtotalCountForStringColumn($context, $column, $label_map, 'in', 'options[]');
 				break;
 				
 			case SearchFields_ContextActivityLog::VIRTUAL_ACTOR:
-				$counts = $this->_getSubtotalCountForContextAndIdColumns('DAO_ContextActivityLog', CerberusContexts::CONTEXT_ACTIVITY_LOG, $column, DAO_ContextActivityLog::ACTOR_CONTEXT, DAO_ContextActivityLog::ACTOR_CONTEXT_ID);
+				$counts = $this->_getSubtotalCountForContextAndIdColumns($context, $column, DAO_ContextActivityLog::ACTOR_CONTEXT, DAO_ContextActivityLog::ACTOR_CONTEXT_ID);
 				break;
 				
 			case SearchFields_ContextActivityLog::VIRTUAL_TARGET:
-				$counts = $this->_getSubtotalCountForContextAndIdColumns('DAO_ContextActivityLog', CerberusContexts::CONTEXT_ACTIVITY_LOG, $column, DAO_ContextActivityLog::TARGET_CONTEXT, DAO_ContextActivityLog::TARGET_CONTEXT_ID);
+				$counts = $this->_getSubtotalCountForContextAndIdColumns($context, $column, DAO_ContextActivityLog::TARGET_CONTEXT, DAO_ContextActivityLog::TARGET_CONTEXT_ID);
 				break;
 				
 			default:
 				// Custom fields
 				if('cf_' == substr($column,0,3)) {
-					$counts = $this->_getSubtotalCountForCustomColumn('DAO_ContextActivityLog', $column, 'context_activity_log.id');
+					$counts = $this->_getSubtotalCountForCustomColumn($context, $column);
 				}
 				
 				break;
@@ -498,8 +603,12 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 	function getQuickSearchFields() {
 		$search_fields = SearchFields_ContextActivityLog::getFields();
 		
+		$activities = array_map(function($e) { 
+			return $e['params']['label_key'];
+		}, DevblocksPlatform::getActivityPointRegistry());
+		
 		$fields = array(
-			'_fulltext' => 
+			'text' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_ContextActivityLog::ENTRY_JSON, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
@@ -507,7 +616,10 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 			'activity' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
-					'options' => array('param_key' => SearchFields_ContextActivityLog::ACTIVITY_POINT, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
+					'options' => array('param_key' => SearchFields_ContextActivityLog::ACTIVITY_POINT),
+					'examples' => [
+						['type' => 'list', 'values' => $activities],
+					],
 				),
 			'created' => 
 				array(
@@ -519,7 +631,20 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_ContextActivityLog::ENTRY_JSON, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
 				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_ContextActivityLog::ID),
+					'examples' => [
+						['type' => 'chooser', 'context' => CerberusContexts::CONTEXT_ACTIVITY_LOG, 'q' => ''],
+					]
+				),
 		);
+		
+		// Add dynamic actor.* and target.* filters
+		
+		$fields = self::_appendVirtualFiltersFromQuickSearchContexts('actor', $fields);
+		$fields = self::_appendVirtualFiltersFromQuickSearchContexts('target', $fields);
 		
 		// Add searchable custom fields
 		
@@ -535,20 +660,22 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 		
 		return $fields;
 	}	
-	
-	function getParamsFromQuickSearchFields($fields) {
-		$search_fields = $this->getQuickSearchFields();
-		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
 
-		// Handle virtual fields and overrides
-		if(is_array($fields))
-		foreach($fields as $k => $v) {
-			switch($k) {
-				// ...
-			}
+	function getParamFromQuickSearchFieldTokens($field, $tokens) {
+		switch($field) {
+			default:
+				if($field == 'actor' || DevblocksPlatform::strStartsWith($field, 'actor.'))
+					return DevblocksSearchCriteria::getVirtualContextParamFromTokens($field, $tokens, 'actor', SearchFields_ContextActivityLog::VIRTUAL_ACTOR);
+					
+				if($field == 'target' || DevblocksPlatform::strStartsWith($field, 'target.'))
+					return DevblocksSearchCriteria::getVirtualContextParamFromTokens($field, $tokens, 'target', SearchFields_ContextActivityLog::VIRTUAL_TARGET);
+				
+				$search_fields = $this->getQuickSearchFields();
+				return DevblocksSearchCriteria::getParamFromQueryFieldTokens($field, $tokens, $search_fields);
+				break;
 		}
 		
-		return $params;
+		return false;
 	}
 	
 	function render() {
@@ -612,10 +739,11 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 		
 		switch($key) {
 			case SearchFields_ContextActivityLog::VIRTUAL_ACTOR:
-				$this->_renderVirtualContextLinks($param, 'Actor', 'Actors');
+				$this->_renderVirtualContextLinks($param, 'Actor', 'Actors', 'Actor is');
 				break;
+			
 			case SearchFields_ContextActivityLog::VIRTUAL_TARGET:
-				$this->_renderVirtualContextLinks($param, 'Target', 'Targets');
+				$this->_renderVirtualContextLinks($param, 'Target', 'Targets', 'Target is');
 				break;
 		}
 	}
@@ -724,6 +852,23 @@ class View_ContextActivityLog extends C4_AbstractView implements IAbstractView_S
 };
 
 class Context_ContextActivityLog extends Extension_DevblocksContext {
+	static function isReadableByActor($models, $actor) {
+		// Everyone can read
+		return CerberusContexts::allowEverything($models);
+	}
+	
+	static function isWriteableByActor($models, $actor) {
+		// Only admins can modify
+		if(false == ($actor = CerberusContexts::polymorphActorToDictionary($actor)))
+			CerberusContexts::denyEverything($models);
+		
+		// Admins can do whatever they want
+		if(CerberusContexts::isActorAnAdmin($actor))
+			return CerberusContexts::allowEverything($models);
+		
+		return CerberusContexts::denyEverything($models);
+	}
+	
 	function getRandom() {
 		return DAO_ContextActivityLog::random();
 	}
@@ -763,7 +908,6 @@ class Context_ContextActivityLog extends Extension_DevblocksContext {
 		return $labels;
 	}
 	
-	// [TODO] Interface
 	function getDefaultProperties() {
 		return array(
 			'event',
@@ -849,7 +993,7 @@ class Context_ContextActivityLog extends Extension_DevblocksContext {
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true, true);
 		}
 		
 		switch($token) {

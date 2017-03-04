@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class DAO_Task extends Cerb_ORMHelper {
@@ -20,6 +20,8 @@ class DAO_Task extends Cerb_ORMHelper {
 	const TITLE = 'title';
 	const CREATED_AT = 'created_at';
 	const UPDATED_DATE = 'updated_date';
+	const OWNER_ID = 'owner_id';
+	const IMPORTANCE = 'importance';
 	const DUE_DATE = 'due_date';
 	const IS_COMPLETED = 'is_completed';
 	const COMPLETED_DATE = 'completed_date';
@@ -74,7 +76,7 @@ class DAO_Task extends Cerb_ORMHelper {
 			)
 		);
 		
-		// Virtual Attendant events
+		// Bot events
 		Event_TaskCreatedByWorker::trigger($id, null);
 		
 		return $id;
@@ -119,6 +121,87 @@ class DAO_Task extends Cerb_ORMHelper {
 				DevblocksPlatform::markContextChanged(CerberusContexts::CONTEXT_TASK, $batch_ids);
 			}
 		}
+	}
+	
+	/**
+	 * @param Model_ContextBulkUpdate $update
+	 * @return boolean
+	 */
+	static function bulkUpdate(Model_ContextBulkUpdate $update) {
+		$tpl_builder = DevblocksPlatform::getTemplateBuilder();
+
+		$do = $update->actions;
+		$ids = $update->context_ids;
+
+		// Make sure we have actions
+		if(empty($ids) || empty($do))
+			return false;
+		
+		$update->markInProgress();
+		
+		$change_fields = array();
+		$custom_fields = array();
+		$deleted = false;
+
+		if(is_array($do))
+		foreach($do as $k => $v) {
+			switch($k) {
+				case 'delete':
+					$deleted = true;
+					break;
+				case 'due':
+					@$date = strtotime($v);
+					$change_fields[DAO_Task::DUE_DATE] = intval($date);
+					break;
+				case 'importance':
+					@$importance = DevblocksPlatform::intClamp($v, 0, 100);
+					$change_fields[DAO_Task::IMPORTANCE] = $importance;
+					break;
+				case 'owner':
+					@$owner_id = intval($v);
+					$change_fields[DAO_Task::OWNER_ID] = $owner_id;
+					break;
+				case 'status':
+					switch($v) {
+						case 1: // completed
+							$change_fields[DAO_Task::IS_COMPLETED] = 1;
+							$change_fields[DAO_Task::COMPLETED_DATE] = time();
+							break;
+						default: // active
+							$change_fields[DAO_Task::IS_COMPLETED] = 0;
+							$change_fields[DAO_Task::COMPLETED_DATE] = 0;
+							break;
+					}
+					break;
+				default:
+					// Custom fields
+					if(substr($k,0,3)=="cf_") {
+						$custom_fields[substr($k,3)] = $v;
+					}
+					break;
+			}
+		}
+		
+		if($deleted) {
+			DAO_Task::delete($ids);
+			
+		} else {
+			DAO_Task::update($ids, $change_fields);
+			
+			// Custom Fields
+			C4_AbstractView::_doBulkSetCustomFields(CerberusContexts::CONTEXT_TASK, $custom_fields, $ids);
+			
+			// Scheduled behavior
+			if(isset($do['behavior']))
+				C4_AbstractView::_doBulkScheduleBehavior(CerberusContexts::CONTEXT_TASK, $do['behavior'], $ids);
+			
+			// Watchers
+			if(isset($do['watchers']))
+				C4_AbstractView::_doBulkChangeWatchers(CerberusContexts::CONTEXT_TASK, $do['watchers'], $ids);
+		}
+		
+		$update->markCompleted();
+		return true;
 	}
 	
 	static function _processUpdateEvents($ids, $change_fields) {
@@ -189,7 +272,7 @@ class DAO_Task extends Cerb_ORMHelper {
 	static function getWhere($where=null) {
 		$db = DevblocksPlatform::getDatabaseService();
 		
-		$sql = "SELECT id, title, due_date, created_at, updated_date, is_completed, completed_date ".
+		$sql = "SELECT id, title, owner_id, importance, due_date, created_at, updated_date, is_completed, completed_date ".
 			"FROM task ".
 			(!empty($where) ? sprintf("WHERE %s ",$where) : "").
 			"ORDER BY id asc";
@@ -223,6 +306,9 @@ class DAO_Task extends Cerb_ORMHelper {
 	static private function _getObjectsFromResult($rs) {
 		$objects = array();
 		
+		if(!($rs instanceof mysqli_result))
+			return false;
+		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object = new Model_Task();
 			$object->id = $row['id'];
@@ -230,6 +316,8 @@ class DAO_Task extends Cerb_ORMHelper {
 			$object->created_at = intval($row['created_at']);
 			$object->updated_date = intval($row['updated_date']);
 			$object->due_date = intval($row['due_date']);
+			$object->owner_id = intval($row['owner_id']);
+			$object->importance = intval($row['importance']);
 			$object->is_completed = intval($row['is_completed']);
 			$object->completed_date = intval($row['completed_date']);
 			$objects[$object->id] = $object;
@@ -273,6 +361,12 @@ class DAO_Task extends Cerb_ORMHelper {
 	}
 	
 	public static function maint() {
+		$db = DevblocksPlatform::getDatabaseService();
+		
+		// Fix missing owners
+		$sql = "UPDATE task SET owner_id = 0 WHERE owner_id != 0 AND owner_id NOT IN (SELECT id FROM worker)";
+		$db->ExecuteMaster($sql);
+		
 		// Fire event
 		$eventMgr = DevblocksPlatform::getEventService();
 		$eventMgr->trigger(
@@ -294,13 +388,15 @@ class DAO_Task extends Cerb_ORMHelper {
 	public static function getSearchQueryComponents($columns, $params, $sortBy=null, $sortAsc=null) {
 		$fields = SearchFields_Task::getFields();
 		
-		list($tables, $wheres) = parent::_parseSearchParams($params, $columns, $fields, $sortBy);
+		list($tables, $wheres) = parent::_parseSearchParams($params, $columns, 'SearchFields_Task', $sortBy);
 		
 		$select_sql = sprintf("SELECT ".
 			"t.id as %s, ".
 			"t.title as %s, ".
 			"t.created_at as %s, ".
 			"t.updated_date as %s, ".
+			"t.owner_id as %s, ".
+			"t.importance as %s, ".
 			"t.due_date as %s, ".
 			"t.is_completed as %s, ".
 			"t.completed_date as %s ",
@@ -308,31 +404,20 @@ class DAO_Task extends Cerb_ORMHelper {
 				SearchFields_Task::TITLE,
 				SearchFields_Task::CREATED_AT,
 				SearchFields_Task::UPDATED_DATE,
+				SearchFields_Task::OWNER_ID,
+				SearchFields_Task::IMPORTANCE,
 				SearchFields_Task::DUE_DATE,
 				SearchFields_Task::IS_COMPLETED,
 				SearchFields_Task::COMPLETED_DATE
 		);
 
 		$join_sql =
-			"FROM task t ".
+			"FROM task t ";
 
-			// [JAS]: Dynamic table joins
-			(isset($tables['context_link']) ? "INNER JOIN context_link ON (context_link.to_context = 'cerberusweb.contexts.task' AND context_link.to_context_id = t.id) " : " ")
-			;
-
-		// Custom field joins
-		list($select_sql, $join_sql, $has_multiple_values) = self::_appendSelectJoinSqlForCustomFieldTables(
-			$tables,
-			$params,
-			't.id',
-			$select_sql,
-			$join_sql
-		);
-		
 		$where_sql = "".
 			(!empty($wheres) ? sprintf("WHERE %s ",implode(' AND ',$wheres)) : "WHERE 1 ");
 			
-		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields);
+		$sort_sql = self::_buildSortClause($sortBy, $sortAsc, $fields, $select_sql, 'SearchFields_Task');
 		
 		// Translate virtual fields
 		
@@ -340,7 +425,6 @@ class DAO_Task extends Cerb_ORMHelper {
 			'join_sql' => &$join_sql,
 			'where_sql' => &$where_sql,
 			'tables' => &$tables,
-			'has_multiple_values' => &$has_multiple_values
 		);
 		
 		array_walk_recursive(
@@ -354,7 +438,6 @@ class DAO_Task extends Cerb_ORMHelper {
 			'select' => $select_sql,
 			'join' => $join_sql,
 			'where' => $where_sql,
-			'has_multiple_values' => $has_multiple_values,
 			'sort' => $sort_sql,
 		);
 		
@@ -372,51 +455,8 @@ class DAO_Task extends Cerb_ORMHelper {
 		settype($param_key, 'string');
 		
 		switch($param_key) {
-			case SearchFields_Task::FULLTEXT_COMMENT_CONTENT:
-				$search = Extension_DevblocksSearchSchema::get(Search_CommentContent::ID);
-				$query = $search->getQueryFromParam($param);
-				
-				if(false === ($ids = $search->query($query, array('context_crc32' => sprintf("%u", crc32($from_context)))))) {
-					$args['where_sql'] .= 'AND 0 ';
-				
-				} elseif(is_array($ids)) {
-					$from_ids = DAO_Comment::getContextIdsByContextAndIds($from_context, $ids);
-					
-					$args['where_sql'] .= sprintf('AND %s IN (%s) ',
-						$from_index,
-						implode(', ', (!empty($from_ids) ? $from_ids : array(-1)))
-					);
-					
-				} elseif(is_string($ids)) {
-					$db = DevblocksPlatform::getDatabaseService();
-					$temp_table = sprintf("_tmp_%s", uniqid());
-					
-					$db->ExecuteSlave(sprintf("CREATE TEMPORARY TABLE %s (PRIMARY KEY (id)) SELECT DISTINCT context_id AS id FROM comment INNER JOIN %s ON (%s.id=comment.id)",
-						$temp_table,
-						$ids,
-						$ids
-					));
-					
-					$args['join_sql'] .= sprintf("INNER JOIN %s ON (%s.id=t.id) ",
-						$temp_table,
-						$temp_table
-					);
-				}
-				
-				break;
-			
-			case SearchFields_Task::VIRTUAL_CONTEXT_LINK:
-				$args['has_multiple_values'] = true;
-				self::_searchComponentsVirtualContextLinks($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
-				break;
-				
 			case SearchFields_Task::VIRTUAL_HAS_FIELDSET:
 				self::_searchComponentsVirtualHasFieldset($param, $from_context, $from_index, $args['join_sql'], $args['where_sql']);
-				break;
-			
-			case SearchFields_Task::VIRTUAL_WATCHERS:
-				$args['has_multiple_values'] = true;
-				self::_searchComponentsVirtualWatchers($param, $from_context, $from_index, $args['join_sql'], $args['where_sql'], $args['tables']);
 				break;
 		}
 	}
@@ -441,7 +481,6 @@ class DAO_Task extends Cerb_ORMHelper {
 		$select_sql = $query_parts['select'];
 		$join_sql = $query_parts['join'];
 		$where_sql = $query_parts['where'];
-		$has_multiple_values = $query_parts['has_multiple_values'];
 		$sort_sql = $query_parts['sort'];
 		
 		// Build it
@@ -449,12 +488,15 @@ class DAO_Task extends Cerb_ORMHelper {
 			$select_sql.
 			$join_sql.
 			$where_sql.
-			($has_multiple_values ? 'GROUP BY t.id ' : '').
 			$sort_sql;
 		
-		$rs = $db->SelectLimit($sql,$limit,$page*$limit) or die(__CLASS__ . '('.__LINE__.')'. ':' . $db->ErrorMsg());
+		if(false == ($rs = $db->SelectLimit($sql,$limit,$page*$limit)))
+			return false;
 		
 		$results = array();
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$object_id = intval($row[SearchFields_Task::ID]);
@@ -467,7 +509,7 @@ class DAO_Task extends Cerb_ORMHelper {
 			// We can skip counting if we have a less-than-full single page
 			if(!(0 == $page && $total < $limit)) {
 				$count_sql =
-					($has_multiple_values ? "SELECT COUNT(DISTINCT t.id) " : "SELECT COUNT(t.id) ").
+					"SELECT COUNT(t.id) ".
 					$join_sql.
 					$where_sql;
 				$total = $db->GetOneSlave($count_sql);
@@ -481,11 +523,13 @@ class DAO_Task extends Cerb_ORMHelper {
 	
 };
 
-class SearchFields_Task implements IDevblocksSearchFields {
+class SearchFields_Task extends DevblocksSearchFields {
 	// Task
 	const ID = 't_id';
 	const CREATED_AT = 't_created_at';
 	const UPDATED_DATE = 't_updated_date';
+	const OWNER_ID = 't_owner_id';
+	const IMPORTANCE = 't_importance';
 	const DUE_DATE = 't_due_date';
 	const IS_COMPLETED = 't_is_completed';
 	const COMPLETED_DATE = 't_completed_date';
@@ -493,18 +537,66 @@ class SearchFields_Task implements IDevblocksSearchFields {
 	
 	const VIRTUAL_CONTEXT_LINK = '*_context_link';
 	const VIRTUAL_HAS_FIELDSET = '*_has_fieldset';
+	const VIRTUAL_OWNER_SEARCH = '*_owner_search';
 	const VIRTUAL_WATCHERS = '*_workers';
-	
-	const CONTEXT_LINK = 'cl_context_from';
-	const CONTEXT_LINK_ID = 'cl_context_from_id';
 	
 	// Comment Content
 	const FULLTEXT_COMMENT_CONTENT = 'ftcc_content';
+	
+	static private $_fields = null;
+	
+	static function getPrimaryKey() {
+		return 't.id';
+	}
+	
+	static function getCustomFieldContextKeys() {
+		return array(
+			CerberusContexts::CONTEXT_TASK => new DevblocksSearchFieldContextKeys('t.id', self::ID),
+		);
+	}
+	
+	static function getWhereSQL(DevblocksSearchCriteria $param) {
+		switch($param->field) {
+			case self::FULLTEXT_COMMENT_CONTENT:
+				return self::_getWhereSQLFromCommentFulltextField($param, Search_CommentContent::ID, CerberusContexts::CONTEXT_TASK, self::getPrimaryKey());
+				break;
+				
+			case self::VIRTUAL_CONTEXT_LINK:
+				return self::_getWhereSQLFromContextLinksField($param, CerberusContexts::CONTEXT_TASK, self::getPrimaryKey());
+				break;
+				
+			case self::VIRTUAL_OWNER_SEARCH:
+				return self::_getWhereSQLFromVirtualSearchField($param, CerberusContexts::CONTEXT_WORKER, 't.owner_id');
+				break;
+				
+			case self::VIRTUAL_WATCHERS:
+				return self::_getWhereSQLFromWatchersField($param, CerberusContexts::CONTEXT_TASK, self::getPrimaryKey());
+				break;
+			
+			default:
+				if('cf_' == substr($param->field, 0, 3)) {
+					return self::_getWhereSQLFromCustomFields($param);
+				} else {
+					return $param->getWhereSQL(self::getFields(), self::getPrimaryKey());
+				}
+				break;
+		}
+	}
 	
 	/**
 	 * @return DevblocksSearchField[]
 	 */
 	static function getFields() {
+		if(is_null(self::$_fields))
+			self::$_fields = self::_getFields();
+		
+		return self::$_fields;
+	}
+	
+	/**
+	 * @return DevblocksSearchField[]
+	 */
+	static function _getFields() {
 		$translate = DevblocksPlatform::getTranslationService();
 		
 		$columns = array(
@@ -513,16 +605,16 @@ class SearchFields_Task implements IDevblocksSearchFields {
 			self::UPDATED_DATE => new DevblocksSearchField(self::UPDATED_DATE, 't', 'updated_date', $translate->_('common.updated'), Model_CustomField::TYPE_DATE, true),
 			self::TITLE => new DevblocksSearchField(self::TITLE, 't', 'title', $translate->_('common.title'), Model_CustomField::TYPE_SINGLE_LINE, true),
 			self::IS_COMPLETED => new DevblocksSearchField(self::IS_COMPLETED, 't', 'is_completed', $translate->_('task.is_completed'), Model_CustomField::TYPE_CHECKBOX, true),
+			self::OWNER_ID => new DevblocksSearchField(self::OWNER_ID, 't', 'owner_id', $translate->_('common.owner'), Model_CustomField::TYPE_WORKER, true),
+			self::IMPORTANCE => new DevblocksSearchField(self::IMPORTANCE, 't', 'importance', $translate->_('common.importance'), Model_CustomField::TYPE_NUMBER, true),
 			self::DUE_DATE => new DevblocksSearchField(self::DUE_DATE, 't', 'due_date', $translate->_('task.due_date'), Model_CustomField::TYPE_DATE, true),
 			self::COMPLETED_DATE => new DevblocksSearchField(self::COMPLETED_DATE, 't', 'completed_date', $translate->_('task.completed_date'), Model_CustomField::TYPE_DATE, true),
 			
 			self::VIRTUAL_CONTEXT_LINK => new DevblocksSearchField(self::VIRTUAL_CONTEXT_LINK, '*', 'context_link', $translate->_('common.links'), null, false),
 			self::VIRTUAL_HAS_FIELDSET => new DevblocksSearchField(self::VIRTUAL_HAS_FIELDSET, '*', 'has_fieldset', $translate->_('common.fieldset'), null, false),
+			self::VIRTUAL_OWNER_SEARCH => new DevblocksSearchField(self::VIRTUAL_OWNER_SEARCH, '*', 'owner_search', null, null, false),
 			self::VIRTUAL_WATCHERS => new DevblocksSearchField(self::VIRTUAL_WATCHERS, '*', 'workers', $translate->_('common.watchers'), 'WS', false),
 			
-			self::CONTEXT_LINK => new DevblocksSearchField(self::CONTEXT_LINK, 'context_link', 'from_context', null, null, false),
-			self::CONTEXT_LINK_ID => new DevblocksSearchField(self::CONTEXT_LINK_ID, 'context_link', 'from_context_id', null, null, false),
-				
 			self::FULLTEXT_COMMENT_CONTENT => new DevblocksSearchField(self::FULLTEXT_COMMENT_CONTENT, 'ftcc', 'content', $translate->_('comment.filters.content'), 'FT', false),
 		);
 		
@@ -532,9 +624,7 @@ class SearchFields_Task implements IDevblocksSearchFields {
 		
 		// Custom fields with fieldsets
 		
-		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array(
-			CerberusContexts::CONTEXT_TASK,
-		));
+		$custom_columns = DevblocksSearchField::getCustomSearchFieldsByContexts(array_keys(self::getCustomFieldContextKeys()));
 		
 		if(is_array($custom_columns))
 			$columns = array_merge($columns, $custom_columns);
@@ -550,10 +640,19 @@ class Model_Task {
 	public $id;
 	public $title;
 	public $created_at;
+	public $owner_id;
+	public $importance;
 	public $due_date;
 	public $is_completed;
 	public $completed_date;
 	public $updated_date;
+	
+	function getOwner() {
+		if(!$this->owner_id || false === ($worker = DAO_Worker::get($this->owner_id)))
+			return null;
+		
+		return $worker;
+	}
 };
 
 class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbstractView_QuickSearch {
@@ -570,22 +669,22 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 		$this->view_columns = array(
 			SearchFields_Task::UPDATED_DATE,
 			SearchFields_Task::DUE_DATE,
+			SearchFields_Task::IMPORTANCE,
+			SearchFields_Task::OWNER_ID,
 		);
 		
 		$this->addColumnsHidden(array(
 			SearchFields_Task::ID,
-			SearchFields_Task::CONTEXT_LINK,
-			SearchFields_Task::CONTEXT_LINK_ID,
 			SearchFields_Task::FULLTEXT_COMMENT_CONTENT,
 			SearchFields_Task::VIRTUAL_CONTEXT_LINK,
 			SearchFields_Task::VIRTUAL_HAS_FIELDSET,
+			SearchFields_Task::VIRTUAL_OWNER_SEARCH,
 			SearchFields_Task::VIRTUAL_WATCHERS,
 		));
 		
 		$this->addParamsHidden(array(
 			SearchFields_Task::ID,
-			SearchFields_Task::CONTEXT_LINK,
-			SearchFields_Task::CONTEXT_LINK_ID,
+			SearchFields_Task::VIRTUAL_OWNER_SEARCH,
 		));
 		
 		$this->addParamsDefault(array(
@@ -596,7 +695,7 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 	}
 
 	function getData() {
-		return $this->_objects = DAO_Task::search(
+		$objects = DAO_Task::search(
 			$this->view_columns,
 			$this->getParams(),
 			$this->renderLimit,
@@ -605,6 +704,10 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 			$this->renderSortAsc,
 			$this->renderTotal
 		);
+		
+		$this->_lazyLoadCustomFieldsIntoObjects($objects, 'SearchFields_Task');
+		
+		return $objects;
 	}
 	
 	function getDataAsObjects($ids=null) {
@@ -654,31 +757,32 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 	function getSubtotalCounts($column) {
 		$counts = array();
 		$fields = $this->getFields();
+		$context = CerberusContexts::CONTEXT_TASK;
 
 		if(!isset($fields[$column]))
 			return array();
 		
 		switch($column) {
 			case SearchFields_Task::IS_COMPLETED:
-				$counts = $this->_getSubtotalCountForBooleanColumn('DAO_Task', $column);
+				$counts = $this->_getSubtotalCountForBooleanColumn($context, $column);
 				break;
 				
 			case SearchFields_Task::VIRTUAL_CONTEXT_LINK:
-				$counts = $this->_getSubtotalCountForContextLinkColumn('DAO_Task', CerberusContexts::CONTEXT_TASK, $column);
+				$counts = $this->_getSubtotalCountForContextLinkColumn($context, $column);
 				break;
 				
 			case SearchFields_Task::VIRTUAL_HAS_FIELDSET:
-				$counts = $this->_getSubtotalCountForHasFieldsetColumn('DAO_Task', CerberusContexts::CONTEXT_TASK, $column);
+				$counts = $this->_getSubtotalCountForHasFieldsetColumn($context, $column);
 				break;
 				
 			case SearchFields_Task::VIRTUAL_WATCHERS:
-				$counts = $this->_getSubtotalCountForWatcherColumn('DAO_Task', $column);
+				$counts = $this->_getSubtotalCountForWatcherColumn($context, $column);
 				break;
 			
 			default:
 				// Custom fields
 				if('cf_' == substr($column,0,3)) {
-					$counts = $this->_getSubtotalCountForCustomColumn('DAO_Task', $column, 't.id');
+					$counts = $this->_getSubtotalCountForCustomColumn($context, $column);
 				}
 				
 				break;
@@ -691,7 +795,7 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 		$search_fields = SearchFields_Task::getFields();
 		
 		$fields = array(
-			'_fulltext' => 
+			'text' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_TEXT,
 					'options' => array('param_key' => SearchFields_Task::TITLE, 'match' => DevblocksSearchCriteria::OPTION_TEXT_PARTIAL),
@@ -716,10 +820,39 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 					'type' => DevblocksSearchCriteria::TYPE_DATE,
 					'options' => array('param_key' => SearchFields_Task::DUE_DATE),
 				),
+			'id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_Task::ID),
+					'examples' => [
+						['type' => 'chooser', 'context' => CerberusContexts::CONTEXT_TASK, 'q' => ''],
+					]
+				),
+			'importance' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_Task::IMPORTANCE),
+				),
 			'isCompleted' => 
 				array(
 					'type' => DevblocksSearchCriteria::TYPE_BOOL,
 					'options' => array('param_key' => SearchFields_Task::IS_COMPLETED),
+				),
+			'owner' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_VIRTUAL,
+					'options' => array('param_key' => SearchFields_Task::VIRTUAL_OWNER_SEARCH),
+					'examples' => [
+						['type' => 'search', 'context' => CerberusContexts::CONTEXT_WORKER, 'q' => ''],
+					]
+				),
+			'owner.id' => 
+				array(
+					'type' => DevblocksSearchCriteria::TYPE_NUMBER,
+					'options' => array('param_key' => SearchFields_Task::OWNER_ID),
+					'examples' => [
+						['type' => 'chooser', 'context' => CerberusContexts::CONTEXT_WORKER, 'q' => ''],
+					]
 				),
 			'title' => 
 				array(
@@ -737,6 +870,10 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 					'options' => array('param_key' => SearchFields_Task::VIRTUAL_WATCHERS),
 				),
 		);
+		
+		// Add quick search links
+		
+		$fields = self::_appendVirtualFiltersFromQuickSearchContexts('links', $fields, 'links');
 		
 		// Add searchable custom fields
 		
@@ -764,21 +901,24 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 		ksort($fields);
 		
 		return $fields;
-	}	
+	}
 	
-	function getParamsFromQuickSearchFields($fields) {
-		$search_fields = $this->getQuickSearchFields();
-		$params = DevblocksSearchCriteria::getParamsFromQueryFields($fields, $search_fields);
-
-		// Handle virtual fields and overrides
-		if(is_array($fields))
-		foreach($fields as $k => $v) {
-			switch($k) {
-				// ...
-			}
+	function getParamFromQuickSearchFieldTokens($field, $tokens) {
+		switch($field) {
+			case 'owner':
+				return DevblocksSearchCriteria::getVirtualQuickSearchParamFromTokens($field, $tokens, SearchFields_Task::VIRTUAL_OWNER_SEARCH);
+				break;
+				
+			default:
+				if($field == 'links' || substr($field, 0, 6) == 'links.')
+					return DevblocksSearchCriteria::getContextLinksParamFromTokens($field, $tokens);
+				
+				$search_fields = $this->getQuickSearchFields();
+				return DevblocksSearchCriteria::getParamFromQueryFieldTokens($field, $tokens, $search_fields);
+				break;
 		}
 		
-		return $params;
+		return false;
 	}
 	
 	function render() {
@@ -823,6 +963,10 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__bool.tpl');
 				break;
 				
+			case SearchFields_Task::IMPORTANCE:
+				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__number.tpl');
+				break;
+				
 			case SearchFields_Task::CREATED_AT:
 			case SearchFields_Task::UPDATED_DATE:
 			case SearchFields_Task::DUE_DATE:
@@ -844,6 +988,7 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 				$this->_renderCriteriaHasFieldset($tpl, CerberusContexts::CONTEXT_TASK);
 				break;
 			
+			case SearchFields_Task::OWNER_ID:
 			case SearchFields_Task::VIRTUAL_WATCHERS:
 				$tpl->display('devblocks:cerberusweb.core::internal/views/criteria/__context_worker.tpl');
 				break;
@@ -870,7 +1015,14 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 			case SearchFields_Task::VIRTUAL_HAS_FIELDSET:
 				$this->_renderVirtualHasFieldset($param);
 				break;
-			
+				
+			case SearchFields_Task::VIRTUAL_OWNER_SEARCH:
+				echo sprintf("%s matches <b>%s</b>",
+					DevblocksPlatform::strEscapeHtml(DevblocksPlatform::translateCapitalized('common.owner')),
+					DevblocksPlatform::strEscapeHtml($param->value)
+				);
+				break;
+				
 			case SearchFields_Task::VIRTUAL_WATCHERS:
 				$this->_renderVirtualWatchers($param);
 				break;
@@ -885,6 +1037,10 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 		switch($field) {
 			case SearchFields_Task::IS_COMPLETED:
 				$this->_renderCriteriaParamBoolean($param);
+				break;
+				
+			case SearchFields_Task::OWNER_ID:
+				$this->_renderCriteriaParamWorker($param);
 				break;
 				
 			default:
@@ -903,6 +1059,11 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 		switch($field) {
 			case SearchFields_Task::TITLE:
 				$criteria = $this->_doSetCriteriaString($field, $oper, $value);
+				break;
+				
+			case SearchFields_Task::IMPORTANCE:
+				@$value = DevblocksPlatform::importGPC($_REQUEST['value'],'integer',0);
+				$criteria = new DevblocksSearchCriteria($field,$oper,$value);
 				break;
 				
 			case SearchFields_Task::CREATED_AT:
@@ -927,6 +1088,7 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 				$criteria = new DevblocksSearchCriteria($field,DevblocksSearchCriteria::OPER_IN,$options);
 				break;
 				
+			case SearchFields_Task::OWNER_ID:
 			case SearchFields_Task::VIRTUAL_WATCHERS:
 				@$worker_ids = DevblocksPlatform::importGPC($_REQUEST['worker_id'],'array',array());
 				$criteria = new DevblocksSearchCriteria($field,$oper,$worker_ids);
@@ -950,121 +1112,19 @@ class View_Task extends C4_AbstractView implements IAbstractView_Subtotals, IAbs
 			$this->renderPage = 0;
 		}
 	}
-	
-	function doBulkUpdate($filter, $do, $ids=array()) {
-		@set_time_limit(600); // 10m
-		
-		$change_fields = array();
-		$custom_fields = array();
-		$deleted = false;
-
-		// Make sure we have actions
-		if(empty($do))
-			return;
-
-		// Make sure we have checked items if we want a checked list
-		if(0 == strcasecmp($filter,"checks") && empty($ids))
-			return;
-			
-		if(is_array($do))
-		foreach($do as $k => $v) {
-			switch($k) {
-				case 'delete':
-					$deleted = true;
-					break;
-				case 'due':
-					@$date = strtotime($v);
-					$change_fields[DAO_Task::DUE_DATE] = intval($date);
-					break;
-				case 'status':
-					switch($v) {
-						case 1: // completed
-							$change_fields[DAO_Task::IS_COMPLETED] = 1;
-							$change_fields[DAO_Task::COMPLETED_DATE] = time();
-							break;
-						default: // active
-							$change_fields[DAO_Task::IS_COMPLETED] = 0;
-							$change_fields[DAO_Task::COMPLETED_DATE] = 0;
-							break;
-					}
-					break;
-				default:
-					// Custom fields
-					if(substr($k,0,3)=="cf_") {
-						$custom_fields[substr($k,3)] = $v;
-					}
-			}
-		}
-		
-		$pg = 0;
-
-		if(empty($ids))
-		do {
-			list($objects,$null) = DAO_Task::search(
-				array(),
-				$this->getParams(),
-				100,
-				$pg++,
-				SearchFields_Task::ID,
-				true,
-				false
-			);
-			 
-			$ids = array_merge($ids, array_keys($objects));
-			 
-		} while(!empty($objects));
-
-		$batch_total = count($ids);
-		for($x=0;$x<=$batch_total;$x+=100) {
-			$batch_ids = array_slice($ids,$x,100);
-			
-			if($deleted) {
-				DAO_Task::delete($batch_ids);
-				
-			} else {
-				DAO_Task::update($batch_ids, $change_fields);
-				
-				// Custom Fields
-				self::_doBulkSetCustomFields(CerberusContexts::CONTEXT_TASK, $custom_fields, $batch_ids);
-				
-				// Scheduled behavior
-				if(isset($do['behavior']) && is_array($do['behavior'])) {
-					$behavior_id = $do['behavior']['id'];
-					@$behavior_when = strtotime($do['behavior']['when']) or time();
-					@$behavior_params = isset($do['behavior']['params']) ? $do['behavior']['params'] : array();
-					
-					if(!empty($batch_ids) && !empty($behavior_id))
-					foreach($batch_ids as $batch_id) {
-						DAO_ContextScheduledBehavior::create(array(
-							DAO_ContextScheduledBehavior::BEHAVIOR_ID => $behavior_id,
-							DAO_ContextScheduledBehavior::CONTEXT => CerberusContexts::CONTEXT_TASK,
-							DAO_ContextScheduledBehavior::CONTEXT_ID => $batch_id,
-							DAO_ContextScheduledBehavior::RUN_DATE => $behavior_when,
-							DAO_ContextScheduledBehavior::VARIABLES_JSON => json_encode($behavior_params),
-						));
-					}
-				}
-				
-				// Watchers
-				if(isset($do['watchers']) && is_array($do['watchers'])) {
-					$watcher_params = $do['watchers'];
-					foreach($batch_ids as $batch_id) {
-						if(isset($watcher_params['add']) && is_array($watcher_params['add']))
-							CerberusContexts::addWatchers(CerberusContexts::CONTEXT_TASK, $batch_id, $watcher_params['add']);
-						if(isset($watcher_params['remove']) && is_array($watcher_params['remove']))
-							CerberusContexts::removeWatchers(CerberusContexts::CONTEXT_TASK, $batch_id, $watcher_params['remove']);
-					}
-				}
-			}
-			
-			unset($batch_ids);
-		}
-
-		unset($ids);
-	}
 };
 
 class Context_Task extends Extension_DevblocksContext implements IDevblocksContextProfile, IDevblocksContextPeek, IDevblocksContextImport {
+	static function isReadableByActor($models, $actor) {
+		// Everyone can read
+		return CerberusContexts::allowEverything($models);
+	}
+	
+	static function isWriteableByActor($models, $actor) {
+		// Everyone can modify
+		return CerberusContexts::allowEverything($models);
+	}
+	
 	function profileGetUrl($context_id) {
 		if(empty($context_id))
 			return '';
@@ -1087,6 +1147,7 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 			'id' => $task->id,
 			'name' => $task->title,
 			'permalink' => $url,
+			'owner_id' => $task->owner_id,
 			'updated' => $task->updated_date,
 		);
 	}
@@ -1117,13 +1178,13 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 		return $labels;
 	}
 	
-	// [TODO] Interface
 	function getDefaultProperties() {
 		return array(
 			'status',
-			'created',
+			'importance',
 			'due',
-			'completed',
+			'updated',
+			'owner__label',
 		);
 	}
 	
@@ -1152,6 +1213,7 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 			'completed' => $prefix.$translate->_('task.completed_date'),
 			'due' => $prefix.$translate->_('task.due_date'),
 			'id' => $prefix.$translate->_('common.id'),
+			'importance' => $prefix.$translate->_('common.importance'),
 			'is_completed' => $prefix.$translate->_('task.is_completed'),
 			'status' => $prefix.$translate->_('common.status'),
 			'title' => $prefix.$translate->_('common.title'),
@@ -1166,6 +1228,7 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 			'completed' => Model_CustomField::TYPE_DATE,
 			'due' => Model_CustomField::TYPE_DATE,
 			'id' => Model_CustomField::TYPE_NUMBER,
+			'importance' => Model_CustomField::TYPE_NUMBER,
 			'is_completed' => Model_CustomField::TYPE_CHECKBOX,
 			'status' => Model_CustomField::TYPE_SINGLE_LINE,
 			'title' => Model_CustomField::TYPE_SINGLE_LINE,
@@ -1194,15 +1257,17 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 			$token_values['completed'] = $task->completed_date;
 			$token_values['due'] = $task->due_date;
 			$token_values['id'] = $task->id;
+			$token_values['importance'] = $task->importance;
 			$token_values['is_completed'] = $task->is_completed;
+			$token_values['owner_id'] = $task->owner_id;
 			$token_values['title'] = $task->title;
 			$token_values['updated'] = $task->updated_date;
 			
 			// Status
 			if($task->is_completed) {
-				$token_values['status'] = 'completed';
+				$token_values['status'] = mb_convert_case($translate->_('status.completed'), MB_CASE_LOWER);
 			} else {
-				$token_values['status'] = 'active';
+				$token_values['status'] = mb_convert_case($translate->_('status.open'), MB_CASE_LOWER);
 			}
 
 			// Custom fields
@@ -1212,6 +1277,29 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 			$url_writer = DevblocksPlatform::getUrlService();
 			$token_values['record_url'] = $url_writer->writeNoProxy(sprintf("c=profiles&type=task&id=%d-%s",$task->id, DevblocksPlatform::strToPermalink($task->title)), true);
 		}
+		
+		// Owner
+		$merge_token_labels = array();
+		$merge_token_values = array();
+		CerberusContexts::getContext(CerberusContexts::CONTEXT_WORKER, null, $merge_token_labels, $merge_token_values, '', true);
+
+			// Clear dupe content
+			CerberusContexts::scrubTokensWithRegexp(
+				$merge_token_labels,
+				$merge_token_values,
+				array(
+					"#^address_org_#",
+				)
+			);
+		
+			CerberusContexts::merge(
+				'owner_',
+				$prefix.'Owner:',
+				$merge_token_labels,
+				$merge_token_values,
+				$token_labels,
+				$token_values
+			);
 
 		return true;
 	}
@@ -1228,10 +1316,15 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 		
 		if(!$is_loaded) {
 			$labels = array();
-			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true);
+			CerberusContexts::getContext($context, $context_id, $labels, $values, null, true, true);
 		}
 		
 		switch($token) {
+			case 'links':
+				$links = $this->_lazyLoadLinks($context, $context_id);
+				$values = array_merge($values, $links);
+				break;
+			
 			case 'watchers':
 				$watchers = array(
 					$token => CerberusContexts::getWatchers($context, $context_id, true),
@@ -1240,7 +1333,7 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 				break;
 				
 			default:
-				if(substr($token,0,7) == 'custom_') {
+				if(DevblocksPlatform::strStartsWith($token, 'custom_')) {
 					$fields = $this->_lazyLoadCustomFields($token, $context, $context_id);
 					$values = array_merge($values, $fields);
 				}
@@ -1264,8 +1357,10 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 		$view = C4_AbstractViewLoader::getView($view_id, $defaults);
 		$view->name = 'Tasks';
 		$view->view_columns = array(
-			SearchFields_Task::UPDATED_DATE,
 			SearchFields_Task::DUE_DATE,
+			SearchFields_Task::IMPORTANCE,
+			SearchFields_Task::OWNER_ID,
+			SearchFields_Task::UPDATED_DATE,
 		);
 		$view->addParams(array(
 			SearchFields_Task::IS_COMPLETED => new DevblocksSearchCriteria(SearchFields_Task::IS_COMPLETED,'=',0),
@@ -1291,8 +1386,7 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 		
 		if(!empty($context) && !empty($context_id)) {
 			$params_req = array(
-				new DevblocksSearchCriteria(SearchFields_Task::CONTEXT_LINK,'=',$context),
-				new DevblocksSearchCriteria(SearchFields_Task::CONTEXT_LINK_ID,'=',$context_id),
+				new DevblocksSearchCriteria(SearchFields_Task::VIRTUAL_CONTEXT_LINK,'in',array($context.':'.$context_id)),
 			);
 		}
 		
@@ -1304,33 +1398,73 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 	
 	function renderPeekPopup($context_id=0, $view_id='', $edit=false) {
 		$tpl = DevblocksPlatform::getTemplateService();
-
+		$tpl->assign('view_id', $view_id);
+		
 		if(!empty($context_id)) {
 			$task = DAO_Task::get($context_id);
 			$tpl->assign('task', $task);
 		}
 
-		// Custom fields
-		$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TASK, false);
-		$tpl->assign('custom_fields', $custom_fields);
+		if(empty($context_id) || $edit) {
+			// Custom fields
+			$custom_fields = DAO_CustomField::getByContext(CerberusContexts::CONTEXT_TASK, false);
+			$tpl->assign('custom_fields', $custom_fields);
+	
+			$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_TASK, $context_id);
+			if(isset($custom_field_values[$context_id]))
+				$tpl->assign('custom_field_values', $custom_field_values[$context_id]);
+			
+			$types = Model_CustomField::getTypes();
+			$tpl->assign('types', $types);
+			
+			// View
+			$tpl->assign('id', $context_id);
+			$tpl->assign('view_id', $view_id);
+			$tpl->display('devblocks:cerberusweb.core::tasks/rpc/peek_edit.tpl');
+			
+		} else {
+			// Counts
+			$activity_counts = array(
+				'comments' => DAO_Comment::count(CerberusContexts::CONTEXT_TASK, $context_id),
+			);
+			$tpl->assign('activity_counts', $activity_counts);
+			
+			// Links
+			$links = array(
+				CerberusContexts::CONTEXT_TASK => array(
+					$context_id => 
+						DAO_ContextLink::getContextLinkCounts(
+							CerberusContexts::CONTEXT_TASK,
+							$context_id,
+							array(CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+						),
+				),
+			);
+			$tpl->assign('links', $links);
+			
+			// Timeline
+			if($context_id) {
+				$timeline_json = Page_Profiles::getTimelineJson(Extension_DevblocksContext::getTimelineComments(CerberusContexts::CONTEXT_TASK, $context_id));
+				$tpl->assign('timeline_json', $timeline_json);
+			}
 
-		$custom_field_values = DAO_CustomFieldValue::getValuesByContextIds(CerberusContexts::CONTEXT_TASK, $context_id);
-		if(isset($custom_field_values[$context_id]))
-			$tpl->assign('custom_field_values', $custom_field_values[$context_id]);
-		
-		$types = Model_CustomField::getTypes();
-		$tpl->assign('types', $types);
+			// Context
+			if(false == ($context_ext = Extension_DevblocksContext::get(CerberusContexts::CONTEXT_TASK)))
+				return;
+			
+			// Dictionary
+			$labels = array();
+			$values = array();
+			CerberusContexts::getContext(CerberusContexts::CONTEXT_TASK, $task, $labels, $values, '', true, false);
+			$dict = DevblocksDictionaryDelegate::instance($values);
+			$tpl->assign('dict', $dict);
+			
+			$properties = $context_ext->getCardProperties();
+			$tpl->assign('properties', $properties);
+			
+			$tpl->display('devblocks:cerberusweb.core::tasks/rpc/peek.tpl');
+		}
 
-		// Comments
-		
-		$comments = DAO_Comment::getByContext(CerberusContexts::CONTEXT_TASK, $context_id);
-		$comments = array_reverse($comments, true);
-		$tpl->assign('comments', $comments);
-
-		// View
-		$tpl->assign('id', $context_id);
-		$tpl->assign('view_id', $view_id);
-		$tpl->display('devblocks:cerberusweb.core::tasks/rpc/peek.tpl');
 	}
 	
 	function importGetKeys() {
@@ -1352,10 +1486,20 @@ class Context_Task extends Extension_DevblocksContext implements IDevblocksConte
 				'type' => Model_CustomField::TYPE_DATE,
 				'param' => SearchFields_Task::DUE_DATE,
 			),
+			'importance' => array(
+				'label' => 'Importance',
+				'type' => Model_CustomField::TYPE_NUMBER,
+				'param' => SearchFields_Task::IMPORTANCE,
+			),
 			'is_completed' => array(
 				'label' => 'Is Completed',
 				'type' => Model_CustomField::TYPE_CHECKBOX,
 				'param' => SearchFields_Task::IS_COMPLETED,
+			),
+			'owner_id' => array(
+				'label' => 'Owner',
+				'type' => Model_CustomField::TYPE_WORKER,
+				'param' => SearchFields_Task::OWNER_ID,
 			),
 			'title' => array(
 				'label' => 'Title',

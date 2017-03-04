@@ -12,9 +12,15 @@ class _DevblocksClassLoadManager {
 			$this->classMap = $map;
 			
 		} else {
-			$this->_initLibs();
-			$this->_initServices();
-			$this->_initPlugins();
+			if(false == ($this->_initLibs()))
+				return false;
+					
+			if(false == ($this->_initServices()))
+				return false;
+			
+			if(false == ($this->_initPlugins()))
+				return false;
+			
 			$cache->save($this->classMap, self::CACHE_CLASS_MAP);
 		}
 	}
@@ -79,6 +85,9 @@ class _DevblocksClassLoadManager {
 			"TijsVerkoyen\\CssToInlineStyles\\"
 		);
 		
+		$this->registerClasses(DEVBLOCKS_PATH . 'libs/finediff/FineDiff.php', array(
+			'FineDiff'
+		));
 		$this->registerClasses(DEVBLOCKS_PATH . 'libs/parsedown/Parsedown.php', array(
 			'Parsedown'
 		));
@@ -106,9 +115,14 @@ class _DevblocksClassLoadManager {
 		$this->registerClasses(DEVBLOCKS_PATH . 'libs/Twig/Autoloader.php', array(
 			'Twig_Autoloader',
 		));
+		
+		return true;
 	}
 	
 	private function _initServices() {
+		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/bayes_classifier.php', array(
+			'_DevblocksBayesClassifierService',
+		));
 		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/database.php', array(
 			'_DevblocksDatabaseManager',
 		));
@@ -118,6 +132,9 @@ class _DevblocksClassLoadManager {
 		));
 		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/email.php', array(
 			'_DevblocksEmailManager',
+		));
+		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/encryption.php', array(
+			'_DevblocksEncryptionService',
 		));
 		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/event.php', array(
 			'_DevblocksEventManager',
@@ -133,13 +150,11 @@ class _DevblocksClassLoadManager {
 			'DevblocksNeuralNetwork',
 			'DevblocksNeuralNetworkNode',
 		));
+		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/oauth.php', array(
+			'_DevblocksOAuthService',
+		));
 		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/openid.php', array(
 			'_DevblocksOpenIDManager',
-		));
-		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/proxy.php', array(
-			'_DevblocksProxy',
-			'_DevblocksProxy_Curl',
-			'_DevblocksProxy_Socket',
 		));
 		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/registry.php', array(
 			'_DevblocksRegistryManager',
@@ -181,6 +196,8 @@ class _DevblocksClassLoadManager {
 		$this->registerClasses(DEVBLOCKS_PATH . 'api/services/url.php', array(
 			'_DevblocksUrlManager',
 		));
+		
+		return true;
 	}
 	
 	private function _initPlugins() {
@@ -190,5 +207,7 @@ class _DevblocksClassLoadManager {
 		foreach($class_map as $path => $classes) {
 			$this->registerClasses($path, $classes);
 		}
+		
+		return true;
 	}
 };

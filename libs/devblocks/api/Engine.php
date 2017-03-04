@@ -3,10 +3,6 @@ include_once(DEVBLOCKS_PATH . "api/Model.php");
 include_once(DEVBLOCKS_PATH . "api/DAO.php");
 include_once(DEVBLOCKS_PATH . "api/Extension.php");
 
-interface DevblocksExtensionDelegate {
-	static function shouldLoadExtension(DevblocksExtensionManifest $extension_manifest);
-};
-
 if(!function_exists('mb_ucfirst')) {
 	function mb_ucfirst($string) {
 		if(!is_string($string))
@@ -31,13 +27,13 @@ abstract class DevblocksEngine {
 	const CACHE_TABLES = 'devblocks_tables';
 	const CACHE_TAG_TRANSLATIONS = 'devblocks_translations';
 
-	static protected $extensionDelegate = null;
 	static protected $handlerSession = null;
 
 	static protected $start_time = 0;
 	static protected $start_memory = 0;
 	static protected $start_peak_memory = 0;
 
+	static protected $timezone = '';
 	static protected $locale = 'en_US';
 	static protected $dateTimeFormat = 'D, d M Y h:i a';
 
@@ -238,15 +234,6 @@ abstract class DevblocksEngine {
 			}
 		}
 
-		// Routing
-		if(isset($plugin->uri_routing->uri)) {
-			foreach($plugin->uri_routing->uri as $eUri) {
-				@$sUriName = (string) $eUri['name'];
-				@$sController = (string) $eUri['controller'];
-				$manifest->uri_routing[$sUriName] = $sController;
-			}
-		}
-
 		// ACL
 		if(isset($plugin->acl->priv)) {
 			foreach($plugin->acl->priv as $ePriv) {
@@ -411,19 +398,6 @@ abstract class DevblocksEngine {
 			));
 		}
 
-		// URI routing cache
-		$db->ExecuteMaster(sprintf("DELETE FROM %suri_routing WHERE plugin_id = %s",$prefix,$db->qstr($plugin->id)));
-		if(is_array($manifest->uri_routing))
-		foreach($manifest->uri_routing as $uri => $controller_id) {
-			$db->ExecuteMaster(sprintf(
-				"REPLACE INTO ${prefix}uri_routing (uri,plugin_id,controller_id) ".
-				"VALUES (%s,%s,%s)",
-				$db->qstr($uri),
-				$db->qstr($manifest->id),
-				$db->qstr($controller_id)
-			));
-		}
-
 		// ACL caching
 		$db->ExecuteMaster(sprintf("DELETE FROM %sacl WHERE plugin_id = %s",$prefix,$db->qstr($plugin->id)));
 		if(is_array($manifest->acl_privs))
@@ -453,6 +427,39 @@ abstract class DevblocksEngine {
 		return $manifest;
 	}
 
+	static function getClientIp() {
+		if(null == ($ip = @$_SERVER['REMOTE_ADDR']))
+			return null;
+		
+		/*
+		 * It's possible to have multiple REMOTE_ADDR listed when an upstream sets 
+		 * it based on X-Forwarded-For, etc.
+		 */
+		if(false != ($ips = DevblocksPlatform::parseCsvString($ip)) && is_array($ips) && count($ips) > 1)
+			$ip = array_shift($ips);
+		
+		return $ip;
+	}
+	
+	static function getHostname() {
+		$app_hostname = APP_HOSTNAME;
+		
+		if(!empty($app_hostname))
+			return $app_hostname;
+		
+		$host = @$_SERVER['HTTP_HOST'];
+		
+		if(!empty($host))
+			return $host;
+			
+		$server_name = @$_SERVER['SERVER_NAME'];
+		
+		if(!empty($server_name))
+			return $server_name;
+		
+		return 'localhost';
+	}
+	
 	static function getWebPath() {
 		$location = "";
 
@@ -528,11 +535,11 @@ abstract class DevblocksEngine {
 
 				$file = implode(DIRECTORY_SEPARATOR, $path); // combine path
 				$dir = $plugin->getStoragePath() . '/' . 'resources';
-				if(!is_dir($dir)) die(""); // basedir Security
+				if(!is_dir($dir)) DevblocksPlatform::dieWithHttpError(null, 403); // basedir security
 				$resource = $dir . '/' . $file;
-				if(0 != strstr($dir,$resource)) die("");
+				if(0 != strstr($dir,$resource)) DevblocksPlatform::dieWithHttpError(null, 403);
 				$ext = @array_pop(explode('.', $resource));
-				if(!is_file($resource) || 'php' == $ext) die(""); // extension security
+				if(!is_file($resource) || 'php' == $ext) DevblocksPlatform::dieWithHttpError(null, 403); // extension security
 
 				// Caching
 				switch($ext) {
@@ -543,6 +550,7 @@ abstract class DevblocksEngine {
 					case 'png':
 					case 'ttf':
 					case 'woff':
+					case 'woff2':
 						header('Cache-control: max-age=604800', true); // 1 wk // , must-revalidate
 						header('Expires: ' . gmdate('D, d M Y H:i:s',time()+604800) . ' GMT'); // 1 wk
 						break;
@@ -574,6 +582,9 @@ abstract class DevblocksEngine {
 					case 'woff':
 						header('Content-type: application/font-woff');
 						break;
+					case 'woff2':
+						header('Content-type: font/woff2');
+						break;
 					case 'xml':
 						header('Content-type: text/xml');
 						break;
@@ -594,7 +605,7 @@ abstract class DevblocksEngine {
 				break;
 		}
 
-		$method = strtoupper(@$_SERVER['REQUEST_METHOD']);
+		$method = DevblocksPlatform::strUpper(@$_SERVER['REQUEST_METHOD']);
 		
 		$request = new DevblocksHttpRequest($parts,$queryArgs,$method);
 		$request->csrf_token = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : @$_REQUEST['_csrf_token'];
@@ -620,19 +631,18 @@ abstract class DevblocksEngine {
 		// Security: CSRF
 		
 		// If we are running a controller action with an active session...
-		if(!in_array($controller_uri, array('portal')) && (isset($_REQUEST['c']) || isset($_REQUEST['a']))) {
+		if(!in_array($controller_uri, array('oauth', 'portal')) && (isset($_REQUEST['c']) || isset($_REQUEST['a']))) {
 			
 			// ...and we're not in DEVELOPMENT_MODE
 			if(!DEVELOPMENT_MODE_ALLOW_CSRF) {
 			
 				// ...and the CSRF token is invalid for this session, freak out
 				if(!isset($_SESSION['csrf_token']) || $_SESSION['csrf_token'] != $request->csrf_token) {
-					header("Status: 403");
 					@$referer = $_SERVER['HTTP_REFERER'];
-					@$remote_addr = $_SERVER['REMOTE_ADDR'];
+					@$remote_addr = DevblocksPlatform::getClientIp();
 					
-					error_log(sprintf("[Cerb/Security] Possible CSRF attack from IP %s using referrer %s", $remote_addr, $referer), E_USER_WARNING);
-					die("Access denied");
+					//error_log(sprintf("[Cerb/Security] Possible CSRF attack from IP %s using referrer %s", $remote_addr, $referer), E_USER_WARNING);
+					DevblocksPlatform::dieWithHttpError("Access denied", 403);
 				}
 			}
 		}
@@ -653,7 +663,7 @@ abstract class DevblocksEngine {
 				}
 
 				if(empty($controllers))
-					die("No controllers are available!");
+					DevblocksPlatform::dieWithHttpError("No controllers are available!", 500);
 
 				// Set our controller based on the results
 				$controller_mft = (isset($routing[$controller_uri]))
@@ -680,8 +690,7 @@ abstract class DevblocksEngine {
 					}
 
 				} else {
-					header("Status: 404");
-					die();
+					DevblocksPlatform::dieWithHttpError(null, 404);
 				}
 
 				break;

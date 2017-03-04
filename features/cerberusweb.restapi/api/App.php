@@ -2,29 +2,29 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 /*
- * IMPORTANT LICENSING NOTE from your friends on the Cerb Development Team
+ * IMPORTANT LICENSING NOTE from your friends at Cerb
  *
- * Sure, it would be so easy to just cheat and edit this file to use the
- * software without paying for it.  But we trust you anyway.  In fact, we're
- * writing this software for you!
+ * Sure, it would be really easy to just cheat and edit this file to use
+ * Cerb without paying for a license.  We trust you anyway.
  *
- * Quality software backed by a dedicated team takes money to develop.  We
- * don't want to be out of the office bagging groceries when you call up
- * needing a helping hand.  We'd rather spend our free time coding your
- * feature requests than mowing the neighbors' lawns for rent money.
+ * It takes a significant amount of time and money to develop, maintain,
+ * and support high-quality enterprise software with a dedicated team.
+ * For Cerb's entire history we've avoided taking money from outside
+ * investors, and instead we've relied on actual sales from satisfied
+ * customers to keep the project running.
  *
  * We've never believed in hiding our source code out of paranoia over not
  * getting paid.  We want you to have the full source code and be able to
@@ -32,19 +32,12 @@
  * having less of everything than you might need (time, people, money,
  * energy).  We shouldn't be your bottleneck.
  *
- * We've been building our expertise with this project since January 2002.  We
- * promise spending a couple bucks [Euro, Yuan, Rupees, Galactic Credits] to
- * let us take over your shared e-mail headache is a worthwhile investment.
- * It will give you a sense of control over your inbox that you probably
- * haven't had since spammers found you in a game of 'E-mail Battleship'.
- * Miss. Miss. You sunk my inbox!
+ * As a legitimate license owner, your feedback will help steer the project.
+ * We'll also prioritize your issues, and work closely with you to make sure
+ * your teams' needs are being met.
  *
- * A legitimate license entitles you to support from the developers,
- * and the warm fuzzy feeling of feeding a couple of obsessed developers
- * who want to help you get more done.
- *
- \* - Jeff Standen, Darren Sugita, Dan Hildebrandt
- *	 Webgroup Media LLC - Developers of Cerb
+ * - Jeff Standen and Dan Hildebrandt
+ *	 Founders at Webgroup Media LLC; Developers of Cerb
  */
 
 class Plugin_RestAPI {
@@ -64,7 +57,7 @@ class Plugin_RestAPI {
 				$array['results'] = $filtered_results;
 			}
 			
-			header("Content-type: text/javascript; charset=utf-8");
+			header("Content-type: application/json; charset=utf-8");
 			echo json_encode($array);
 			
 		} elseif ('xml' == $format) {
@@ -178,8 +171,8 @@ class Ch_RestPreferencesTab extends Extension_PreferenceTab {
 		@$generate_new_keys = DevblocksPlatform::importGPC($_REQUEST['regenerate_keys'],'integer',0);
 		
 		if(empty($id) || $generate_new_keys) {
-			$fields[DAO_WebApiCredentials::ACCESS_KEY] = strtolower(CerberusApplication::generatePassword(12));
-			$fields[DAO_WebApiCredentials::SECRET_KEY] = strtolower(CerberusApplication::generatePassword(32));
+			$fields[DAO_WebApiCredentials::ACCESS_KEY] = DevblocksPlatform::strLower(CerberusApplication::generatePassword(12));
+			$fields[DAO_WebApiCredentials::SECRET_KEY] = DevblocksPlatform::strLower(CerberusApplication::generatePassword(32));
 		}
 		
 		if(empty($id)) { // Create
@@ -200,7 +193,7 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 	protected $_payload = '';
 	
 	private function _getRestControllers() {
-		$manifests = DevblocksPlatform::getExtensions('cerberusweb.rest.controller', false, true);
+		$manifests = DevblocksPlatform::getExtensions('cerberusweb.rest.controller', false);
 		$controllers = array();
 		
 		if(is_array($manifests))
@@ -241,7 +234,7 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 		$url_path = $url_parts['path'];
 		$url_query = $this->_sortQueryString($_SERVER['QUERY_STRING']);
 		$string_to_sign_prefix = "$verb\n$header_date\n$url_path\n$url_query\n$this->_payload";
-
+		
 		if(!$this->_validateRfcDate($header_date)) {
 			Plugin_RestAPI::render(array('__status'=>'error', 'message'=>"Access denied! (Invalid timestamp)"));
 		}
@@ -255,7 +248,7 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 			Plugin_RestAPI::render(array('__status'=>'error', 'message'=>"Access denied! (Invalid credentials: worker)"));
 		}
 
-		$secret = strtolower(md5($credential->secret_key));
+		$secret = DevblocksPlatform::strLower(md5($credential->secret_key));
 		$string_to_sign = "$string_to_sign_prefix\n$secret\n";
 		$compare_hash = md5($string_to_sign);
 
@@ -305,7 +298,8 @@ class Ch_RestFrontController implements DevblocksHttpRequestHandler {
 			DevblocksPlatform::setLocale(!empty($worker->language) ? $worker->language : 'en_US');
 			
 			// Set worker timezone
-			if(!empty($worker->timezone)) @date_default_timezone_set($worker->timezone);
+			if(!empty($worker->timezone))
+				DevblocksPlatform::setTimezone($worker->timezone);
 			
 			// Set worker time format
 			$default_time_format = DevblocksPlatform::getPluginSetting('cerberusweb.core', CerberusSettings::TIME_FORMAT, CerberusSettingsDefaults::TIME_FORMAT);
@@ -580,7 +574,7 @@ abstract class Extension_RestController extends DevblocksExtension {
 		}
 		
 		// Verb Actions
-		$method = strtolower($verb) .'Action';
+		$method = DevblocksPlatform::strLower($verb) .'Action';
 		if(method_exists($this,$method)) {
 			call_user_func(array(&$this,$method), $stack);
 		}
@@ -628,7 +622,10 @@ abstract class Extension_RestController extends DevblocksExtension {
 						unset($filters[$key]);
 					}
 				}
-				$params[$field] = new DevblocksSearchCriteria($field, $filter[1], $filter[2]);
+				
+				if(!empty($field)) {
+					$params[$field] = new DevblocksSearchCriteria($field, $filter[1], $filter[2]);
+				}
 			}
 		}
 		return $params;

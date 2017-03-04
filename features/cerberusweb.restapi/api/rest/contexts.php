@@ -64,13 +64,13 @@ class ChRest_Contexts extends Extension_RestController {
 	private function _verifyContext($context, $context_id) {
 		$active_worker = CerberusApplication::getActiveWorker();
 		
-		if(false == ($context_mft = Extension_DevblocksContext::get($context)))
+		if(false == ($context_ext = Extension_DevblocksContext::get($context)))
 			return false;
 		
-		if(false === $context_mft->authorize($context_id, $active_worker))
+		if(false === (CerberusContexts::isReadableByActor($context, $context_id, $active_worker)))
 			return false;
 		
-		if(false == (@$meta = $context_mft->getMeta($context_id)))
+		if(false == (@$meta = $context_ext->getMeta($context_id)))
 			return false;
 		
 		return array(
@@ -292,7 +292,7 @@ class ChRest_Contexts extends Extension_RestController {
 	
 	private function postActivityCreate() {
 		@$on = DevblocksPlatform::importGPC($_POST['on'], 'string', '');
-		@$activity_point = strtolower(DevblocksPlatform::importGPC($_POST['activity_point'], 'string', ''));
+		@$activity_point = DevblocksPlatform::strLower(DevblocksPlatform::importGPC($_POST['activity_point'], 'string', ''));
 		@$variables_json = DevblocksPlatform::importGPC($_POST['variables'], 'string', '');
 		@$urls_json = DevblocksPlatform::importGPC($_POST['urls'], 'string', '');
 

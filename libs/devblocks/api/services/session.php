@@ -12,7 +12,7 @@ class _DevblocksSessionManager {
 	/**
 	 * @private
 	 */
-	private function _DevblocksSessionManager() {}
+	private function __construct() {}
 	
 	/**
 	 * Returns an instance of the session manager
@@ -44,7 +44,9 @@ class _DevblocksSessionManager {
 
 			session_name(APP_SESSION_NAME);
 			session_set_cookie_params($session_lifespan, '/', NULL, $url_writer->isSSL(), true);
-			session_start();
+			
+			if(php_sapi_name() != 'cli')
+				session_start();
 			
 			$instance = new _DevblocksSessionManager();
 			$instance->visit = isset($_SESSION['db_visit']) ? $_SESSION['db_visit'] : NULL; /* @var $visit DevblocksVisit */

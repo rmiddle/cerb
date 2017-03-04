@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class PageSection_ProfilesGroup extends Extension_PageSection {
@@ -89,7 +89,7 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 					DAO_ContextLink::getContextLinkCounts(
 						CerberusContexts::CONTEXT_GROUP,
 						$group->id,
-						array(CerberusContexts::CONTEXT_WORKER, CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
+						array(CerberusContexts::CONTEXT_CUSTOM_FIELDSET)
 					),
 			),
 		);
@@ -110,7 +110,7 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 		// Filter macros to only those owned by the current group
 		
 		$macros = array_filter($macros, function($macro) use ($group) { /* @var $macro Model_TriggerEvent */
-			$va = $macro->getVirtualAttendant(); /* @var $va Model_VirtualAttendant */
+			$va = $macro->getBot(); /* @var $va Model_Bot */
 			
 			if($va->owner_context == CerberusContexts::CONTEXT_GROUP && $va->owner_context_id != $group->id)
 				return false;
@@ -124,10 +124,6 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 		$tab_manifests = Extension_ContextProfileTab::getExtensions(false, CerberusContexts::CONTEXT_GROUP);
 		$tpl->assign('tab_manifests', $tab_manifests);
 		
-		// SSL
-		$url_writer = DevblocksPlatform::getUrlService();
-		$tpl->assign('is_ssl', $url_writer->isSSL());
-		
 		// Template
 		$tpl->display('devblocks:cerberusweb.core::profiles/group.tpl');
 	}
@@ -139,7 +135,7 @@ class PageSection_ProfilesGroup extends Extension_PageSection {
 
 		$active_worker = CerberusApplication::getActiveWorker();
 		
-		header('Content-Type: application/json; charset=' . LANG_CHARSET_CODE);
+		header('Content-Type: application/json; charset=utf-8');
 		
 		try {
 			if(!($active_worker->is_superuser || $active_worker->isGroupManager($group_id)))

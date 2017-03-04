@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 class ChReportWorkerHistory extends Extension_Report {
@@ -32,11 +32,6 @@ class ChReportWorkerHistory extends Extension_Report {
 		@$filter_group_ids = DevblocksPlatform::importGPC($_REQUEST['group_id'],'array',array());
 		$tpl->assign('filter_group_ids', $filter_group_ids);
 		
-		@$filter_statuses = DevblocksPlatform::importGPC($_REQUEST['filter_statuses'],'array',array());
-		if(empty($filter_statuses))
-			$filter_statuses = array('open', 'waiting', 'closed');
-		$tpl->assign('filter_statuses', $filter_statuses);
-		
 		$workers = DAO_Worker::getAll();
 		$tpl->assign('workers', $workers);
 		
@@ -45,8 +40,11 @@ class ChReportWorkerHistory extends Extension_Report {
 
 		// Year shortcuts
 		$years = array();
-		$sql = "SELECT date_format(from_unixtime(created_date),'%Y') as year FROM ticket WHERE created_date > 0 GROUP BY year having year <= date_format(now(),'%Y') ORDER BY year desc limit 0,10";
+		$sql = "SELECT date_format(from_unixtime(created_date),'%Y') as year FROM ticket WHERE created_date > 0 GROUP BY year ORDER BY year desc limit 0,10";
 		$rs = $db->ExecuteSlave($sql);
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		while($row = mysqli_fetch_assoc($rs)) {
 			$years[] = intval($row['year']);
@@ -168,10 +166,6 @@ class ChReportWorkerHistory extends Extension_Report {
 				$params[] = new DevblocksSearchCriteria(SearchFields_Message::TICKET_GROUP_ID,DevblocksSearchCriteria::OPER_IN, $filter_group_ids);
 			}
 			
-			if(!empty($filter_statuses)) {
-				$params[] = new DevblocksSearchCriteria(SearchFields_Message::VIRTUAL_TICKET_STATUS,DevblocksSearchCriteria::OPER_IN, $filter_statuses);
-			}
-			
 			$view->addParamsRequired($params, true);
 			
 			$view->renderPage = 0;
@@ -194,8 +188,10 @@ class ChReportWorkerHistory extends Extension_Report {
 			$query_parts['join'],
 			$query_parts['where']
 		);
-		
 		$rs = $db->ExecuteSlave($sql);
+		
+		if(!($rs instanceof mysqli_result))
+			return false;
 		
 		$data = array();
 		while($row = mysqli_fetch_assoc($rs)) {

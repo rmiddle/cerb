@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class ChCronController extends DevblocksControllerExtension {
@@ -38,14 +38,15 @@ class ChCronController extends DevblocksControllerExtension {
 		$authorized_ips = array_merge($authorized_ips, $authorized_ip_defaults);
 		
 		@$is_ignoring_wait = DevblocksPlatform::importGPC($_REQUEST['ignore_wait'],'integer',0);
+		@$is_ignoring_internal = DevblocksPlatform::importGPC($_REQUEST['ignore_internal'],'integer',0);
 		
 		$pass = false;
 		foreach ($authorized_ips as $ip) {
-			if(substr($ip,0,strlen($ip)) == substr($_SERVER['REMOTE_ADDR'],0,strlen($ip)))
+			if(substr($ip,0,strlen($ip)) == substr(DevblocksPlatform::getClientIp(),0,strlen($ip)))
 		 	{ $pass=true; break; }
 		}
 		if(!$pass) {
-			echo vsprintf($translate->_('cron.ip_unauthorized'), DevblocksPlatform::strEscapeHtml($_SERVER['REMOTE_ADDR']));
+			echo vsprintf($translate->_('cron.ip_unauthorized'), DevblocksPlatform::strEscapeHtml(DevblocksPlatform::getClientIp()));
 			return;
 		}
 		
@@ -56,17 +57,20 @@ class ChCronController extends DevblocksControllerExtension {
 		
 		@set_time_limit(600); // 10 mins
 		
+		CerberusContexts::pushActivityDefaultActor(CerberusContexts::CONTEXT_APPLICATION, 0);
+		
 		$url = DevblocksPlatform::getUrlService();
 		$time_left = intval(ini_get('max_execution_time')) ?: 86400;
 		
 		$logger->info(sprintf("[Scheduler] Set Time Limit: %d seconds", $time_left));
 		
 		if($reload) {
-			$reload_url = sprintf("%s?reload=%d&loglevel=%d&ignore_wait=%d",
+			$reload_url = sprintf("%s?reload=%d&loglevel=%d&ignore_wait=%d&ignore_internal=%d",
 				$url->write('c=cron' . ($job_ids ? ("&a=".$job_ids) : "")),
 				intval($reload),
 				intval($loglevel),
-				intval($is_ignoring_wait)
+				intval($is_ignoring_wait),
+				intval($is_ignoring_internal)
 			);
 			echo "<HTML>".
 			"<HEAD>".
@@ -77,10 +81,30 @@ class ChCronController extends DevblocksControllerExtension {
 			"<BODY>"; // onload=\"setTimeout(\\\"window.location.replace('".$url->write('c=cron')."')\\\",30);\"
 		}
 
-		$cron_manifests = DevblocksPlatform::getExtensions('cerberusweb.cron', true, true);
+		$cron_manifests = DevblocksPlatform::getExtensions('cerberusweb.cron', true);
 		$jobs = array();
 		
 		if(empty($job_ids)) { // do everything
+			if($is_ignoring_internal) {
+				$cron_manifests = array_filter($cron_manifests, function($instance) {
+					switch($instance->id) {
+						case 'cron.mailbox':
+						case 'cron.parser':
+						case 'cron.maint':
+						case 'cron.heartbeat':
+						case 'cron.import':
+						case 'cron.storage':
+						case 'cron.search':
+						case 'cron.mail_queue':
+						case 'cron.bot.scheduled_behavior':
+							return false;
+							break;
+					}
+					
+					return true;
+				});
+			}
+			
 			if(is_array($cron_manifests))
 			foreach($cron_manifests as $idx => $instance) { /* @var $instance CerberusCronPageExtension */
 				if($instance->isReadyToRun($is_ignoring_wait)) {
@@ -131,6 +155,8 @@ class ChCronController extends DevblocksControllerExtension {
 			echo "</BODY>".
 			"</HTML>";
 		}
+		
+		CerberusContexts::popActivityDefaultActor();
 		
 		exit;
 	}

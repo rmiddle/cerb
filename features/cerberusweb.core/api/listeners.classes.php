@@ -2,17 +2,17 @@
 /***********************************************************************
  | Cerb(tm) developed by Webgroup Media, LLC.
  |-----------------------------------------------------------------------
- | All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+ | All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
  |   unless specifically noted otherwise.
  |
  | This source code is released under the Devblocks Public License.
  | The latest version of this license can be found here:
- | http://cerberusweb.com/license
+ | http://cerb.ai/license
  |
  | By using this software, you acknowledge having read this license
  | and agree to be bound thereby.
  | ______________________________________________________________________
- |	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+ |	http://cerb.ai	    http://webgroup.media
  ***********************************************************************/
 
 class ChCoreTour extends DevblocksHttpResponseListenerExtension {
@@ -288,7 +288,7 @@ class ChCoreTour extends DevblocksHttpResponseListenerExtension {
 					case 'license':
 						$tour = array(
 							'title' => 'License',
-							'body' => "This setup page manages your Cerb license.  If you don't have a license, one can be <a href='http://www.cerberusweb.com/buy' target='_blank'>purchased from the project website</a>.",
+							'body' => "This setup page manages your Cerb license.  If you don't have a license, one can be <a href='https://cerb.ai/pricing' target='_blank'>purchased from the project website</a>.",
 						);
 						break;
 						
@@ -313,15 +313,15 @@ class ChCoreTour extends DevblocksHttpResponseListenerExtension {
 						);
 						break;
 
-					case 'attendants':
+					case 'bots':
 						$tour = array(
-							'title' => 'Virtual Attendants',
-							'body' => 'This setup page provides a place to globally manage Virtual Attendants.',
+							'title' => DevblocksPlatform::translateCapitalized('common.bots'),
+							'body' => 'This setup page provides a place to globally manage bots.',
 							'callouts' => array(
 								new DevblocksTourCallout(
-									'#viewsetup_virtual_attendants TABLE.worklist A > SPAN.glyphicons-circle-plus',
-									'Add Virtual Attendant',
-									'You can add a Virtual Attendant by clicking on the (+) icon in this worklist.',
+									'#viewsetup_bots TABLE.worklist A > SPAN.glyphicons-circle-plus',
+									'Add Bot',
+									'You can add a bot by clicking on the (+) icon in this worklist.',
 									'bottomRight',
 									'topLeft',
 									10,
@@ -334,7 +334,7 @@ class ChCoreTour extends DevblocksHttpResponseListenerExtension {
 					case 'scheduled_behavior':
 						$tour = array(
 							'title' => 'Scheduled Behavior',
-							'body' => 'This setup page provides a place to globally manage Virtual Attendant scheduled behavior.',
+							'body' => 'This setup page provides a place to globally manage bot scheduled behavior.',
 						);
 						break;
 
@@ -417,8 +417,8 @@ class ChCoreTour extends DevblocksHttpResponseListenerExtension {
 
 					case 'mail_from':
 						$tour = array(
-							'title' => 'Reply-To Addresses',
-							'body' => "Each group or bucket can specify a reply-to address.  This is where you configure all the available reply-to email addresses.  It is <b>very important</b> that these addresses deliver to one of the mailboxes that Cerb checks for new mail, otherwise you won't receive correspondence from your audience.",
+							'title' => 'Sender Addresses',
+							'body' => "Each group or bucket can specify a sender address.  This is where you configure all the available sender addresses.  It is <b>very important</b> that these addresses deliver to one of the mailboxes that Cerb checks for new mail, otherwise you won't receive correspondence from your audience.",
 						);
 						break;
 
@@ -591,7 +591,7 @@ class ChCoreTour extends DevblocksHttpResponseListenerExtension {
 					case 'worker':
 						$tour = array(
 							'title' => 'Worker Profiles',
-							'body' => "You can think of your profile as your homepage within Cerb.  It provides quick access to your notifications, activity history, calendar, virtual attendant, and watchlist.",
+							'body' => "You can think of your profile as your homepage within Cerb.  It provides quick access to your notifications, activity history, calendar, bot, and watchlist.",
 							'callouts' => array(
 							),
 						);
@@ -656,6 +656,10 @@ class EventListener_Triggers extends DevblocksEventListenerExtension {
 		return self::$_traversal_log;
 	}
 	
+	static function setNodeLog(array $log) {
+		self::$_traversal_log = $log;
+	}
+	
 	static function clear() {
 		self::$_traversal_log = array();
 		self::$_trigger_log = array();
@@ -667,7 +671,7 @@ class EventListener_Triggers extends DevblocksEventListenerExtension {
 	 * @param Model_DevblocksEvent $event
 	 */
 	function handleEvent(Model_DevblocksEvent $event) {
-		$logger = DevblocksPlatform::getConsoleLog("Attendant");
+		$logger = DevblocksPlatform::getConsoleLog('Bot');
 		
 		$logger->info(sprintf("EVENT: %s",
 			$event->id
@@ -679,7 +683,7 @@ class EventListener_Triggers extends DevblocksEventListenerExtension {
 		
 		// Load all VAs
 		
-		$trigger_vas = DAO_VirtualAttendant::getAll();
+		$trigger_vas = DAO_Bot::getAll();
 		
 		// Are we limited to only one trigger on this event, or all of them?
 		
@@ -716,7 +720,7 @@ class EventListener_Triggers extends DevblocksEventListenerExtension {
 		// We're restricting the scope of the event
 		if(isset($event->params['_whisper']) && is_array($event->params['_whisper']) && !empty($event->params['_whisper'])) {
 			foreach($triggers as $trigger_id => $trigger) { /* @var $trigger Model_TriggerEvent */
-				if(false == (@$trigger_va = $trigger_vas[$trigger->virtual_attendant_id]))
+				if(false == (@$trigger_va = $trigger_vas[$trigger->bot_id]))
 					continue;
 
 				if($trigger_va->is_disabled)
@@ -755,7 +759,7 @@ class EventListener_Triggers extends DevblocksEventListenerExtension {
 		$registry = DevblocksPlatform::getRegistryService();
 		
 		foreach($triggers as $trigger) { /* @var $trigger Model_TriggerEvent */
-			if(false == (@$trigger_va = $trigger_vas[$trigger->virtual_attendant_id]))
+			if(false == (@$trigger_va = $trigger_vas[$trigger->bot_id]))
 				continue;
 			
 			if(self::inception($trigger->id)) {
@@ -782,11 +786,11 @@ class EventListener_Triggers extends DevblocksEventListenerExtension {
 			
 			$start_runtime = intval(microtime(true));
 			
-			$logger->info(sprintf("Running behavior '%s' (#%d) for %s (#%d)",
+			$logger->info(sprintf("Running behavior %s (#%d) for %s (#%d)",
 				$trigger->title,
 				$trigger->id,
 				$trigger_va->name,
-				$trigger->virtual_attendant_id
+				$trigger->bot_id
 			));
 			
 			// Load the intermediate data ONCE! (if at least one VA is responding)
@@ -890,10 +894,10 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 			return;
 		
 		// Core
-		DAO_AttachmentLink::removeAllByContext($context, $context_ids);
 		DAO_Calendar::deleteByContext($context, $context_ids);
 		DAO_Comment::deleteByContext($context, $context_ids);
 		DAO_ContextActivityLog::deleteByContext($context, $context_ids);
+		DAO_ContextAlias::delete($context, $context_ids);
 		DAO_ContextAvatar::deleteByContext($context, $context_ids);
 		DAO_ContextRecommendation::deleteByContext($context, $context_ids);
 		DAO_ContextLink::delete($context, $context_ids);
@@ -901,7 +905,8 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 		DAO_CustomFieldValue::deleteByContextIds($context, $context_ids);
 		DAO_Notification::deleteByContext($context, $context_ids);
 		DAO_ContextScheduledBehavior::deleteByContext($context, $context_ids);
-		DAO_VirtualAttendant::deleteByOwner($context, $context_ids);
+		DAO_Snippet::deleteByOwner($context, $context_ids);
+		DAO_Bot::deleteByOwner($context, $context_ids);
 		DAO_WorkspacePage::deleteByOwner($context, $context_ids);
 	}
 	
@@ -916,17 +921,6 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 		$context_index = $context_table . '.' . $context_key;
 		
 		$logger->info(sprintf("Running maintenance on context: %s", $context));
-		
-		// ===========================================================================
-		// Attachment links
-
-		$db->ExecuteMaster(sprintf("DELETE FROM attachment_link WHERE context = %s AND context_id NOT IN (SELECT %s FROM %s)",
-			$db->qstr($context),
-			$db->escape($context_index),
-			$db->escape($context_table)
-		));
-		if(null != ($deletes = $db->Affected_Rows()))
-			$logger->info(sprintf("Purged %d %s attachment links.", $deletes, $context));
 		
 		// ===========================================================================
 		// Comments
@@ -1014,10 +1008,10 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 		}
 		
 		// ===========================================================================
-		// Virtual Attendants
+		// Bots
 		
-		if($context != CerberusContexts::CONTEXT_VIRTUAL_ATTENDANT) {
-			$rs = $db->ExecuteSlave(sprintf("SELECT id FROM virtual_attendant WHERE owner_context = %s AND owner_context_id NOT IN (SELECT %s FROM %s)",
+		if($context != CerberusContexts::CONTEXT_BOT) {
+			$rs = $db->ExecuteSlave(sprintf("SELECT id FROM bot WHERE owner_context = %s AND owner_context_id NOT IN (SELECT %s FROM %s)",
 				$db->qstr($context),
 				$db->escape($context_index),
 				$db->escape($context_table)
@@ -1027,12 +1021,12 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 				$deletes = 0;
 				
 				while($row = mysqli_fetch_row($rs)) {
-					DAO_VirtualAttendant::delete($row[0]);
+					DAO_Bot::delete($row[0]);
 					$deletes++;
 				}
 				
 				if(null != ($deletes = $db->Affected_Rows()))
-					$logger->info(sprintf("Purged %d %s virtual attendants.", $deletes, $context));
+					$logger->info(sprintf("Purged %d %s bots.", $deletes, $context));
 			}
 		}
 	}
@@ -1056,6 +1050,8 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 		DAO_Attachment::maint();
 		DAO_WorkspacePage::maint();
 		DAO_WorkspaceTab::maint();
+		DAO_WorkerViewModel::flush();
+		DAO_ContextBulkUpdate::maint();
 	}
 	
 	private function _handleCronHeartbeat($event) {
@@ -1063,12 +1059,7 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 		list($results, $null) = DAO_Ticket::search(
 			array(),
 			array(
-				array(
-					DevblocksSearchCriteria::GROUP_OR,
-					SearchFields_Ticket::TICKET_CLOSED => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_CLOSED,'=',1),
-					SearchFields_Ticket::TICKET_WAITING => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_WAITING,'=',1),
-				),
-				SearchFields_Ticket::TICKET_DELETED => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_DELETED,'=',0),
+				SearchFields_Ticket::TICKET_STATUS_ID => new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_STATUS_ID,'in',array(Model_Ticket::STATUS_WAITING, Model_Ticket::STATUS_CLOSED)),
 				array(
 					DevblocksSearchCriteria::GROUP_AND,
 					new DevblocksSearchCriteria(SearchFields_Ticket::TICKET_REOPEN_AT,DevblocksSearchCriteria::OPER_GT,0),
@@ -1083,8 +1074,7 @@ class ChCoreEventListener extends DevblocksEventListenerExtension {
 		);
 		
 		$fields = array(
-			DAO_Ticket::IS_CLOSED => 0,
-			DAO_Ticket::IS_WAITING => 0,
+			DAO_Ticket::STATUS_ID => Model_Ticket::STATUS_OPEN,
 			DAO_Ticket::REOPEN_AT => 0
 		);
 		

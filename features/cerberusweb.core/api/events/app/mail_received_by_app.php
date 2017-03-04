@@ -2,17 +2,17 @@
 /***********************************************************************
 | Cerb(tm) developed by Webgroup Media, LLC.
 |-----------------------------------------------------------------------
-| All source code & content (c) Copyright 2002-2015, Webgroup Media LLC
+| All source code & content (c) Copyright 2002-2017, Webgroup Media LLC
 |   unless specifically noted otherwise.
 |
 | This source code is released under the Devblocks Public License.
 | The latest version of this license can be found here:
-| http://cerberusweb.com/license
+| http://cerb.ai/license
 |
 | By using this software, you acknowledge having read this license
 | and agree to be bound thereby.
 | ______________________________________________________________________
-|	http://www.cerbweb.com	    http://www.webgroupmedia.com/
+|	http://cerb.ai	    http://webgroup.media
 ***********************************************************************/
 
 class Event_MailReceivedByApp extends Extension_DevblocksEvent {
@@ -55,6 +55,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 		$parser_message->headers['bcc'] = 'secret@example.com';
 		$parser_message->headers['subject'] = 'This is the subject';
 		$parser_message->body = "This is the message body\r\nOn more than one line.\r\n";
+		$parser_message->build();
 		
 		if(empty($parser_model) || !($parser_model instanceof CerberusParserModel)) {
 			$parser_model = new CerberusParserModel($parser_message);
@@ -311,7 +312,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			case 'header':
 				$not = (substr($params['oper'],0,1) == '!');
 				$oper = ltrim($params['oper'],'!');
-				@$header = strtolower($params['header']);
+				@$header = DevblocksPlatform::strLower($params['header']);
 				@$param_value = $params['value'];
 
 				if(!isset($dict->headers[$header])) {
@@ -774,7 +775,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 			case 'set_header':
 				$tpl_builder = DevblocksPlatform::getTemplateBuilder();
 				
-				$header = strtolower($tpl_builder->build($params['header'], $dict));
+				$header = DevblocksPlatform::strLower($tpl_builder->build($params['header'], $dict));
 				$value = $tpl_builder->build($params['value'], $dict);
 				
 				@$parser_model = $dict->_parser_model;
@@ -792,7 +793,7 @@ class Event_MailReceivedByApp extends Extension_DevblocksEvent {
 				}
 				
 				// Are we changing any threading headers?
-				if(in_array(strtolower($header), array('subject', 'in-reply-to', 'references')))
+				if(in_array(DevblocksPlatform::strLower($header), array('subject', 'in-reply-to', 'references')))
 					$dict->pre_actions['headers_dirty'] = true;
 				
 				break;

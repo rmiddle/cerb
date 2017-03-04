@@ -1,5 +1,5 @@
 <form style="margin:5px;">
-	{if $active_worker->hasPriv('core.display.actions.comment')}<button type="button" id="btnComment"><span class="glyphicons glyphicons-conversation"></span> Comment</button>{/if}
+	<button type="button" id="btnComment" class="cerb-peek-trigger" data-context="{CerberusContexts::CONTEXT_COMMENT}" data-context-id="0" data-edit="context:{CerberusContexts::CONTEXT_TICKET} context.id:{$ticket->id}"><span class="glyphicons glyphicons-conversation"></span> {'common.comment'|devblocks_translate|capitalize}</button>
 	{if !$expand_all}<button id="btnReadAll" title="{'display.shortcut.read_all'|devblocks_translate}" type="button" onclick="document.location='{devblocks_url}c=profiles&type=ticket&id={$ticket->mask}&tab=conversation&opt=read_all{/devblocks_url}';"><span class="glyphicons glyphicons-book-open"></span> {'display.button.read_all'|devblocks_translate|capitalize}</button>{/if} 
 </form>
 
@@ -112,15 +112,16 @@
 	});
 	{/if}
 
-	$('#btnComment').click(function(event) {
-		var $popup = genericAjaxPopup('comment', 'c=internal&a=commentShowPopup&context={CerberusContexts::CONTEXT_TICKET}&context_id={$ticket->id}', null, false, '550');
-		$popup.one('comment_save', function(event) {
-			var $tabs = $('#btnComment').closest('div.ui-tabs');
-			if(0 != $tabs) {
-				$tabs.tabs('load', $tabs.tabs('option','active'));
-			}
-		});
-	});
+	$('#btnComment')
+		.cerbPeekTrigger()
+			.on('cerb-peek-saved', function(e) {
+				if(e.id && e.comment_html) {
+					var $convo = $('#conversation');
+					var $new_comment = $('<div id="comment' + e.id + '"/>').hide();
+					$new_comment.html(e.comment_html).prependTo($convo).fadeIn();
+				}
+			})
+		;
 	
 	var displayReply = function(msgid, is_forward, draft_id, reply_mode, is_confirmed) {
 		var msgid = parseInt(msgid);
@@ -155,30 +156,6 @@
 				
 				var offset = $div.offset();
 				window.scrollTo(offset.left, offset.top);
-			}
-		);
-	}
-	
-	var displayAddNote = function(msgid) {
-		var div = document.getElementById('reply' + msgid);
-		if(null == div) return;
-		
-		genericAjaxGet('','c=display&a=addNote&id=' + msgid,
-			function(html) {
-				$div = $('#reply' + msgid);
-				
-				if(0 == $div.length)
-					return;
-				
-				$div.html(html);
-				
-				var offset = $div.offset();
-				window.scrollTo(offset.left, offset.top);
-				
-				$frm = $('#reply' + msgid + '_form');
-				$textarea = $frm.find('textarea[name=content]');
-				
-				$textarea.focus();
 			}
 		);
 	}

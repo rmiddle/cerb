@@ -1,4 +1,5 @@
 {$div_id = "peek{uniqid()}"}
+{$peek_context = CerberusContexts::CONTEXT_MESSAGE}
 
 <div id="{$div_id}">
 	<div style="float:left;">
@@ -7,14 +8,12 @@
 		</div>
 
 		<div style="margin:5px 0px 10px 0px;">
-			{if $dict->ticket_group_is_private && (!$active_worker->isGroupMember($dict->ticket_group_id) && !$active_worker->is_superuser)}
-			{else}
-				{if $active_worker->hasPriv('core.display.actions.reply')}
-				<button type="button" class="cerb-peek-edit" data-context="{CerberusContexts::CONTEXT_MESSAGE}" data-context-id="{$dict->id}" data-edit="true"><span class="glyphicons glyphicons-cogwheel"></span> {'common.edit'|devblocks_translate|capitalize}</button>
-				{/if}
+			{if $is_writeable}
+			<button type="button" class="cerb-peek-edit" data-context="{CerberusContexts::CONTEXT_MESSAGE}" data-context-id="{$dict->id}" data-edit="true"><span class="glyphicons glyphicons-cogwheel"></span> {'common.edit'|devblocks_translate|capitalize}</button>
 			{/if}
 			
-			{if $dict->ticket_mask}<button type="button" class="cerb-peek-profile"><span class="glyphicons glyphicons-link"></span> {'common.permalink'|devblocks_translate|capitalize}</button>{/if}
+			{if $is_readable}<button type="button" class="cerb-peek-profile"><span class="glyphicons glyphicons-link"></span> {'common.permalink'|devblocks_translate|capitalize}</button>{/if}
+			{if $is_writeable}<button type="button" class="cerb-peek-comments-add" data-context="{CerberusContexts::CONTEXT_COMMENT}" data-context-id="0" data-edit="context:{$peek_context} context.id:{$dict->id}"><span class="glyphicons glyphicons-conversation"></span> {'common.comment'|devblocks_translate|capitalize}</button>{/if}
 		</div>
 	</div>
 </div>
@@ -40,13 +39,13 @@
 	</div>
 </fieldset>
 
-{include file="devblocks:cerberusweb.core::internal/peek/peek_links.tpl" links=$links}
+{include file="devblocks:cerberusweb.core::internal/profiles/profile_record_links.tpl" properties_links=$links peek=true page_context=$peek_context page_context_id=$dict->id links_label="{'common.links'|devblocks_translate|capitalize}"}
 
-<fieldset class="peek cerb-peek-timeline" style="margin:5px 0px 0px 0px;">
-	<div class="cerb-peek-timeline-preview" style="margin:0px 5px;">
-		<span class="cerb-ajax-spinner"></span>
-	</div>
-</fieldset>
+{include file="devblocks:cerberusweb.core::internal/notifications/context_profile.tpl" context=$peek_context context_id=$dict->id view_id=$view_id}
+
+{if $is_readable}
+{include file="devblocks:cerberusweb.core::internal/peek/card_timeline_pager.tpl"}
+{/if}
 
 <script type="text/javascript">
 $(function() {
@@ -54,14 +53,18 @@ $(function() {
 	var $popup = genericAjaxPopupFind($div);
 	var $layer = $popup.attr('data-layer');
 	
+	{if $is_readable}var $timeline = {$timeline_json|default:'{}' nofilter};{/if}
+	
 	$popup.one('popup_open',function(event,ui) {
 		// Title
 		$popup.dialog('option','title', '{'common.message'|devblocks_translate|escape:'javascript' nofilter}');
+		$popup.css('overflow', 'inherit');
 		
 		// Properties grid
 		$popup.find('div.cerb-properties-grid').cerbPropertyGrid();
 		
 		// Edit button
+		{if $is_writeable}
 		$popup.find('button.cerb-peek-edit')
 			.cerbPeekTrigger({ 'view_id': '{$view_id}' })
 			.on('cerb-peek-saved', function(e) {
@@ -71,11 +74,17 @@ $(function() {
 				genericAjaxPopupClose($layer);
 			})
 			;
+		{/if}
 		
-		// Preview
-		var $timeline_fieldset = $popup.find('fieldset.cerb-peek-timeline');
-		var $timeline_preview = $popup.find('div.cerb-peek-timeline-preview').width($timeline_fieldset.width());
-		genericAjaxGet($timeline_preview, 'c=profiles&a=handleSectionAction&section=ticket&action=getPeekPreview&context={CerberusContexts::CONTEXT_MESSAGE}&context_id={$dict->id}');
+		// Comments
+		{if $is_readable}
+		$popup.find('button.cerb-peek-comments-add')
+			.cerbPeekTrigger()
+			.on('cerb-peek-saved', function() {
+				genericAjaxPopup($layer,'c=internal&a=showPeekPopup&context={$peek_context}&context_id={$dict->id}&view_id={$view_id}','reuse',false,'50%');
+			})
+			;
+		{/if}
 		
 		// Searches
 		$popup.find('button.cerb-search-trigger')
@@ -87,13 +96,18 @@ $(function() {
 		
 		// View profile
 		$popup.find('.cerb-peek-profile').click(function(e) {
-			if(e.metaKey) {
+			if(e.shiftKey || e.metaKey) {
 				window.open('{devblocks_url}c=profiles&type=ticket&id={$dict->ticket_mask}&what=message&msgid={$dict->id}{/devblocks_url}', '_blank');
 				
 			} else {
 				document.location='{devblocks_url}c=profiles&type=ticket&id={$dict->ticket_mask}&what=message&msgid={$dict->id}{/devblocks_url}';
 			}
 		});
+		
+		// Timeline
+		{if $is_readable}
+		{include file="devblocks:cerberusweb.core::internal/peek/card_timeline_script.tpl"}
+		{/if}
 	});
 });
 </script>

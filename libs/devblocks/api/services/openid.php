@@ -12,22 +12,16 @@ class _DevblocksOpenIDManager {
 	
 	public function discover($url) {
 		$num_redirects = 0;
-		$is_safemode = !(ini_get('open_basedir') == '' && ini_get('safe_mode' == 'Off'));
 		
 		do {
 			$repeat = false;
 			
-			$ch = curl_init();
+			$ch = DevblocksPlatform::curlInit();
 			curl_setopt($ch, CURLOPT_URL, $url);
 			curl_setopt($ch, CURLOPT_HEADER, true);
-			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
-			// We can't use option this w/ safemode enabled
-			if(!$is_safemode)
-				curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-			
-			$content = curl_exec($ch);
+			$content = DevblocksPlatform::curlExec($ch);
 			$info = curl_getinfo($ch);
 			curl_close($ch);
 	
@@ -63,16 +57,6 @@ class _DevblocksOpenIDManager {
 			
 			// Scan headers
 			foreach($headers as $header) {
-				// Safemode specific behavior
-				if($is_safemode) {
-					if(preg_match("/^Location:.*?/i", $header)) {
-						$out = explode(':', $header, 2);
-						$url = isset($out[1]) ? trim($out[1]) : null;
-						$repeat = true;
-						break;
-					}
-				}
-				
 				// Check the headers for an 'X-XRDS-Location'
 				if(preg_match("/^X-XRDS-Location:.*?/i", $header)) {
 					$out = explode(':', $header, 2);
@@ -225,12 +209,11 @@ class _DevblocksOpenIDManager {
 			}
 		}
 		
-		$ch = curl_init();
+		$ch = DevblocksPlatform::curlInit();
 		curl_setopt($ch, CURLOPT_URL, $url.$query);
 		curl_setopt($ch, CURLOPT_HEADER, false);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		$response = curl_exec($ch);
+		$response = DevblocksPlatform::curlExec($ch);
 		curl_close($ch);
 		
 		if(preg_match('/is_valid:true/', $response))
@@ -246,11 +229,11 @@ class _DevblocksOpenIDManager {
 		foreach($scope as $ns => $spec) {
 			// Namespaces
 			if(preg_match("/^openid_ns_(.*)$/",$ns,$ns_found)) {
-				switch(strtolower($spec)) {
+				switch(DevblocksPlatform::strLower($spec)) {
 					case 'http://openid.net/srv/ax/1.0';
 						foreach($scope as $k => $v) {
 							if(preg_match("/^openid_".$ns_found[1]."_value_(.*)$/i",$k,$attrib_found)) {
-								$attribs[strtolower($attrib_found[1])] = $v;
+								$attribs[DevblocksPlatform::strLower($attrib_found[1])] = $v;
 							}
 						}
 						break;
@@ -259,7 +242,7 @@ class _DevblocksOpenIDManager {
 					case 'http://openid.net/extensions/sreg/1.1';
 						foreach($scope as $k => $v) {
 							if(preg_match("/^openid_".$ns_found[1]."_(.*)$/i",$k,$attrib_found)) {
-								$attribs[strtolower($attrib_found[1])] = $v;
+								$attribs[DevblocksPlatform::strLower($attrib_found[1])] = $v;
 							}
 						}
 						break;

@@ -1,39 +1,91 @@
-{if empty($attachments_map) || !is_array($attachments_map)}
-{$attachments_map = DAO_AttachmentLink::getLinksAndAttachments($context, $context_id)}
-{/if}
-{$links = $attachments_map.links}
-{$attachments = $attachments_map.attachments}
-{$uniq_id = uniqid()}
+{if empty($attachments)}{$attachments = DAO_Attachment::getByContextIds($context, $context_id)}{/if}
+{$attach_uniqid = uniqid()}
 
-{if !empty($links) && !empty($attachments)}
-<div id="attachments{$uniq_id}" style="margin-bottom:15px;">
-<b>{'common.attachments'|devblocks_translate|capitalize}:</b><br>
-<ul style="margin-top:0px;margin-bottom:5px;">
-	{foreach from=$links item=link name=links}
-	{$attachment = $attachments.{$link->attachment_id}}
-	{if !empty($attachment)}
-		<li>
-			<a href="{devblocks_url}c=files&p={$link->guid}&name={$attachment->display_name|escape:'url'}{/devblocks_url}" target="_blank" style="font-weight:bold;color:rgb(50,120,50);">{$attachment->display_name}</a>
-			(  
-			{$attachment->storage_size|devblocks_prettybytes} 
+{if $attachments}
+<b>{'common.attachments'|devblocks_translate|capitalize}:</b>
+<ul id="{$attach_uniqid}" class="bubbles" style="display:block;margin:5px 0px 15px 10px;">
+	{foreach from=$attachments item=attachment}
+	<li>
+		<a href="javascript:;" class="cerb-peek-trigger" data-context="{CerberusContexts::CONTEXT_ATTACHMENT}" data-context-id="{$attachment->id}" data-profile-url="{devblocks_url}c=files&id={$attachment->id}&name={$attachment->name|devblocks_permalink}{/devblocks_url}">
+			<b>{$attachment->name}</b>
+			({$attachment->storage_size|devblocks_prettybytes} 
 			- 
-			{if !empty($attachment->mime_type)}{$attachment->mime_type}{else}{'display.convo.unknown_format'|devblocks_translate|capitalize}{/if}
-			 )
-			 <span style="margin-left:10px;" class="download"><a href="{devblocks_url}c=files&p={$link->guid}&name={$attachment->display_name|escape:'url'}{/devblocks_url}?download=">download</a></span>
-		</li>
-	{/if}
+			{if !empty($attachment->mime_type)}{$attachment->mime_type}{else}{'display.convo.unknown_format'|devblocks_translate|capitalize}{/if})
+		</a>
+		<a href="javascript:;" class="cerb-menu-trigger"><span class="glyphicons glyphicons-chevron-down" style="top:4px;"></span></a>
+	</li>
 	{/foreach}
 </ul>
-</div>
+<ul class="cerb-menu" style="display:none;position:absolute;">
+	{*<li data-option="card"><b>View file's card popup</b></li>*}
+	<li data-option="download"><b>Download</b></li>
+	<li data-option="browser"><b>Open in browser</b></li>
+</ul>
+{/if}
 
 <script type="text/javascript">
-$('#attachments{$uniq_id} ul li').hover(
-	function() {
-		$(this).find('span.download').show();
-	},
-	function() {
-		$(this).find('span.download').hide();
-	}
-);
+$(function() {
+	var $attachments = $('#{$attach_uniqid}');
+	var $menu = $attachments.next('ul.cerb-menu').menu();
+	var $target = null;
+	
+	$attachments.find('li > a.cerb-menu-trigger')
+	.hoverIntent({
+		over: function(e) {
+			$(this).click();
+		},
+		out: function(e) {
+		}
+	})
+	.click(function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		
+		$target = $(this).closest('li');
+		
+		$menu.css('width', $target.width() + 'px');
+		$menu.zIndex($target.zIndex()+1);
+		$menu.show().position( { my: 'left top', at: 'left bottom', of: $target } );
+	});
+	
+	$menu.find('li')
+	.click(function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		
+		var $link = $(e.target);
+		
+		if(!$link.is('li'))
+			return;
+		
+		switch($link.attr('data-option')) {
+			case 'card':
+				$target.find('a').click();
+				break;
+			case 'browser':
+				var url = $target.find('a').attr('data-profile-url');
+				window.open(url, '_blank');
+				break;
+			case 'download':
+				var url = $target.find('a').attr('data-profile-url') + '?download=';
+				window.open(url);
+				break;
+		}
+		
+		$menu.hide();
+		$target = null;
+	});
+	
+	$menu.hoverIntent({
+		interval: 0,
+		timeout: 250,
+		over: function(e) {
+			
+		},
+		out: function(e) {
+			$menu.hide();
+		}
+	});
+	
+});
 </script>
-{/if}

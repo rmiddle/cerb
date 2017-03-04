@@ -1,8 +1,8 @@
 {$view_context = CerberusContexts::CONTEXT_CALENDAR_EVENT}
 {$view_fields = $view->getColumnsAvailable()}
-{assign var=results value=$view->getData()}
-{assign var=total value=$results[1]}
-{assign var=data value=$results[0]}
+{$results = $view->getData()}
+{$total = $results[1]}
+{$data = $results[0]}
 
 {include file="devblocks:cerberusweb.core::internal/views/view_marquee.tpl" view=$view}
 
@@ -10,7 +10,7 @@
 	<tr>
 		<td nowrap="nowrap"><span class="title">{$view->name}</span></td>
 		<td nowrap="nowrap" align="right" class="title-toolbar">
-			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={$view_context}&context_id=0&view_id={$view->id}',null,false,'600');"><span class="glyphicons glyphicons-circle-plus"></span></a>
+			<a href="javascript:;" title="{'common.add'|devblocks_translate|capitalize}" class="minimal cerb-peek-trigger" data-context="{CerberusContexts::CONTEXT_CALENDAR_EVENT}" data-context-id="0" data-edit="true"><span class="glyphicons glyphicons-circle-plus"></span></a>
 			<a href="javascript:;" title="{'common.search'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxPopup('search','c=internal&a=viewShowQuickSearchPopup&view_id={$view->id}',null,false,'400');"><span class="glyphicons glyphicons-search"></span></a>
 			<a href="javascript:;" title="{'common.customize'|devblocks_translate|capitalize}" class="minimal" onclick="genericAjaxGet('customize{$view->id}','c=internal&a=viewCustomize&id={$view->id}');toggleDiv('customize{$view->id}','block');"><span class="glyphicons glyphicons-cogwheel"></span></a>
 			<a href="javascript:;" title="{'common.subtotals'|devblocks_translate|capitalize}" class="subtotals minimal"><span class="glyphicons glyphicons-signal"></span></a>
@@ -60,16 +60,16 @@
 	{foreach from=$data item=result key=idx name=results}
 
 	{if $smarty.foreach.results.iteration % 2}
-		{assign var=tableRowClass value="even"}
+		{$tableRowClass = "even"}
 	{else}
-		{assign var=tableRowClass value="odd"}
+		{$tableRowClass = "odd"}
 	{/if}
 	<tbody style="cursor:pointer;">
 		<tr class="{$tableRowClass}">
-			<td colspan="{$smarty.foreach.headers.total}">
+			<td data-column="label" colspan="{$smarty.foreach.headers.total}">
 				<input type="checkbox" name="row_id[]" value="{$result.c_id}" style="display:none;">
-				<a href="{devblocks_url}c=profiles&a=calendar_event&id={$result.c_id}-{$result.c_name|devblocks_permalink}{/devblocks_url}" class="subject">{if !empty($result.c_name)}{$result.c_name}{else}New Event{/if}</a> 
-				<button type="button" class="peek" onclick="genericAjaxPopup('peek','c=internal&a=showPeekPopup&context={CerberusContexts::CONTEXT_CALENDAR_EVENT}&context_id={$result.c_id}&view_id={$view->id}',null,false,'600');"><span class="glyphicons glyphicons-new-window-alt"></span></button>
+				<a href="{devblocks_url}c=profiles&a=calendar_event&id={$result.c_id}-{$result.c_name|devblocks_permalink}{/devblocks_url}" class="subject">{if !empty($result.c_name)}{$result.c_name}{else}New Event{/if}</a>
+				<button type="button" class="peek cerb-peek-trigger" data-context="{CerberusContexts::CONTEXT_CALENDAR_EVENT}" data-context-id="{$result.c_id}"><span class="glyphicons glyphicons-new-window-alt"></span></button> 
 			</td>
 		</tr>
 		<tr class="{$tableRowClass}">
@@ -77,24 +77,24 @@
 			{if substr($column,0,3)=="cf_"}
 				{include file="devblocks:cerberusweb.core::internal/custom_fields/view/cell_renderer.tpl"}
 			{elseif $column=="c_date_start" || $column=="c_date_end"}
-				<td title="{$result.$column|devblocks_date}">
+				<td data-column="{$column}" title="{$result.$column|devblocks_date}">
 					{if !empty($result.$column)}
 						{$result.$column|devblocks_prettytime}&nbsp;
 					{/if}
 				</td>
 			{elseif $column=="c_calendar_id"}
-				<td>
+				<td data-column="{$column}">
 					{$calendar_id = $result.c_calendar_id}
 					{if isset($calendars.$calendar_id)}
-						<a href="{devblocks_url}c=profiles&what=calendar&id={$calendar_id}-{$calendars.$calendar_id->name|devblocks_permalink}{/devblocks_url}">{$calendars.$calendar_id->name}</a>
+						<a href="javascript:;" class="cerb-peek-trigger no-underline" data-context="{CerberusContexts::CONTEXT_CALENDAR}" data-context-id="{$calendar_id}">{$calendars.$calendar_id->name}</a>
 					{/if}
 				</td>
 			{elseif $column=="c_is_available"}
-				<td>
+				<td data-column="{$column}">
 					{if $result.$column}{'common.yes'|devblocks_translate}{else}{'common.no'|devblocks_translate}{/if}
 				</td>
 			{elseif $column=='*_owner'}
-				<td>
+				<td data-column="{$column}">
 					{if !isset($workers)}{$workers = DAO_Worker::getAll()}{/if}
 					{$worker_id = {$result.c_owner_context_id}}
 					{if isset($workers.$worker_id)}
@@ -102,7 +102,7 @@
 					{/if}
 				</td>
 			{else}
-				<td>{$result.$column}</td>
+				<td data-column="{$column}">{$result.$column}</td>
 			{/if}
 		{/foreach}
 		</tr>

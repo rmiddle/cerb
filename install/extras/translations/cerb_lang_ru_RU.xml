@@ -23,11 +23,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="acl.core.addybook">
-			<tuv xml:lang="ru_RU">
-				<seg>[Адресная книга] Может просматривать адресную книгу</seg>
-			</tuv>
-		</tu>
 		<tu tuid="acl.core.addybook.addy.actions.update">
 			<tuv xml:lang="ru_RU">
 				<seg>[Адресная книга] Может изменять адреса электронной почты контакта</seg>
@@ -76,11 +71,6 @@
 		<tu tuid="acl.core.display.actions.attachments.download">
 			<tuv xml:lang="ru_RU">
 				<seg>[Показ заявки] Может загружать вложения из заявки</seg>
-			</tuv>
-		</tu>
-		<tu tuid="acl.core.display.actions.comment">
-			<tuv xml:lang="ru_RU">
-				<seg>[Показ заявки] Может комментировать в заявках</seg>
 			</tuv>
 		</tu>
 		<tu tuid="acl.core.display.actions.forward">
@@ -203,11 +193,6 @@
 				<seg>[Заявки] Может объединять заявки в списках</seg>
 			</tuv>
 		</tu>
-		<tu tuid="acl.core.ticket.view.actions.pile_sort">
-			<tuv xml:lang="ru_RU">
-				<seg>[Заявки] Может использовать сортировщик в списках</seg>
-			</tuv>
-		</tu>
 		<tu tuid="acl.core.watchers.assign">
 			<tuv xml:lang="ru_RU">
 				<seg/>
@@ -308,7 +293,7 @@
 				<seg>[Отчеты] Может просматривать группу 'Отчеты по заявкам' </seg>
 			</tuv>
 		</tu>
-		<tu tuid="acl.reports.group.virtual_attendants">
+		<tu tuid="acl.reports.group.bots">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
@@ -483,56 +468,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="activity.activity">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает логи активности</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.address_book">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает адресную книгу</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.config">
-			<tuv xml:lang="ru_RU">
-				<seg>%s конфигурирует хелпдеск</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.default">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает хелпдеск</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.display_ticket">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает заявку %s</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.kb">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает базу знаний</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.mail.search">
-			<tuv xml:lang="ru_RU">
-				<seg>%s ищет заявки</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.mail.workspaces">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает %s в рабочей области</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.simulator">
-			<tuv xml:lang="ru_RU">
-				<seg>%s создает тестовые заявки</seg>
-			</tuv>
-		</tu>
-		<tu tuid="activity.tickets">
-			<tuv xml:lang="ru_RU">
-				<seg>%s просматривает %s заявки</seg>
-			</tuv>
-		</tu>
 		<tu tuid="address.address">
 			<tuv xml:lang="ru_RU">
 				<seg>Адрес</seg>
@@ -638,11 +573,6 @@
 				<seg>Зарегистрированные контакты</seg>
 			</tuv>
 		</tu>
-		<tu tuid="attachment.display_name">
-			<tuv xml:lang="ru_RU">
-				<seg>Имя файла</seg>
-			</tuv>
-		</tu>
 		<tu tuid="attachment.id">
 			<tuv xml:lang="ru_RU">
 				<seg>Идентификатор вложения</seg>
@@ -673,11 +603,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="attachment.storage_size">
-			<tuv xml:lang="ru_RU">
-				<seg>Размер (байт)</seg>
-			</tuv>
-		</tu>
 		<tu tuid="calls.activity.tab">
 			<tuv xml:lang="ru_RU">
 				<seg>Звонки</seg>
@@ -691,11 +616,6 @@
 		<tu tuid="calls.ui.log_call">
 			<tuv xml:lang="ru_RU">
 				<seg>Лог звонка</seg>
-			</tuv>
-		</tu>
-		<tu tuid="call_entry.model.is_closed">
-			<tuv xml:lang="ru_RU">
-				<seg>Закрыто</seg>
 			</tuv>
 		</tu>
 		<tu tuid="call_entry.model.is_outgoing">
@@ -773,6 +693,11 @@
 				<seg>Доступ запрещен.</seg>
 			</tuv>
 		</tu>
+		<tu tuid="common.actions">
+			<tuv xml:lang="ru_RU">
+				<seg>Действия</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.active">
 			<tuv xml:lang="ru_RU">
 				<seg/>
@@ -826,6 +751,11 @@
 		<tu tuid="common.attachments">
 			<tuv xml:lang="ru_RU">
 				<seg>Вложения</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.author">
+			<tuv xml:lang="ru_RU">
+				<seg/>
 			</tuv>
 		</tu>
 		<tu tuid="common.availability">
@@ -1128,11 +1058,6 @@
 				<seg>фильтры</seg>
 			</tuv>
 		</tu>
-		<tu tuid="common.fnr">
-			<tuv xml:lang="ru_RU">
-				<seg>загрузить &amp; показать</seg>
-			</tuv>
-		</tu>
 		<tu tuid="common.group">
 			<tuv xml:lang="ru_RU">
 				<seg>Группа</seg>
@@ -1221,6 +1146,16 @@
 		<tu tuid="common.languages">
 			<tuv xml:lang="ru_RU">
 				<seg>Языки</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.last_activity">
+			<tuv xml:lang="ru_RU">
+				<seg>Последняя активность</seg>
+			</tuv>
+		</tu>
+		<tu tuid="common.last_activity_date">
+			<tuv xml:lang="ru_RU">
+				<seg>Последняя дата активности</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.last_login">
@@ -1443,6 +1378,11 @@
 				<seg>владелец</seg>
 			</tuv>
 		</tu>
+		<tu tuid="common.params">
+			<tuv xml:lang="ru_RU">
+				<seg>Параметры</seg>
+			</tuv>
+		</tu>
 		<tu tuid="common.password">
 			<tuv xml:lang="ru_RU">
 				<seg>пароль</seg>
@@ -1610,7 +1550,7 @@
 		</tu>
 		<tu tuid="common.size">
 			<tuv xml:lang="ru_RU">
-				<seg/>
+				<seg>Размер</seg>
 			</tuv>
 		</tu>
 		<tu tuid="common.snippets">
@@ -1753,12 +1693,12 @@
 				<seg>URL записи</seg>
 			</tuv>
 		</tu>
-		<tu tuid="common.virtual_attendant">
+		<tu tuid="common.bot">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="common.virtual_attendants">
+		<tu tuid="common.bots">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
@@ -2003,11 +1943,6 @@
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="dao.cerb_plugin.author">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="dao.cerb_plugin.description">
 			<tuv xml:lang="ru_RU">
 				<seg/>
@@ -2109,11 +2044,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="dao.decision_node.node_type">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.decision_node.params">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
@@ -2289,36 +2219,6 @@
 			</tuv>
 		</tu>
 		<tu tuid="dao.trigger_event.is_disabled">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.trigger_event.owner_context">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.trigger_event.owner_context_id">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.last_synced_at">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.last_synced_msgid">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.oauth_token">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
-		<tu tuid="dao.twitter_account.screen_name">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
@@ -2506,11 +2406,6 @@
 		<tu tuid="dashboard">
 			<tuv xml:lang="ru_RU">
 				<seg>Панель</seg>
-			</tuv>
-		</tu>
-		<tu tuid="dashboard.actions">
-			<tuv xml:lang="ru_RU">
-				<seg>Действия</seg>
 			</tuv>
 		</tu>
 		<tu tuid="dashboard.active_dashboard">
@@ -3243,11 +3138,6 @@
 				<seg>В очереди</seg>
 			</tuv>
 		</tu>
-		<tu tuid="mail_queue.params_json">
-			<tuv xml:lang="ru_RU">
-				<seg>Параметры</seg>
-			</tuv>
-		</tu>
 		<tu tuid="mail_queue.queue_delivery_date">
 			<tuv xml:lang="ru_RU">
 				<seg/>
@@ -3598,21 +3488,6 @@
 				<seg>Feed URL:</seg>
 			</tuv>
 		</tu>
-		<tu tuid="portal.sc.cfg.fnr.choose_resources">
-			<tuv xml:lang="ru_RU">
-				<seg>Choose which resources to expose to this portal:</seg>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.fnr.info">
-			<tuv xml:lang="ru_RU">
-				<seg>This Support Center will allow your community to search your external knowledge resources through Cerb's Fetch &amp; Retrieve system, returning direct links to content like knowledgebase articles, wiki articles, forum posts, documentation pages, blog entries, wishlist/bug reports, etc.</seg>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.fnr.not_configured">
-			<tuv xml:lang="ru_RU">
-				<seg>Fetch &amp; Retrieve has not been configured.</seg>
-			</tuv>
-		</tu>
 		<tu tuid="portal.sc.cfg.followup_questions_hint">
 			<tuv xml:lang="ru_RU">
 				<seg>(start with * to require; e.g. "*Which product are you considering?")</seg>
@@ -3621,11 +3496,6 @@
 		<tu tuid="portal.sc.cfg.login_registration">
 			<tuv xml:lang="ru_RU">
 				<seg>Логин/Регистрация</seg>
-			</tuv>
-		</tu>
-		<tu tuid="portal.sc.cfg.open_ticket.allow_custom_subjects">
-			<tuv xml:lang="ru_RU">
-				<seg>Разрешать пользователям использовать собственные темы заявок.</seg>
 			</tuv>
 		</tu>
 		<tu tuid="portal.sc.cfg.open_ticket.attachments">
@@ -4218,7 +4088,7 @@
 				<seg>Отчеты по заявкам</seg>
 			</tuv>
 		</tu>
-		<tu tuid="reports.ui.group.virtual_attendant">
+		<tu tuid="reports.ui.group.bot">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
@@ -4358,7 +4228,7 @@
 				<seg>По Компании</seg>
 			</tuv>
 		</tu>
-		<tu tuid="reports.ui.virtual_attendant.usage">
+		<tu tuid="reports.ui.bot.usage">
 			<tuv xml:lang="ru_RU">
 				<seg/>
 			</tuv>
@@ -4602,6 +4472,11 @@ login &lt;ftp&#13;
 				<seg>Закрытая</seg>
 			</tuv>
 		</tu>
+		<tu tuid="status.completed">
+			<tuv xml:lang="ru_RU">
+				<seg>Закрыто</seg>
+			</tuv>
+		</tu>
 		<tu tuid="status.deleted">
 			<tuv xml:lang="ru_RU">
 				<seg>Удалено</seg>
@@ -4635,11 +4510,6 @@ login &lt;ftp&#13;
 		<tu tuid="task.status.active">
 			<tuv xml:lang="ru_RU">
 				<seg>Активно</seg>
-			</tuv>
-		</tu>
-		<tu tuid="task.status.completed">
-			<tuv xml:lang="ru_RU">
-				<seg>Закрыто</seg>
 			</tuv>
 		</tu>
 		<tu tuid="task.worker_id">
@@ -5012,19 +4882,9 @@ login &lt;ftp&#13;
 				<seg>Действие</seg>
 			</tuv>
 		</tu>
-		<tu tuid="timetracking_entry.id">
-			<tuv xml:lang="ru_RU">
-				<seg>Идентификатор</seg>
-			</tuv>
-		</tu>
-		<tu tuid="timetracking_entry.is_closed">
-			<tuv xml:lang="ru_RU">
-				<seg/>
-			</tuv>
-		</tu>
 		<tu tuid="timetracking_entry.log_date">
 			<tuv xml:lang="ru_RU">
-				<seg>Число </seg>
+				<seg>Число</seg>
 			</tuv>
 		</tu>
 		<tu tuid="timetracking_entry.time_actual_mins">
@@ -5237,11 +5097,6 @@ login &lt;ftp&#13;
 				<seg/>
 			</tuv>
 		</tu>
-		<tu tuid="whos_online.heading">
-			<tuv xml:lang="ru_RU">
-				<seg>%s Исполнителей авторизовано:</seg>
-			</tuv>
-		</tu>
 		<tu tuid="worker.at_mention_name">
 			<tuv xml:lang="ru_RU">
 				<seg/>
@@ -5255,16 +5110,6 @@ login &lt;ftp&#13;
 		<tu tuid="worker.is_superuser">
 			<tuv xml:lang="ru_RU">
 				<seg>Администратор</seg>
-			</tuv>
-		</tu>
-		<tu tuid="worker.last_activity">
-			<tuv xml:lang="ru_RU">
-				<seg>Последняя активность</seg>
-			</tuv>
-		</tu>
-		<tu tuid="worker.last_activity_date">
-			<tuv xml:lang="ru_RU">
-				<seg>Последняя дата активности</seg>
 			</tuv>
 		</tu>
 		<tu tuid="worker.title">

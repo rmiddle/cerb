@@ -62,7 +62,7 @@ var markitupParsedownDefaults = {
 			return markItUp.line+'. ';
 		}},
 		{name:'Link to an External Image', openWith:'![Image](', closeWith:')', placeHolder:'http://www.example.com/path/to/image.png', className:'img'},
-		{name:'Link', key:'L', openWith:'[', closeWith:'](http://www.example.com/)', placeHolder:'link text', className:'a' },
+		{name:'Link', key:"L", openWith:'[', closeWith:']([![Url:!:http://]!])', placeHolder:'Your text to link here...', className:'a' },
 		{name:'Quotes', openWith:'> ', className:'blockquote'},
 		{
 			name:'Code Format', 
@@ -130,6 +130,8 @@ var atwho_twig_modifiers = [
 	{ name: "upper", content: "Convert text to uppercase" },
 	
 	{ name: "abs", content: "Return the absolute value of a number" },
+	{ name: "base64_encode", content: "Encode text in Base64 format" },
+	{ name: "base64_decode", content: "Decode Base64 encoded text" },
 	{ name: "bytes_pretty(2)", content: "Format a number as human-readable bytes" },
 	{ name: "date_modify('+1 day')", content: "Modify a date or timestamp" },
 	{ name: "escape", content: "Escape text for html, js, css, or url" },
@@ -144,8 +146,8 @@ var atwho_twig_modifiers = [
 	{ name: "md5", content: "Convert text to an MD5 hash" },
 	{ name: "merge", content: "Merge multiple arrays together" },
 	{ name: "nl2br", content: "Convert newlines to HTML breaks" },
-	{ name: "nlp_parse(patterns)", content: "Parse natural language with patterns" },
 	{ name: "number_format(2, '.', ',')", content: "Format a number" },
+	{ name: "parse_emails", content: "Parse a delimited list of email addresses in text to an array of objects" },
 	{ name: "regexp", content: "Match a regular expression" },
 	{ name: "replace('this', 'that')", content: "Replace text" },
 	{ name: "reverse", content: "Reverse an array or text" },
@@ -159,6 +161,8 @@ var atwho_twig_modifiers = [
 	{ name: "trim", content: "Trim whitespace or given characters from the ends of text" },
 	{ name: "truncate(10)", content: "Truncate text" },
 	{ name: "url_encode", content: "Encode an array or text for use in a URL" },
+	{ name: "url_decode", content: "Decode URL escaped text" },
+	{ name: "url_decode('json')", content: "Decode URL escaped parameters to JSON" },
 ];
 
 $.fn.cerbDateInputHelper = function(options) {
@@ -180,6 +184,7 @@ $.fn.cerbDateInputHelper = function(options) {
 		$this
 			.attr('placeholder', '+2 hours; +4 hours @Calendar; Jan 15 2018 2pm; 5pm America/New York')
 			.autocomplete({
+				delay: 300,
 				minLength: 1,
 				autoFocus: false,
 				source: function(request, response) {
@@ -371,15 +376,16 @@ var cAjaxCalls = function() {
 		}
 	}
 	
-	this.viewAddFilter = function(view_id, field, oper, values) {
+	this.viewAddFilter = function(view_id, field, oper, values, replace) {
 		var $view = $('#view'+view_id);
 		
 		var post_str = 'c=internal' +
 			'&a=viewAddFilter' + 
 			'&id=' + view_id +
+			'&replace=' + encodeURIComponent(replace ? 1 : 0) +
 			'&field=' + encodeURIComponent(field) +
 			'&oper=' + encodeURIComponent(oper) +
-			'&' + $.param(values, true)  
+			'&' + $.param(values, true)
 			;
 		
 		var cb = function(o) {
@@ -453,6 +459,9 @@ var cAjaxCalls = function() {
 	this.emailAutoComplete = function(sel, options) {
 		var url = DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=cerberusweb.contexts.address&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
 		if(null == options) options = { };
+		
+		if(null == options.delay)
+			options.delay = 300;
 
 		if(null == options.minLength)
 			options.minLength = 1;
@@ -534,6 +543,9 @@ var cAjaxCalls = function() {
 		
 		options.source = DevblocksAppPath+'ajax.php?c=contacts&a=getOrgsAutoCompletions&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
 		
+		if(null == options.delay)
+			options.delay = 300;
+		
 		if(null == options.minLength)
 			options.minLength = 1;
 		
@@ -550,6 +562,9 @@ var cAjaxCalls = function() {
 		if(null == options) options = { };
 		
 		options.source = DevblocksAppPath+'ajax.php?c=contacts&a=getCountryAutoCompletions&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content');
+		
+		if(null == options.delay)
+			options.delay = 300;
 		
 		if(null == options.minLength)
 			options.minLength = 1;
@@ -613,6 +628,7 @@ var cAjaxCalls = function() {
 			$autocomplete.insertBefore($button);
 			
 			$autocomplete.autocomplete({
+				delay: 300,
 				source: DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=' + context + '&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
 				minLength: 1,
 				focus:function(event, ui) {
@@ -650,7 +666,7 @@ var cAjaxCalls = function() {
 		
 		$textarea.focus();
 		
-		var $chooser = genericAjaxPopup(layer,'c=internal&a=chooserOpenSnippet&context=cerberusweb.contexts.snippet&contexts=' + ctx.join(','),null,false,'600');
+		var $chooser = genericAjaxPopup(layer,'c=internal&a=chooserOpenSnippet&context=cerberusweb.contexts.snippet&contexts=' + ctx.join(','),null,false,'70%');
 		
 		$chooser.on('snippet_select', function(event) {
 			event.stopPropagation();
@@ -662,7 +678,7 @@ var cAjaxCalls = function() {
 				return;
 			
 			// Now we need to read in each snippet as either 'raw' or 'parsed' via Ajax
-			var url = 'c=internal&a=snippetPaste&id='+encodeURIComponent(snippet_id);
+			var url = 'c=internal&a=snippetPaste&id=' + encodeURIComponent(snippet_id);
 			
 			// Context-dependent arguments
 			if(null != contexts[context])
@@ -673,7 +689,7 @@ var cAjaxCalls = function() {
 				if(json.has_custom_placeholders) {
 					$textarea.focus();
 					
-					var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&id=' + encodeURIComponent(json.id) + '&context_id=' + encodeURIComponent(json.context_id),null,false,'600');
+					var $popup_paste = genericAjaxPopup('snippet_paste', 'c=internal&a=snippetPlaceholders&id=' + encodeURIComponent(json.id) + '&context_id=' + encodeURIComponent(json.context_id),null,false,'50%');
 					
 					$popup_paste.bind('snippet_paste', function(event) {
 						if(null == event.text)
@@ -725,7 +741,12 @@ var cAjaxCalls = function() {
 				// Add the labels
 				for(var idx in event.labels)
 					if(0==$ul.find('input:hidden[value="'+event.values[idx]+'"]').length) {
-						var $li = $('<li/>').text(event.labels[idx]);
+						var $label = $('<a href="javascript:;" class="cerb-peek-trigger" data-context="cerberusweb.contexts.attachment" />')
+							.attr('data-context-id', event.values[idx])
+							.text(event.labels[idx])
+							.cerbPeekTrigger()
+							;
+						var $li = $('<li/>').append($label);
 						var $hidden = $('<input type="hidden">').attr('name', field_name + (options.single ? '' : '[]')).attr('value', event.values[idx]).appendTo($li);
 						var $a = $('<a href="javascript:;" onclick="$(this).parent().remove();"><span class="glyphicons glyphicons-circle-remove"></span></a>').appendTo($li);
 						
@@ -822,7 +843,17 @@ var ajax = new cAjaxCalls();
 				//layer = "peek" + Devblocks.uniqueId();
 				layer = $.md5(context + ':' + context_id + ':' + (edit_mode ? 'true' : 'false'));
 			
-			$trigger.click(function() {
+			$trigger.click(function(evt) {
+				var profile_url = $trigger.attr('data-profile-url');
+				
+				// Are they also holding SHIFT or CMD?
+				if((evt.shiftKey || evt.metaKey) && profile_url) {
+					evt.preventDefault();
+					evt.stopPropagation();
+					window.open(profile_url, '_blank');
+					return;
+				}
+				
 				var peek_url = 'c=internal&a=showPeekPopup&context=' + encodeURIComponent(context) + '&context_id=' + encodeURIComponent(context_id);
 
 				// View
@@ -1015,8 +1046,6 @@ var ajax = new cAjaxCalls();
 							$ul.trigger(evt);
 						}
 					}
-					
-					$trigger.trigger('cerb-chooser-saved');
 				});
 			});
 			
@@ -1031,6 +1060,7 @@ var ajax = new cAjaxCalls();
 				e.stopPropagation();
 				var $label = e.label;
 				var $value = e.value;
+				var icon_url = e.icon;
 				
 				if(undefined != $label && undefined != $value) {
 					if(0 == $ul.find('input:hidden[value="'+$value+'"]').length) {
@@ -1045,25 +1075,8 @@ var ajax = new cAjaxCalls();
 							.cerbPeekTrigger()
 							;
 						
-						var alias = '';
-						
-						if(context == "cerberusweb.contexts.address") {
-							alias = 'address';
-						} else if(context == "cerberusweb.contexts.contact") {
-							alias = 'contact';
-						} else if(context == "cerberusweb.contexts.group") {
-							alias = 'group';
-						} else if(context == "cerberusweb.contexts.org") {
-							alias = 'org';
-						} else if(context == "cerberusweb.contexts.worker") {
-							alias = 'worker';
-						} else if(context == "cerberusweb.contexts.virtual_attendant") {
-							alias = 'va';
-						}
-						
-						if(alias.length > 0) {
-							var url = DevblocksAppPath + 'avatars/' + alias + '/' + $value + '?v=';
-							var $img = $('<img class="cerb-avatar">').attr('src',url).prependTo($li);
+						if(icon_url && icon_url.length > 0) {
+							var $img = $('<img class="cerb-avatar">').attr('src',icon_url).prependTo($li);
 						}
 						
 						var $hidden = $('<input type="hidden">').attr('name', field_name).attr('title', $label).attr('value', $value).appendTo($li);
@@ -1103,8 +1116,8 @@ var ajax = new cAjaxCalls();
 				// When the record is saved, retrieve the id+label and make a chooser bubble
 				$button.on('cerb-peek-saved', function(e) {
 					var evt = jQuery.Event('bubble-create');
-					evt.label = e.context_label;
-					evt.value = e.context_id;
+					evt.label = e.label;
+					evt.value = e.id;
 					$ul.trigger(evt);
 				});
 				
@@ -1124,15 +1137,25 @@ var ajax = new cAjaxCalls();
 			}
 			
 			// Autocomplete
-			if($trigger.attr('data-autocomplete')) {
-				var is_autocomplete_ifnull = $trigger.attr('data-autocomplete') == 'if-null';
+			if(undefined != $trigger.attr('data-autocomplete')) {
+				var is_single = $trigger.attr('data-single');
+				var is_autocomplete_ifnull = $trigger.attr('data-autocomplete-if-empty');
 				var autocomplete_placeholders = $trigger.attr('data-autocomplete-placeholders');
 				
 				var $autocomplete = $('<input type="search" size="32">');
 				$autocomplete.insertAfter($trigger);
 				
 				$autocomplete.autocomplete({
-					source: DevblocksAppPath+'ajax.php?c=internal&a=autocomplete&context=' + context + '&_csrf_token=' + $('meta[name="_csrf_token"]').attr('content'),
+					delay: 300,
+					source: function(request, response) {
+						genericAjaxGet(
+							'',
+							'c=internal&a=autocomplete&term=' + encodeURIComponent(request.term) + '&context=' + context + '&query=' + encodeURIComponent($trigger.attr('data-autocomplete')),
+							function(json) {
+								response(json);
+							}
+						);
+					},
 					minLength: 1,
 					focus:function(event, ui) {
 						return false;
@@ -1194,9 +1217,10 @@ var ajax = new cAjaxCalls();
 				
 				$autocomplete.autocomplete('widget').css('max-width', $autocomplete.closest('form').width());
 				
-				if(is_autocomplete_ifnull) {
-					if($ul.find('>li').length > 0)
+				if(is_autocomplete_ifnull || is_single) {
+					if($ul.find('>li').length > 0) {
 						$autocomplete.hide();
+					}
 					
 					$trigger.on('cerb-chooser-saved', function() {
 						// If we have zero bubbles, show autocomplete
